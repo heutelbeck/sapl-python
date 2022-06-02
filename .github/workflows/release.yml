@@ -16,7 +16,7 @@ jobs:
 
     strategy:
       matrix:
-        packagename: [sapl_tornado]
+        packagename: [sapl_base]
 
     steps:
       - uses: actions/checkout@v3

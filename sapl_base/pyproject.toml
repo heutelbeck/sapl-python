@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 
 [project]
-name = "sapl-core"
+name = "sapl-base"
 version = "0.0.1"
 description = "initial upload to register the name for future development"
 readme = "README.md"
@@ -13,4 +13,4 @@ license = { file = "LICENSE" }
 
 
 [tools.setuptools]
-packages = ["sapl_core"]
+packages = ["sapl_base"]
