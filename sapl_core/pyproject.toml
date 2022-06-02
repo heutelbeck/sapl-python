@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "SAPL-Core"
+version = "0.0.1"
+description = "initial upload to register the name for future development"
+readme = "README.md"
+authors = [{ name = "Dominic Heutelbeck", email = "dominic@heutelbeck.com"}]
+license = { file = "LICENSE" }
+
+
+[tools.setuptools]
+packages = ["sapl_core"]
