@@ -3,10 +3,10 @@ name: release on PyPI
 on:
   push:
 #tags:
-      #- sapl-core_v*
-      #- sapl-django_v*
-      #- sapl-flask_v*
-      #- sapl-tornado_v*
+      #- sapl_base_v*
+      #- sapl_django_v*
+      #- sapl_flask_v*
+      #- sapl_tornado_v*
 
 
 jobs:
@@ -15,8 +15,9 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
-        packagename: [sapl_base]
+        packagename: [sapl_base, sapl_django, sapl_flask, sapl_tornado]
 
     steps:
       - uses: actions/checkout@v3
