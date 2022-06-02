@@ -16,7 +16,7 @@ jobs:
 
     strategy:
       matrix:
-        packagename: [sapl_core, sapl_django, sapl_flask, sapl_tornado]
+        packagename: [sapl_tornado]
 
     steps:
       - uses: actions/checkout@v3
