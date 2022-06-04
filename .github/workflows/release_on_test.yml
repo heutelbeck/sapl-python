@@ -95,7 +95,8 @@ jobs:
       with:
         packages_dir: ./${{ env.identifier }}/dist
         user: __token__
-        password: ${{ secrets.PYPI_TOKEN }}
+        password: ${{ secrets.PYPI_TEST_TOKEN }}
+        repository_url: https://test.pypi.org/legacy/
 
 
 # Remove the triggering Tag, when any job fails
