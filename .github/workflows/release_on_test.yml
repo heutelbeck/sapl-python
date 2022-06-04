@@ -1,16 +1,12 @@
-# This workflow will upload a Python Package, when specific tags are committed
-# Based on the triggering tag, a specific Python Packages of this repository will be tested and released on PyPI
-# If any job fails, the committed tag will be deleted.
-
-name: release on PyPI
+name: release on TestPyPI
 
 on:
   push:
     tags:
-      - sapl_base_v*
-      - sapl_django_v*
-      - sapl_flask_v*
-      - sapl_tornado_v*
+      - snapshot_sapl_base_v*
+      - snapshot_sapl_django_v*
+      - snapshot_sapl_flask_v*
+      - snapshot_sapl_tornado_v*
 
 
 jobs:
@@ -23,18 +19,18 @@ jobs:
     steps:
       - id: packagename
         run: |
-          if   ${{ startsWith(github.ref_name, 'sapl_base_v') }} 
+          if   ${{ startsWith(github.ref_name, 'snapshot_sapl_base_v') }} 
           then 
-            echo "::set-output name=packagename::sapl_base"
-          elif ${{ startsWith(github.ref_name, 'sapl_django_v') }} 
+            echo "::set-output name=packagename::snapshot_sapl_base"
+          elif ${{ startsWith(github.ref_name, 'snapshot_sapl_django_v') }} 
           then 
-            echo "::set-output name=packagename::sapl_django"
-          elif ${{ startsWith(github.ref_name, 'sapl_flask_v') }} 
+            echo "::set-output name=packagename::snapshot_sapl_django"
+          elif ${{ startsWith(github.ref_name, 'snapshot_sapl_flask_v') }} 
           then
-            echo "::set-output name=packagename::sapl_flask"
-          elif ${{ startsWith(github.ref_name, 'sapl_tornado_v') }} 
+            echo "::set-output name=packagename::snapshot_sapl_flask"
+          elif ${{ startsWith(github.ref_name, 'snapshot_sapl_tornado_v') }} 
           then
-            echo "::set-output name=packagename::sapl_tornado"
+            echo "::set-output name=packagename::snapshot_sapl_tornado"
           fi
         shell: bash
 
@@ -71,7 +67,7 @@ jobs:
         python -m unittest
 
 
-# Release the package on PyPI
+# Release the package on TestPyPI
   release:
     needs: [ identify-package, run-tests]
 
@@ -105,7 +101,7 @@ jobs:
 # Remove the triggering Tag, when any job fails
   remove-on-failure:
     if: ${{ failure() }}
-    needs: [ release, run-tests, identify-package ]
+    needs: [ identify-package, release, run-tests ]
     runs-on: ubuntu-latest
     steps:
       - name: remove triggering Tag
