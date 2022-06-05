@@ -17,6 +17,9 @@ jobs:
       packagename: ${{ steps.identifier.outputs.packagename }}
     runs-on: ubuntu-latest
     steps:
+      - name: allow only push to master
+        if: ${{ !(github.event.base_ref == 'refs/heads/master') }}
+        run: exit 1
       - id: packagename
         run: |
           if   ${{ startsWith(github.ref_name, 'snapshot_sapl_base_v') }} 
