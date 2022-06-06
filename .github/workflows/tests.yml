@@ -1,4 +1,4 @@
-name: outputtesting
+name: Test push and pull-request to Master
 
 on:
   push:
