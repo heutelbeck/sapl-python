@@ -26,14 +26,14 @@ class TestAuthorizationSubscription:
                                                                            subscription_id=subscription_id)]
 
     @pytest.mark.parametrize("test_input", authorization_subscriptions)
-    def test_authorization_subscription_repr_can_eval_object(self, test_input):
+    def test_authorization_subscription_from_representative(self, test_input):
         rep = repr(test_input)
         obj = eval(rep)
         assert str(obj) == str(test_input)
         assert obj == test_input
 
     @pytest.mark.parametrize("test_input", authorization_subscriptions_with_keywords)
-    def test_create_authorization_subscription_with_keywords_repr_can_eval_object(self, test_input):
+    def test_create_authorization_subscription_with_keywords_from_representative(self, test_input):
         rep = repr(test_input)
         obj = eval(rep)
         assert str(obj) == str(test_input)
@@ -63,14 +63,14 @@ class TestMultiSubscription:
         MultiSubscription(authorization_subscriptions=authorization_subscriptions)]
 
     @pytest.mark.parametrize("test_input", multi_subscription)
-    def test_create_authorization_subscription_from_representative(self, test_input):
+    def test_create_multi_subscription_from_representative(self, test_input):
         rep_obj = repr(test_input)
         recreation = eval(rep_obj)
         assert str(recreation) == str(test_input)
         assert recreation == test_input
 
     @pytest.mark.parametrize("test_input", multi_subscription_with_keywords)
-    def test_create_authorization_subscription_from_representative(self, test_input):
+    def test_create_multi_subscription_with_keywords_from_representative(self, test_input):
         rep_obj = repr(test_input)
         recreation = eval(rep_obj)
         assert str(recreation) == str(test_input)
