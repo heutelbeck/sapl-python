@@ -8,8 +8,13 @@ name = "SAPL-Base"
 version = "0.0.2"
 description = "initial upload to register the name for future development"
 readme = "README.md"
-authors = [{ name = "Dominic Heutelbeck", email = "dominic@heutelbeck.com"}]
+authors = [{ name = "Dominic Heutelbeck", email = "dominic@heutelbeck.com" }]
 license = { file = "LICENSE" }
+
+[project.optional-dependencies]
+tests = [
+    "pytest",
+]
 
 
 [tools.setuptools]
