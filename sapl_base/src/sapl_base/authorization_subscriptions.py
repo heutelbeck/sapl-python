@@ -27,7 +27,7 @@ class AuthorizationSubscription:
         """
         dictionary = self._clean_dict()
         representative = "',".join(element + "='" + dictionary.get(element) for element in dictionary)
-        return "AuthorizationSubscription(" + representative + "')"
+        return f"{type(self).__name__}({representative})"
 
     def __eq__(self, other):
         try:
@@ -79,7 +79,7 @@ class MultiSubscription:
         for element in dictionary:
             if element is None: del element
         representative = ",".join(element + "=" + str(dictionary.get(element)) for element in dictionary)
-        return "MultiSubscription(" + representative + ")"
+        return f"{type(self).__name__}({representative})"
 
     def __str__(self):
         """
