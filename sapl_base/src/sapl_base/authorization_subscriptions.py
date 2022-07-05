@@ -8,8 +8,9 @@ class AuthorizationSubscription:
     Build the authorization subscription for the SAPL-Server in json-format
     """
 
-    def __init__(self, subject: str = None, action: str = None, resource: str = None, environment: str = None,
-                 subscription_id: str = None):
+    def __init__(self, subject: dict | list = None, action: dict | list = None, resource: dict | list = None,
+                 environment: dict | list = None,
+                 subscription_id: int = None):
 
         self.subject = subject
         self.action = action
@@ -18,7 +19,7 @@ class AuthorizationSubscription:
         if subscription_id is not None:
             self.subscription_id = subscription_id
         else:
-            self.subscription_id = str(id(self))
+            self.subscription_id = id(self)
 
     def __repr__(self):
         """
@@ -26,7 +27,7 @@ class AuthorizationSubscription:
         usually eval will convert it back to that object
         """
         dictionary = self._clean_dict()
-        representative = "',".join(element + "='" + dictionary.get(element) for element in dictionary)
+        representative = ",".join(element + "=" + str(dictionary.get(element)) for element in dictionary)
         return f"{type(self).__name__}({representative})"
 
     def __eq__(self, other):
@@ -60,8 +61,9 @@ class AuthorizationSubscription:
 
 class MultiSubscription:
     def __init__(
-            self, subject=None, action=None, resource=None, environment=None,
-            authorization_subscriptions=None,
+            self, subject: dict | list = None, action: dict | list = None, resource: dict | list = None,
+            environment: dict | list = None,
+            authorization_subscriptions: dict | list = None,
     ):
 
         self.subject = subject

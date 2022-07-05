@@ -1,14 +1,15 @@
 import pytest
 
+from sapl_base.authorization_subscription_builder import BaseAuthorizationSubscriptionBuilder
 from sapl_base.authorization_subscriptions import AuthorizationSubscription, MultiSubscription
 
 
 class TestAuthorizationSubscription:
-    subject = "Subject"
-    action = "Action"
-    resource = "Resource"
-    environment = "Environment"
-    subscription_id = "Subscription_id"
+    subject = {"user": "bernd"}
+    action = {"function": "testfunction", "requestType": "GET"}
+    resource = {"Port": 8888}
+    environment = [{"hometown": "London"}]
+    subscription_id = 55433
 
     authorization_subscriptions = [AuthorizationSubscription(subject), AuthorizationSubscription(None, action),
                                    AuthorizationSubscription(None, None, resource),
@@ -41,10 +42,10 @@ class TestAuthorizationSubscription:
 
 
 class TestMultiSubscription:
-    subjects = ["subject_1", "subject_2"]
-    actions = ["action_1", "action_2"]
-    resources = ["resource_1", "resource_2"]
-    environments = ["environment_1", "environment_2"]
+    subjects = [{"subject_1": "nutzer2"}, {"subject_2": "nutzer"}]
+    actions = [{"action_1": "action"}, {"action_2": "action_2"}]
+    resources = [{"resource_1": "function_1"}, {"resource_2": "function_2"}]
+    environments = [{"environment_1": "environment_1"}, {"environment_2": "environment_2"}]
     authorization_subscriptions = [{"id_1": {"subjectId": 0, "actionID": 0, "resourceId": 0, "environmentId": 0}},
                                    {"id_2": {"subjectId": 1, "actionID": 1, "resourceId": 1, "environmentId": 1}}]
 
