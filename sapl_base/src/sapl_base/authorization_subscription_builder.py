@@ -39,50 +39,73 @@ class BaseAuthorizationSubscriptionBuilder:
         else:
             self.set_environment_filter(self._environment_filter)
 
-    def _filter_values(self, values: dict, sapl_filter):
+    def _get_attributes_from_dict(self, values, dictionary, authorization_subscription_dictionary):
+        for k, v in dictionary.items():
+            try:
+                if values.__contains__(k):
+                    authorization_subscription_dictionary[k] = self._filter_attributes_for_authorization_subscription(
+                        values[k], v)
+            except(TypeError, AttributeError):
+                try:
+                    if hasattr(values, k):
+                        authorization_subscription_dictionary[
+                            k] = self._filter_attributes_for_authorization_subscription(getattr(values, k), v)
+                except(TypeError, AttributeError):
+                    pass
+
+    def _add_attribute_to_authorization_subscription(self, values, element, dictionary):
+        try:
+            if values.__contains__(element):
+                if not callable(values[element]):
+                    dictionary[element] = values.get(element)
+        except(TypeError, AttributeError):
+            try:
+                if hasattr(values, element):
+                    dictionary[element] = getattr(values, element)
+            except(TypeError, AttributeError):
+                pass
+
+    def _filter_attributes_for_authorization_subscription(self, values, sapl_filter):
         dic = dict()
         try:
-            if isinstance(sapl_filter, list):
+            if isinstance(sapl_filter, list or tuple or set or range):
                 for element in sapl_filter:
                     if isinstance(element, dict):
-                        for k, v in element.items():
-                            if values.__contains__(k):
-                                dic[k] = self._filter_values(values[k], v)
-                    elif values.__contains__(element):
-                        dic[element] = values.get(element)
+                        self._get_attributes_from_dict(values, element, dic)
+
+                    else:
+                        self._add_attribute_to_authorization_subscription(values, element, dic)
 
             elif isinstance(sapl_filter, dict):
-                for k, v in sapl_filter.items():
-                    if values.__contains__(k):
-                        dic[k] = self._filter_values(values[k], v)
+                self._get_attributes_from_dict(values, sapl_filter, dic)
 
             else:
-                if values.__contains__(sapl_filter):
-                    dic[sapl_filter] = values.get(sapl_filter)
+                self._add_attribute_to_authorization_subscription(values, sapl_filter, dic)
 
-        except (TypeError, IndexError):
+        except (TypeError, AttributeError):
             pass
         return dic
 
     def set_subject_filter(self, subject_filter):
         self._subject_filter = subject_filter
         if self._original_subject is None:
-            self.subject = self._filter_values(self._values, self._subject_filter)
+            self.subject = self._filter_attributes_for_authorization_subscription(self._values, self._subject_filter)
 
     def set_action_filter(self, action_filter):
         self._action_filter = action_filter
         if self._original_action is None:
-            self.action = self._filter_values(self._values, self._action_filter)
+            self.action = self._filter_attributes_for_authorization_subscription(self._values, self._action_filter)
 
     def set_resource_filter(self, resource_filter):
         self._resource_filter = resource_filter
         if self._original_resource is None:
-            self.resource = self._filter_values(self._values, self._resource_filter)
+            self.resource = self._filter_attributes_for_authorization_subscription(self._values, self._resource_filter)
 
     def set_environment_filter(self, environment_filter):
         self._environment_filter = environment_filter
         if self._original_environment is None:
-            self.environment = self._filter_values(self._values, self._environment_filter)
+            self.environment = self._filter_attributes_for_authorization_subscription(self._values,
+                                                                                      self._environment_filter)
 
     def set_values(self, values: dict):
         self._values = values
