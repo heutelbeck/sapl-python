@@ -8,7 +8,6 @@ class BaseAuthorizationSubscriptionBuilder:
                  environment_filter=None):
 
         self._values = values
-
         self._original_subject = subject
         self._original_action = action
         self._original_resource = resource
@@ -45,6 +44,9 @@ class BaseAuthorizationSubscriptionBuilder:
                 if values.__contains__(k):
                     authorization_subscription_dictionary[k] = self._filter_attributes_for_authorization_subscription(
                         values[k], v)
+                if (values.__len__()-1) >= k:
+                    authorization_subscription_dictionary[k] = self._filter_attributes_for_authorization_subscription(
+                        values[k], v)
             except(TypeError, AttributeError):
                 try:
                     if hasattr(values, k):
@@ -58,6 +60,9 @@ class BaseAuthorizationSubscriptionBuilder:
             if values.__contains__(element):
                 if not callable(values[element]):
                     dictionary[element] = values.get(element)
+            if (values.__len__() - 1) >= element:
+                if not callable(values[element]):
+                    dictionary[element] = values.get(element)
         except(TypeError, AttributeError):
             try:
                 if hasattr(values, element):
@@ -68,7 +73,7 @@ class BaseAuthorizationSubscriptionBuilder:
     def _filter_attributes_for_authorization_subscription(self, values, sapl_filter):
         dic = dict()
         try:
-            if isinstance(sapl_filter, list or tuple or set or range):
+            if isinstance(sapl_filter, (list, tuple, set, range)):
                 for element in sapl_filter:
                     if isinstance(element, dict):
                         self._get_attributes_from_dict(values, element, dic)
