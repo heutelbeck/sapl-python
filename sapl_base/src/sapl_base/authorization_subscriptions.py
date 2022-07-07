@@ -8,10 +8,12 @@ class AuthorizationSubscription:
     Build the authorization subscription for the SAPL-Server in json-format
     """
 
-    def __init__(self, subject: dict | list = None, action: dict | list = None, resource: dict | list = None,
-                 environment: dict | list = None,
+    def __init__(self, subject=None, action=None, resource=None,
+                 environment=None,
                  subscription_id: int = None):
-
+        if not (isinstance(subscription_id, int) or subscription_id is None):
+            raise TypeError(
+                f"subscription_id must be an int, was {subscription_id} type of {subscription_id.__class__}")
         self.subject = subject
         self.action = action
         self.resource = resource
@@ -61,9 +63,9 @@ class AuthorizationSubscription:
 
 class MultiSubscription:
     def __init__(
-            self, subject: dict | list = None, action: dict | list = None, resource: dict | list = None,
-            environment: dict | list = None,
-            authorization_subscriptions: dict | list = None,
+            self, subject=None, action=None, resource=None,
+            environment=None,
+            authorization_subscriptions=None,
     ):
 
         self.subject = subject

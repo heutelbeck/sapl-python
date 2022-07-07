@@ -1,40 +1,92 @@
 import pytest
 
-from sapl_base.authorization_subscription_builder import BaseAuthorizationSubscriptionBuilder
 from sapl_base.authorization_subscriptions import AuthorizationSubscription, MultiSubscription
 
 
 class TestAuthorizationSubscription:
-    subject = {"user": "bernd"}
-    action = {"function": "testfunction", "requestType": "GET"}
-    resource = {"Port": 8888}
-    environment = [{"hometown": "London"}]
+    basic_subject = {"user": "basic_user"}
+    basic_action = {"requestType": "GET"}
+    basic_resource = {"Port": 8888}
+    basic_environment = {"hometown": "London"}
+
+    list_subject = [{"admin_user": "admin_list_user"}, {"basic_user": "basic_list_user"}]
+    set_action = {"set_function": {"set_function_1", "set_function_2"}}, {"set_request": {"set_GET", "set_POST"}}
+    tuple_resource = ({"tuple_resource": "resource"}, {"tuple_port": 5555})
+    nested_environment = {
+        "Land": ({"Deutschland": ["Koeln", "Bonn", "Berlin"]}, {"US": {"State": ("Florida", "New York", "Washington")}},
+                 "Frankreich")}
+
     subscription_id = 55433
+    failing_subscription_id = "subscription_id"
+    basic_authorization_subscriptions = [AuthorizationSubscription(basic_subject),
+                                         AuthorizationSubscription(None, basic_action),
+                                         AuthorizationSubscription(None, None, basic_resource),
+                                         AuthorizationSubscription(None, None, None, basic_environment),
+                                         AuthorizationSubscription(None, None, None, None, subscription_id),
+                                         AuthorizationSubscription(basic_subject, basic_action, basic_resource,
+                                                                   basic_environment)]
 
-    authorization_subscriptions = [AuthorizationSubscription(subject), AuthorizationSubscription(None, action),
-                                   AuthorizationSubscription(None, None, resource),
-                                   AuthorizationSubscription(None, None, None, environment),
-                                   AuthorizationSubscription(None, None, None, None, subscription_id),
-                                   AuthorizationSubscription(subject, action, resource, environment)]
+    complex_authorization_subscriptions = [AuthorizationSubscription(list_subject),
+                                           AuthorizationSubscription(None, set_action),
+                                           AuthorizationSubscription(None, None, tuple_resource),
+                                           AuthorizationSubscription(None, basic_action, None, nested_environment),
+                                           AuthorizationSubscription(None, None, None, None, subscription_id),
+                                           AuthorizationSubscription(list_subject, set_action, tuple_resource,
+                                                                     nested_environment)]
 
-    authorization_subscriptions_with_keywords = [AuthorizationSubscription(subject=subject),
-                                                 AuthorizationSubscription(action=action),
-                                                 AuthorizationSubscription(resource=resource),
-                                                 AuthorizationSubscription(environment=environment),
-                                                 AuthorizationSubscription(subscription_id=subscription_id),
-                                                 AuthorizationSubscription(subject=subject, action=action,
-                                                                           resource=resource, environment=environment,
-                                                                           subscription_id=subscription_id)]
+    basic_authorization_subscriptions_with_keywords = [
+        AuthorizationSubscription(subject=basic_subject, environment=basic_environment),
+        AuthorizationSubscription(action=basic_action),
+        AuthorizationSubscription(resource=basic_resource),
+        AuthorizationSubscription(environment=basic_environment, action=basic_action),
+        AuthorizationSubscription(subscription_id=subscription_id),
+        AuthorizationSubscription(subject=basic_subject,
+                                  action=basic_action,
+                                  resource=basic_resource,
+                                  environment=basic_environment,
+                                  subscription_id=subscription_id)]
 
-    @pytest.mark.parametrize("test_input", authorization_subscriptions)
-    def test_authorization_subscription_from_representative(self, test_input):
+    complex_authorization_subscriptions_with_keywords = [AuthorizationSubscription(subject=list_subject),
+                                                         AuthorizationSubscription(action=set_action,
+                                                                                   subject=list_subject),
+                                                         AuthorizationSubscription(resource=tuple_resource,
+                                                                                   environment=nested_environment),
+                                                         AuthorizationSubscription(environment=nested_environment,
+                                                                                   action=set_action),
+                                                         AuthorizationSubscription(subscription_id=subscription_id),
+                                                         AuthorizationSubscription(subject=list_subject,
+                                                                                   action=set_action,
+                                                                                   resource=tuple_resource,
+                                                                                   environment=nested_environment,
+                                                                                   subscription_id=subscription_id)]
+
+    @pytest.mark.parametrize("test_input", basic_authorization_subscriptions)
+    def test_basic_authorization_subscription_from_representative(self, test_input):
         rep = repr(test_input)
         obj = eval(rep)
         assert str(obj) == str(test_input)
         assert obj == test_input
 
-    @pytest.mark.parametrize("test_input", authorization_subscriptions_with_keywords)
-    def test_create_authorization_subscription_with_keywords_from_representative(self, test_input):
+    @pytest.mark.parametrize("test_input", complex_authorization_subscriptions)
+    def test_complex_authorization_subscription_from_representative(self, test_input):
+        rep = repr(test_input)
+        obj = eval(rep)
+        assert str(obj) == str(test_input)
+        assert obj == test_input
+
+    def test_wrong_subsription_id_type(self):
+        with pytest.raises(TypeError):
+            AuthorizationSubscription(None, None, None, None, self.failing_subscription_id)
+
+    @pytest.mark.parametrize("test_input", basic_authorization_subscriptions_with_keywords)
+    def test_basic_authorization_subscription_with_keywords_from_representative(self, test_input):
+        rep = repr(test_input)
+        obj = eval(rep)
+        assert str(obj) == str(test_input)
+        assert obj == test_input
+
+    @pytest.mark.parametrize("test_input", complex_authorization_subscriptions_with_keywords)
+    def test_complex_authorization_subscription_with_keywords_from_representative(self, test_input):
         rep = repr(test_input)
         obj = eval(rep)
         assert str(obj) == str(test_input)
