@@ -1,4 +1,4 @@
-from .authorization_subscriptions import AuthorizationSubscription
+from .authorization_subscriptions import AuthorizationSubscription, MultiSubscription
 
 
 class BaseAuthorizationSubscriptionBuilder:
@@ -121,28 +121,79 @@ class BaseAuthorizationSubscriptionBuilder:
 
     def _remove_empty_dicts(self, dictionary: dict):
         dict_copy = dictionary.copy()
-
         for k, v in dictionary.items():
-
             if isinstance(v, dict):
                 dict_copy[k] = self._remove_empty_dicts(v)
 
             if dict_copy[k] is None:
                 dict_copy.pop(k)
 
-        if dict_copy.__len__() == 0:
+        if not dict_copy:
             return None
 
         return dict_copy
 
-    @classmethod
-    def construct_authorization_subscription_builder_for_httprequest(cls, request: dict, subject=None, action=None,
-                                                                     resource=None,
-                                                                     environment=None):
-        subject_filter = ['user']
-        action_filter = None
-        resource_filter = None
-        environment_filter = None
-        return BaseAuthorizationSubscriptionBuilder(request, subject, action, resource, environment, subject_filter,
-                                                    action_filter, resource_filter,
-                                                    environment_filter)
+    # @classmethod
+    # def construct_authorization_subscription_builder_for_httprequest(cls, request: dict, subject=None, action=None,
+    #                                                                  resource=None,
+    #                                                                  environment=None):
+    #     subject_filter = ['user']
+    #     action_filter = None
+    #     resource_filter = None
+    #     environment_filter = None
+    #     return BaseAuthorizationSubscriptionBuilder(request, subject, action, resource, environment, subject_filter,
+    #                                                 action_filter, resource_filter,
+    #                                                 environment_filter)
+
+
+class MultiSubscriptionBuilder:
+    SUBJECT_ID = "subjectID"
+    ACTION_ID = "actionID"
+    RESOURCE_ID = "resourceID"
+    ENVIRONMENT_ID = "environmentID"
+    AUTHORIZATION_SUBSCRIPTION_ID = "authorization_subscriptionID"
+
+    def __init__(self):
+        self.subject = []
+        self.action = []
+        self.resource = []
+        self.environment = []
+        self.authorization_subscription = []
+
+    def add_authorization_subscription(self, authorization_subscription: AuthorizationSubscription):
+        dic = dict()
+        self._add_subject(authorization_subscription, dic)
+        self._add_action(authorization_subscription, dic)
+        self._add_resource(authorization_subscription, dic)
+        self._add_environment(authorization_subscription, dic)
+        self.authorization_subscription.append({authorization_subscription.subscription_id: dic})
+
+    def _add_subject(self, authorization_subscription: AuthorizationSubscription, dictionary: dict):
+        if authorization_subscription.subject:
+            self.subject.append(authorization_subscription.subject)
+            dictionary[self.SUBJECT_ID] = len(self.subject) - 1
+
+    def _add_action(self, authorization_subscription: AuthorizationSubscription, dictionary: dict):
+        if authorization_subscription.action:
+            self.action.append(authorization_subscription.action)
+            dictionary[self.ACTION_ID] = len(self.action) - 1
+
+    def _add_resource(self, authorization_subscription: AuthorizationSubscription, dictionary: dict):
+        if authorization_subscription.resource:
+            self.resource.append(authorization_subscription.resource)
+            dictionary[self.RESOURCE_ID] = len(self.resource) - 1
+
+    def _add_environment(self, authorization_subscription: AuthorizationSubscription, dictionary: dict):
+        if authorization_subscription.environment:
+            self.environment.append(authorization_subscription.environment)
+            dictionary[self.ENVIRONMENT_ID] = len(self.environment) - 1
+
+    def _remove_empty_list(self, subscription_list):
+        if not subscription_list:
+            return None
+        return subscription_list
+
+    def create_multi_subscription(self):
+        return MultiSubscription(self._remove_empty_list(self.subject), self._remove_empty_list(self.action),
+                                 self._remove_empty_list(self.resource), self._remove_empty_list(self.environment),
+                                 self._remove_empty_list(self.authorization_subscription))
