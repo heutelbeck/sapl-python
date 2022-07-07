@@ -4,7 +4,7 @@ from sapl_base.authorization_subscriptions import AuthorizationSubscription, Mul
 
 
 class TestAuthorizationSubscription:
-    basic_subject = {"user": "basic_user"}
+    basic_subject = "basic_user"
     basic_action = {"requestType": "GET"}
     basic_resource = {"Port": 8888}
     basic_environment = {"hometown": "London"}
@@ -92,6 +92,13 @@ class TestAuthorizationSubscription:
         assert str(obj) == str(test_input)
         assert obj == test_input
 
+    not_equal_data = ["testinput", 5, AuthorizationSubscription("5")]
+
+    @pytest.mark.parametrize("test_input", not_equal_data)
+    def test_authorization_subscription_not_equal(self, test_input):
+        authorization_subscription = AuthorizationSubscription("subject")
+        assert authorization_subscription.__eq__(test_input) == False
+
 
 class TestMultiSubscription:
     subjects = [{"subject_1": "nutzer2"}, {"subject_2": "nutzer"}]
@@ -128,3 +135,10 @@ class TestMultiSubscription:
         recreation = eval(rep_obj)
         assert str(recreation) == str(test_input)
         assert recreation == test_input
+
+    not_equal_data = ["testinput", 5, MultiSubscription(["5", {"subject": "user"}])]
+
+    @pytest.mark.parametrize("test_input", not_equal_data)
+    def test_authorization_subscription_not_equal(self, test_input):
+        authorization_subscription = MultiSubscription(["subject"])
+        assert authorization_subscription.__eq__(test_input) == False
