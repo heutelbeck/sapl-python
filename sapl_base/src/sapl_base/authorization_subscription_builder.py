@@ -1,7 +1,7 @@
 from .authorization_subscriptions import AuthorizationSubscription, MultiSubscription
 
 
-class BaseAuthorizationSubscriptionBuilder:
+class BaseAuthorizationSubscriptionFactory:
 
     def __init__(self, values: dict, subject=None, action=None, resource=None, environment=None,
                  subject_filter=None, action_filter=None, resource_filter=None,
@@ -61,7 +61,7 @@ class BaseAuthorizationSubscriptionBuilder:
                 if not callable(values[element]):
                     dictionary[element] = values.get(element)
             if (values.__len__() - 1) >= element:
-                if not callable(values[element]):
+                if not callable(values[element]): # str(values[element]) doesnt contain string 'object at 0x'
                     dictionary[element] = values.get(element)
         except(TypeError, AttributeError):
             try:
@@ -95,22 +95,26 @@ class BaseAuthorizationSubscriptionBuilder:
         self._subject_filter = subject_filter
         if self._original_subject is None:
             self.subject = self._filter_attributes_for_authorization_subscription(self._values, self._subject_filter)
+        return self
 
     def set_action_filter(self, action_filter):
         self._action_filter = action_filter
         if self._original_action is None:
             self.action = self._filter_attributes_for_authorization_subscription(self._values, self._action_filter)
+        return self
 
     def set_resource_filter(self, resource_filter):
         self._resource_filter = resource_filter
         if self._original_resource is None:
             self.resource = self._filter_attributes_for_authorization_subscription(self._values, self._resource_filter)
+        return self
 
     def set_environment_filter(self, environment_filter):
         self._environment_filter = environment_filter
         if self._original_environment is None:
             self.environment = self._filter_attributes_for_authorization_subscription(self._values,
                                                                                       self._environment_filter)
+        return self
 
     def set_values(self, values: dict):
         self._values = values
@@ -118,6 +122,7 @@ class BaseAuthorizationSubscriptionBuilder:
         self.set_action_filter(self._action_filter)
         self.set_resource_filter(self._resource_filter)
         self.set_environment_filter(self._environment_filter)
+        return self
 
     def create_authorization_subscription(self) -> AuthorizationSubscription:
         return AuthorizationSubscription(self._remove_empty_dicts(self.subject), self._remove_empty_dicts(self.action),
@@ -159,13 +164,14 @@ class MultiSubscriptionBuilder:
     AUTHORIZATION_SUBSCRIPTION_ID = "authorization_subscriptionID"
 
     def __init__(self):
+        self._built = False
         self.subject = []
         self.action = []
         self.resource = []
         self.environment = []
         self.authorization_subscription = []
 
-    def add_authorization_subscription(self, authorization_subscription: AuthorizationSubscription):
+    def with_authorization_subscription(self, authorization_subscription: AuthorizationSubscription):
         dic = dict()
         self._add_subject(authorization_subscription, dic)
         self._add_action(authorization_subscription, dic)
@@ -198,7 +204,10 @@ class MultiSubscriptionBuilder:
             return None
         return subscription_list
 
-    def create_multi_subscription(self):
+    def build(self):
+        if self._built:
+            raise Exception("already built")
+        self._built = True
         return MultiSubscription(self._remove_empty_list(self.subject), self._remove_empty_list(self.action),
                                  self._remove_empty_list(self.resource), self._remove_empty_list(self.environment),
                                  self._remove_empty_list(self.authorization_subscription))

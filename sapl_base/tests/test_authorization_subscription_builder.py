@@ -1,10 +1,12 @@
+import inspect
 from unittest import mock
 
 import pytest
 
 from contextlib import nullcontext as does_not_raise
-from sapl_base.authorization_subscription_builder import BaseAuthorizationSubscriptionBuilder, MultiSubscriptionBuilder
+from sapl_base.authorization_subscription_builder import BaseAuthorizationSubscriptionFactory, MultiSubscriptionBuilder
 from sapl_base.authorization_subscriptions import AuthorizationSubscription, MultiSubscription
+from sapl_base.policy_decision_points import BaseRemotePolicyDecisionPoint, DummyPolicyDecisionPoint
 
 
 class TestMultiSubscriptionBuilder:
@@ -46,7 +48,7 @@ class TestMultiSubscriptionBuilder:
         multi = MultiSubscriptionBuilder()
         # Add every AuthorizationSubscription
         for element in test_input:
-            multi.add_authorization_subscription(element)
+            multi.with_authorization_subscription(element)
 
         # Iterate through every Element of the authorization_subscription list of the MultiSubscriptionBuilder
         for subscription in multi.authorization_subscription:
@@ -80,8 +82,8 @@ class TestMultiSubscriptionBuilder:
     def test_create_multi_subscription(self, test_input):
         multi = MultiSubscriptionBuilder()
         for element in test_input:
-            multi.add_authorization_subscription(element)
-        subscription = multi.create_multi_subscription()
+            multi.with_authorization_subscription(element)
+        subscription = multi.build()
         assert isinstance(subscription, MultiSubscription)
 
 
@@ -101,18 +103,18 @@ class TestAuthorizationSubscriptionBuilder:
 
     @pytest.fixture
     def basic_authorization_subscription_builder_with_values(self, basic_values_dict):
-        return BaseAuthorizationSubscriptionBuilder(basic_values_dict)
+        return BaseAuthorizationSubscriptionFactory(basic_values_dict)
 
     @pytest.fixture
     def basic_authorization_subscription_builder_with_values_and_filter(self, basic_values_dict):
-        return BaseAuthorizationSubscriptionBuilder(basic_values_dict, subject_filter="subject_entry",
+        return BaseAuthorizationSubscriptionFactory(basic_values_dict, subject_filter="subject_entry",
                                                     action_filter="action_entry",
                                                     resource_filter="resource_entry",
                                                     environment_filter="environment_entry")
 
     @pytest.fixture
     def basic_authorization_subscription_builder_with_static_values(self, basic_values_dict):
-        return BaseAuthorizationSubscriptionBuilder(basic_values_dict, "static_subject", "static_action",
+        return BaseAuthorizationSubscriptionFactory(basic_values_dict, "static_subject", "static_action",
                                                     "static_resource", "static_environment")
 
     def test_change_subject_filter_on_builder_with_static_subject_doesnt_change_entry(self,
@@ -181,7 +183,7 @@ class TestAuthorizationSubscriptionBuilder:
         assert basic_authorization_subscription_builder_with_values.environment == self.environment
 
     def test_set_values_adds_entry(self, basic_values_dict):
-        authorization_subscription_builder = BaseAuthorizationSubscriptionBuilder(dict(),
+        authorization_subscription_builder = BaseAuthorizationSubscriptionFactory(dict(),
                                                                                   subject_filter="subject_entry",
                                                                                   action_filter="action_entry",
                                                                                   resource_filter="resource_entry",
@@ -199,7 +201,7 @@ class TestAuthorizationSubscriptionBuilder:
                     authorization_subscription_builder.environment == self.environment])
 
     def test_create_authorization_subscription(self):
-        authorization_subscription_builder = BaseAuthorizationSubscriptionBuilder(
+        authorization_subscription_builder = BaseAuthorizationSubscriptionFactory(
             dict(subject="subject_value",
                  action={"action_value": [1, 2], "action_value_2": "actionval"},
                  resource="resource_value",
@@ -239,8 +241,6 @@ class TestAuthorizationSubscriptionBuilder:
 
     @pytest.mark.parametrize("example_input,expect", test_init_authorization_subscription_builder_params)
     def test_basic_init_authorization_subscription_builder(self, example_input, expect):
-        builder = BaseAuthorizationSubscriptionBuilder(values=example_input['values'], subject=example_input['subject'],
+        builder = BaseAuthorizationSubscriptionFactory(values=example_input['values'], subject=example_input['subject'],
                                                        subject_filter=example_input['subject_filter'])
         assert builder.subject == expect['subject']
-
-
