@@ -10,7 +10,7 @@ class TestAuthorizationSubscription:
     basic_environment = {"hometown": "London"}
 
     list_subject = [{"admin_user": "admin_list_user"}, {"basic_user": "basic_list_user"}]
-    set_action = {"set_function": {"set_function_1", "set_function_2"}}, {"set_request": {"set_GET", "set_POST"}}
+    set_action = {"set_function": {"set_function_1"}}, {"set_request": {"set_GET"}}
     tuple_resource = ({"tuple_resource": "resource"}, {"tuple_port": 5555})
     nested_environment = {
         "Land": ({"Deutschland": ["Koeln", "Bonn", "Berlin"]}, {"US": {"State": ("Florida", "New York", "Washington")}},
@@ -32,7 +32,8 @@ class TestAuthorizationSubscription:
                                            AuthorizationSubscription(None, basic_action, None, nested_environment),
                                            AuthorizationSubscription(None, None, None, None, subscription_id),
                                            AuthorizationSubscription(list_subject, set_action, tuple_resource,
-                                                                     nested_environment)]
+                                                                     nested_environment)
+                                           ]
 
     basic_authorization_subscriptions_with_keywords = [
         AuthorizationSubscription(subject=basic_subject, environment=basic_environment),

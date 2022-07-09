@@ -1,6 +1,6 @@
 import pytest
 
-from sapl_base.authorization_subscription_builder import BaseAuthorizationSubscriptionFactory, MultiSubscriptionBuilder
+from sapl_base.authorization_subscription_factory import BaseAuthorizationSubscriptionFactory, MultiSubscriptionBuilder
 from sapl_base.authorization_subscriptions import AuthorizationSubscription, MultiSubscription
 
 
