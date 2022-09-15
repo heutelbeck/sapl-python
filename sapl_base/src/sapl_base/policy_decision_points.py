@@ -1,14 +1,16 @@
-# Kann allgemein verwendet werden und Frameworkunabhängig
 import logging
-from abc import ABC, abstractmethod
+from abc import ABC
 from base64 import b64encode
+
+import aiohttp
+import requests
 
 from sapl_base.authorization_subscriptions import AuthorizationSubscription
 
 
 class PolicyDecisionPoint(ABC):
     DEFAULT_POLICY_DECISION_POINT_SETTINGS = {
-        "base_url": "https://localhost:8443/api/pdp/",
+        "base_url": "http://localhost:8443/api/pdp/",
         "key": "YJidgyT2mfdkbmL",
         "secret": "Fa4zvYQdiwHZVXh",
         "verify": False,
@@ -17,45 +19,11 @@ class PolicyDecisionPoint(ABC):
 
     headers = {"Content-type": "application/json"}
 
-    def __init__(self, base_url=None, key=None, secret=None, verify=None, dummy=None):
-        if dummy:
-            return
-        self.base_url = base_url
-        self.verify = verify
-        if (self.verify is None) or (self.base_url is None):
-            raise Exception("No valid configuration for the PDP")
-        if key is not None:
-            key_and_secret = b64encode(str.encode(f"{key}:{secret}")).decode("ascii")
-            self.headers["Authorization"] = f"Basic {key_and_secret}"
-
-    @abstractmethod
-    async def decide(self, subscription: AuthorizationSubscription, decision_events="decide"):
-        """
-        Interface decide of the PolicyDecisionPoint
-        :type subscription: json
-        :param subscription: AuthorizationSubscription for send request
-        :param decision_events: type of request for the SAPL-Server
-        to the Remoteserver
-        """
-        pass
-
-    @abstractmethod
-    async def decide_once(
-            self, subscription: AuthorizationSubscription, decision_events="decide"
-    ):
-        """
-        Interface decide_once of the PolicyDecisionPoint
-        :type subscription: json
-        :param subscription: AuthorizationSubscription for send request
-        to the SAPL-Server
-        :param decision_events: type of request for the SAPL-Server
-        """
-        pass
-
+    # Determine how to get a Remote PDP from settings independent from the Framework
+    # Maybe with a toml file
     @classmethod
-    @abstractmethod
     def from_settings(cls):
-        pass
+        return RemotePolicyDecisionPoint()
 
     @classmethod
     def dummy_pdp(cls):
@@ -76,14 +44,14 @@ class DummyPolicyDecisionPoint(PolicyDecisionPoint):
             "PURPOSE ONLY!"
         )
 
-    def decide(self, subscription: AuthorizationSubscription, decision_events="decide"):
+    async def decide(self, subscription: AuthorizationSubscription, decision_events="decide"):
         """
         The method give back always PERMIT for the interface decide
         """
 
-        return {"decision": "PERMIT"}
+        yield {"decision": "PERMIT"}
 
-    def decide_once(
+    async def decide_once(
             self, subscription: AuthorizationSubscription, decision_events="decide"
     ):
         """
@@ -91,22 +59,121 @@ class DummyPolicyDecisionPoint(PolicyDecisionPoint):
         """
         return {"decision": "PERMIT"}
 
-    @classmethod
-    def from_settings(cls):
-        raise Exception("DummyPolicyDecisionPoints can't be created from settings")
 
+class RemotePolicyDecisionPoint(PolicyDecisionPoint):
+    DEFAULT_POLICY_DECISION_POINT_SETTINGS = {
+        "base_url": "http://localhost:8443/api/pdp/",
+        "key": "YJidgyT2mfdkbmL",
+        "secret": "Fa4zvYQdiwHZVXh",
+        "verify": False,
+    }
+    headers = {"Content-type": "application/json"}
 
-class BaseRemotePolicyDecisionPoint(PolicyDecisionPoint):
+    def __init__(self, base_url="http://localhost:8443/api/pdp/",
+                 key="YJidgyT2mfdkbmL", secret="Fa4zvYQdiwHZVXh", verify=False):
+        self.base_url = base_url
+        self.verify = verify
+        if (self.verify is None) or (self.base_url is None):
+            raise Exception("No valid configuration for the PDP")
+        if key is not None:
+            key_and_secret = b64encode(str.encode(f"{key}:{secret}")).decode("ascii")
+            self.headers["Authorization"] = f"Basic {key_and_secret}"
+
+    # exp backoff für initial damit erneut versucht wird, aber eine erste INDETERMINATE Decision vorhanden ist
+    def _sync_request(self, subscription, decision_events, ):
+        stream_response = requests.post(
+            self.base_url + decision_events,
+            subscription,
+            stream=True,
+            verify=self.verify,
+            headers=self.headers
+        )
+        return stream_response
+
+    def sync_decide(self, subscription: AuthorizationSubscription,
+                    decision_events="decide"):
+        try:
+            with self._sync_request(
+                    subscription, decision_events
+            ) as stream_response:
+                if stream_response.status_code == 204:
+                    return {"decision": "INDETERMINATE"}
+                    # return
+
+                elif stream_response.status_code != 200:
+                    return {"decision": "INDETERMINATE"}
+                    # return
+
+                else:
+                    lines = b''
+                    for line in stream_response.content:
+                        lines += line
+                        if lines.endswith(b'\n\n'):
+                            line_set = lines.splitlines(False)
+                            response = ''
+                            for item in line_set:
+                                response += item.decode('utf-8')
+                            return response
+
+        except Exception as e:
+            return {
+                "decision": "INDETERMINATE",
+                "check_for_errors": "Got error" + str(e),
+            }
+
+    def sync_decide_once(self, subscription: AuthorizationSubscription, decision_events="decide"
+                         ):
+        decision = self.sync_decide(subscription, decision_events)
+        if decision == {"decision": "INDETERMINATE"}:
+            return {"decision": "DENY"}
+        return decision
+
+    # exp backoff für initial damit erneut versucht wird, aber eine erste INDETERMINATE Decision vorhanden ist
+    async def _create_request(self, decision_events, subscription):
+        async with aiohttp.ClientSession(raise_for_status=True) as session:
+            async with session.post(self.base_url + decision_events, data=subscription, verify_ssl=self.verify,
+                                    headers=self.headers) as response:
+                return response
 
     async def decide(self, subscription: AuthorizationSubscription, decision_events="decide"):
-        pass
+        try:
+            async with self._create_request(
+                    decision_events, subscription
+            ) as stream_response:
+                if stream_response.status_code == 204:
+                    yield {"decision": "INDETERMINATE"}
+                    # return
 
-    async def decide_once(self, subscription: AuthorizationSubscription, decision_events="decide"):
-        pass
+                elif stream_response.status_code != 200:
+                    yield {"decision": "INDETERMINATE"}
+                    # return
+                else:
+                    lines = b''
+                    async for line in stream_response.content:
+                        lines += line
+                        if lines.endswith(b'\n\n'):
+                            line_set = lines.splitlines(False)
+                            response = ''
+                            for item in line_set:
+                                response += item.decode('utf-8')
+                            yield response
+                            lines = b''
 
-    @classmethod
-    def from_settings(cls):
-        pass
+        except Exception as e:
+            yield {
+                "decision": "INDETERMINATE",
+                "check_for_errors": "Got error" + str(e),
+            }
 
-    def __init__(self, base_url=None, key=None, secret=None, verify=None, dummy=None):
-        super().__init__(base_url, key, secret, verify, dummy)
+    async def decide_once(
+            self, subscription: AuthorizationSubscription, decision_events="decide"
+    ):
+        decision_stream = self.decide(subscription, decision_events)
+        decision = await decision_stream.__anext__()
+        await decision_stream.aclose()
+        if decision == {"decision": "INDETERMINATE"}:
+            return {"decision": "DENY"}
+        return decision
+
+
+pdp = PolicyDecisionPoint.from_settings()
