@@ -11,11 +11,22 @@ readme = "README.md"
 authors = [{ name = "Dominic Heutelbeck", email = "dominic@heutelbeck.com" }]
 license = { file = "LICENSE" }
 
+dependencies = [
+    "sseclient-py"
+
+]
+
 [project.optional-dependencies]
 tests = [
     "pytest",
+    "pytest-asyncio"
 ]
 
 
 [tools.setuptools]
 packages = ["sapl_base"]
+
+[tools.pytest.ini_options]
+testpaths = [
+    "tests"
+]
