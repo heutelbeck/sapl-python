@@ -99,7 +99,7 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
             key_and_secret = b64encode(str.encode(f"{key}:{secret}")).decode("ascii")
             self.headers["Authorization"] = f"Basic {key_and_secret}"
 
-    def _sync_request(self, subscription, decision_events, ):
+    def _sync_request(self, subscription, decision_events):
         stream_response = requests.post(
             self.base_url + decision_events,
             subscription,
@@ -109,8 +109,8 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         )
         return stream_response
 
-    def sync_decide(self, subscription: AuthorizationSubscription,
-                    decision_events="decide"):
+    def _sync_decide(self, subscription: AuthorizationSubscription,
+                     decision_events="decide"):
         with self._sync_request(
                 subscription, decision_events
         ) as stream_response:
@@ -167,9 +167,12 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
             self, subscription: AuthorizationSubscription, decision_events="decide"
     ):
         decision_stream = self.decide(subscription, decision_events)
-        decision = await decision_stream.__anext__()
-        await decision_stream.aclose()
-        if decision == {"decision": "INDETERMINATE"}:
+        try:
+            decision = await decision_stream.__anext__()
+            await decision_stream.aclose()
+            if decision == {"decision": "INDETERMINATE"}:
+                return {"decision": "DENY"}
+        except Exception as e:
             return {"decision": "DENY"}
         return decision
 
