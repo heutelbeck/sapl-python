@@ -109,7 +109,7 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         )
         return stream_response
 
-    def _sync_decide(self, subscription: AuthorizationSubscription,
+    def sync_decide(self, subscription: AuthorizationSubscription,
                      decision_events="decide"):
         with self._sync_request(
                 subscription, decision_events
