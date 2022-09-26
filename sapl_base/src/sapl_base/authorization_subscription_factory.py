@@ -1,135 +1,124 @@
+from abc import abstractmethod, ABC
+
 from .authorization_subscriptions import AuthorizationSubscription, MultiSubscription
 
 
-class BaseAuthorizationSubscriptionFactory:
+class BaseAuthorizationSubscriptionFactory(ABC):
+    """
+    Baseclass of an AuthorizationSubscriptionFactory, which can be inherited to create a framework specific
+    AuthorizationSubscriptionFactory.
+    """
 
-    def __init__(self, values: dict, subject=None, action=None, resource=None, environment=None,
-                 subject_filter=None, action_filter=None, resource_filter=None,
-                 environment_filter=None):
+    def _create_subscription(self, values: dict, subject=None, action=None, resource=None, environment=None,
+                             default_subject_function=None, default_action_function=None,
+                             default_resource_function=None,
+                             default_environment_function=None):
+        """
+        Create an authorization_subscription for the decorated function with the arguments provided to the decorator
 
-        self._values = values
-        self._original_subject = subject
-        self._original_action = action
-        self._original_resource = resource
-        self._original_environment = environment
-
-        self._resource_filter = resource_filter
-        self._subject_filter = subject_filter
-        self._action_filter = action_filter
-        self._environment_filter = environment_filter
+       :param values: Dictionary which contains data related to the decorated function (class if present, function and dict with named args )
+        :param subject: subject with which the function was decorated. None if not specified
+        :param action:  action with which the function was decorated. None if not specified
+        :param resource: resource with which the function was decorated. None if not specified
+        :param environment: environment with which the function was decorated. None if not specified
+        :param default_subject_function: Function which will be called with values as parameter to define subject, if no subject was provided to the decorator
+        :param default_action_function: Function which will be called with values as parameter to define action, if no action was provided to the decorator
+        :param default_resource_function: Function which will be called with values as parameter to define resource, if no resource was provided to the decorator
+        :param default_environment_function: Function which will be called with values as parameter to define environment, if no environment was provided to the decorator
+        :return: An authorization_subscription which can be sent to a pdp to get an authorization_decision
+        """
+        if not all((default_subject_function, default_action_function, default_resource_function,
+                    default_environment_function)):
+            raise Exception
 
         if subject is not None:
-            self.subject = subject
+            _subject = self._argument_is_callable(subject, values)
         else:
-            self.set_subject_filter(self._subject_filter)
+            _subject = default_subject_function(values)
 
         if action is not None:
-            self.action = action
+            _action = self._argument_is_callable(action, values)
         else:
-            self.set_action_filter(self._action_filter)
+            _action = default_action_function(values)
 
         if resource is not None:
-            self.resource = resource
+            _resource = self._argument_is_callable(resource, values)
         else:
-            self.set_resource_filter(self._resource_filter)
+            _resource = default_resource_function(values)
 
         if environment is not None:
-            self.environment = environment
+            _environment = self._argument_is_callable(environment, values)
         else:
-            self.set_environment_filter(self._environment_filter)
+            _environment = default_environment_function(values)
 
-    def _get_attributes_from_dict(self, values, dictionary, authorization_subscription_dictionary):
-        for k, v in dictionary.items():
-            try:
-                if values.__contains__(k):
-                    authorization_subscription_dictionary[k] = self._filter_attributes_for_authorization_subscription(
-                        values[k], v)
-                if (values.__len__()-1) >= k:
-                    authorization_subscription_dictionary[k] = self._filter_attributes_for_authorization_subscription(
-                        values[k], v)
-            except(TypeError, AttributeError):
-                try:
-                    if hasattr(values, k):
-                        authorization_subscription_dictionary[
-                            k] = self._filter_attributes_for_authorization_subscription(getattr(values, k), v)
-                except(TypeError, AttributeError):
-                    pass
+        return AuthorizationSubscription(self._remove_empty_dicts(_subject), self._remove_empty_dicts(_action),
+                                         self._remove_empty_dicts(_resource),
+                                         self._remove_empty_dicts(_environment))
 
-    def _add_attribute_to_authorization_subscription(self, values, element, dictionary):
-        try:
-            if values.__contains__(element):
-                if not callable(values[element]):
-                    dictionary[element] = values.get(element)
-            if (values.__len__() - 1) >= element:
-                if not callable(values[element]): # str(values[element]) doesnt contain string 'object at 0x'
-                    dictionary[element] = values.get(element)
-        except(TypeError, AttributeError):
-            try:
-                if hasattr(values, element):
-                    dictionary[element] = getattr(values, element)
-            except(TypeError, AttributeError):
-                pass
+    @staticmethod
+    def _argument_is_callable(argument, values: dict):
+        """
+        Checks if the given argument is a callable and calls it with the given dictionary of values as argument
 
-    def _filter_attributes_for_authorization_subscription(self, values, sapl_filter):
-        dic = dict()
-        try:
-            if isinstance(sapl_filter, (list, tuple, set, range)):
-                for element in sapl_filter:
-                    if isinstance(element, dict):
-                        self._get_attributes_from_dict(values, element, dic)
+        :param argument: given argument which was provided to the SAPL Decorator as argument for certain parameter
+        :param values: dictionary of the values which are used to create the authorization_subscription
+        :return: given argument if it is not a callable, otherwise the return-value of the argument called with values
+        """
+        if callable(argument):
+            return argument(values)
+        else:
+            return argument
 
-                    else:
-                        self._add_attribute_to_authorization_subscription(values, element, dic)
+    @abstractmethod
+    def _identify_type(self, values: dict):
+        """
+        Identify depending on the used Framework, which kind of function was decorated.
 
-            elif isinstance(sapl_filter, dict):
-                self._get_attributes_from_dict(values, sapl_filter, dic)
+        Depending on the function create an according authorization_subscription for the PDP
 
-            else:
-                self._add_attribute_to_authorization_subscription(values, sapl_filter, dic)
+        :param values: dictionary which contains class,function and named args of the decorated function
+        """
+        pass
 
-        except (TypeError, AttributeError):
-            pass
-        return dic
+    def create_authorization_subscription(self, values: dict, subject=None, action=None, resource=None,
+                                          environment=None):
+        """
+        Create an authorization_subscription with the given dictionary and arguments
 
-    def set_subject_filter(self, subject_filter):
-        self._subject_filter = subject_filter
-        if self._original_subject is None:
-            self.subject = self._filter_attributes_for_authorization_subscription(self._values, self._subject_filter)
-        return self
+        The returned authorization_subscription is dependent of the framework and the decorated function
 
-    def set_action_filter(self, action_filter):
-        self._action_filter = action_filter
-        if self._original_action is None:
-            self.action = self._filter_attributes_for_authorization_subscription(self._values, self._action_filter)
-        return self
+        :param values: Dictionary which contains data related to the decorated function (class if present, function and dict with named args )
+        :param subject: subject with which the function was decorated. None if not specified
+        :param action:  action with which the function was decorated. None if not specified
+        :param resource: resource with which the function was decorated. None if not specified
+        :param environment: environment with which the function was decorated. None if not specified
+        :return: An authorization_subscription which can be sent to a pdp to get an authorization_decision
+        """
+        fn_type = self._identify_type(values)
+        return self._create_subscription_for_type(fn_type, values, subject, action, resource, environment)
 
-    def set_resource_filter(self, resource_filter):
-        self._resource_filter = resource_filter
-        if self._original_resource is None:
-            self.resource = self._filter_attributes_for_authorization_subscription(self._values, self._resource_filter)
-        return self
+    @abstractmethod
+    def _create_subscription_for_type(self, fn_type, values: dict, subject, action, resource,
+                                      environment) -> AuthorizationSubscription:
+        """
+        Calls implementations on how to create an authorization_subscription for the given type of called function
 
-    def set_environment_filter(self, environment_filter):
-        self._environment_filter = environment_filter
-        if self._original_environment is None:
-            self.environment = self._filter_attributes_for_authorization_subscription(self._values,
-                                                                                      self._environment_filter)
-        return self
-
-    def set_values(self, values: dict):
-        self._values = values
-        self.set_subject_filter(self._subject_filter)
-        self.set_action_filter(self._action_filter)
-        self.set_resource_filter(self._resource_filter)
-        self.set_environment_filter(self._environment_filter)
-        return self
-
-    def create_authorization_subscription(self) -> AuthorizationSubscription:
-        return AuthorizationSubscription(self._remove_empty_dicts(self.subject), self._remove_empty_dicts(self.action),
-                                         self._remove_empty_dicts(self.resource),
-                                         self._remove_empty_dicts(self.environment))
+        :param fn_type: What type of function was annotated e.g. function which renders a view, or a function which makes a database call to get values for a view.
+        :param values: Dictionary which contains data related to the decorated function (class if present, function and dict with named args )
+        :param subject: subject with which the function was decorated. None if not specified
+        :param action:  action with which the function was decorated. None if not specified
+        :param resource: resource with which the function was decorated. None if not specified
+        :param environment: environment with which the function was decorated. None if not specified
+        """
+        pass
 
     def _remove_empty_dicts(self, dictionary: dict):
+        """
+        A helper function to prevent empty dictionary's from being added to the authorization_subscription
+
+        :param dictionary: A dictionary which will be stripped of it's empty dictionary's
+        :return: The given dictionary stripped of empty dictionary's inside itself, or None if the given dictionary is empty
+        """
         dict_copy = dictionary.copy()
         for k, v in dictionary.items():
             if isinstance(v, dict):
@@ -143,20 +132,11 @@ class BaseAuthorizationSubscriptionFactory:
 
         return dict_copy
 
-    # @classmethod
-    # def construct_authorization_subscription_builder_for_httprequest(cls, request: dict, subject=None, action=None,
-    #                                                                  resource=None,
-    #                                                                  environment=None):
-    #     subject_filter = ['user']
-    #     action_filter = None
-    #     resource_filter = None
-    #     environment_filter = None
-    #     return BaseAuthorizationSubscriptionBuilder(request, subject, action, resource, environment, subject_filter,
-    #                                                 action_filter, resource_filter,
-    #                                                 environment_filter)
-
 
 class MultiSubscriptionBuilder:
+    """
+    Can be used to create a Multi subscription by adding single Authorization_subscription
+    """
     SUBJECT_ID = "subjectID"
     ACTION_ID = "actionID"
     RESOURCE_ID = "resourceID"
@@ -172,6 +152,10 @@ class MultiSubscriptionBuilder:
         self.authorization_subscription = []
 
     def with_authorization_subscription(self, authorization_subscription: AuthorizationSubscription):
+        """
+        Adds the given AuthorizationSubscription to the MultiSubscriptionBuilder
+        :param authorization_subscription: AuthorizationSubscription, which will be added to the MultiSubscriptionBuilder
+        """
         dic = dict()
         self._add_subject(authorization_subscription, dic)
         self._add_action(authorization_subscription, dic)
@@ -199,12 +183,23 @@ class MultiSubscriptionBuilder:
             self.environment.append(authorization_subscription.environment)
             dictionary[self.ENVIRONMENT_ID] = len(self.environment) - 1
 
-    def _remove_empty_list(self, subscription_list):
+    @staticmethod
+    def _remove_empty_list(subscription_list):
+        """
+        Helper function to remove empty lists
+
+        :param subscription_list: A list which contains arguments, which will
+        be passed to a Multi subscription as arguments
+        :return: None if the list is empty, otherwise the given list.
+        """
         if not subscription_list:
             return None
         return subscription_list
 
     def build(self):
+        """
+        :return: A multi subscription created from the given Authorization_subscriptions
+        """
         if self._built:
             raise Exception("already built")
         self._built = True
