@@ -81,12 +81,13 @@ class BaseAuthorizationSubscriptionFactory(ABC):
         pass
 
     def create_authorization_subscription(self, values: dict, subject=None, action=None, resource=None,
-                                          environment=None):
+                                          environment=None, scope = "default"):
         """
         Create an authorization_subscription with the given dictionary and arguments
 
         The returned authorization_subscription is dependent of the framework and the decorated function
 
+        :param scope: Argument which creates a AuthorizationSubscription according to the given scope instead of evaluating the scope based on other parameter
         :param values: Dictionary which contains data related to the decorated function (class if present, function and dict with named args )
         :param subject: subject with which the function was decorated. None if not specified
         :param action:  action with which the function was decorated. None if not specified
@@ -95,14 +96,15 @@ class BaseAuthorizationSubscriptionFactory(ABC):
         :return: An authorization_subscription which can be sent to a pdp to get an authorization_decision
         """
         fn_type = self._identify_type(values)
-        return self._create_subscription_for_type(fn_type, values, subject, action, resource, environment)
+        return self._create_subscription_for_type(fn_type, values, subject, action, resource, environment,scope)
 
     @abstractmethod
     def _create_subscription_for_type(self, fn_type, values: dict, subject, action, resource,
-                                      environment) -> AuthorizationSubscription:
+                                      environment,scope) -> AuthorizationSubscription:
         """
         Calls implementations on how to create an authorization_subscription for the given type of called function
 
+        :param scope: Argument which creates a AuthorizationSubscription according to the given scope instead of evaluating the scope based on other parameter
         :param fn_type: What type of function was annotated e.g. function which renders a view, or a function which makes a database call to get values for a view.
         :param values: Dictionary which contains data related to the decorated function (class if present, function and dict with named args )
         :param subject: subject with which the function was decorated. None if not specified

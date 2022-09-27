@@ -7,7 +7,7 @@ from sapl_base.sapl_util import double_wrap
 
 @double_wrap
 def pre_enforce(fn, subject: str | () = None, action: str | () = None, resource: str | () = None,
-                environment: str | () = None):
+                environment: str | () = None, scope: str = "default"):
     """
     Pre_enforces a decorated function with SAPL.
     If the function returns a stream, pre_enforce will cancel the stream when a DENY is received.
@@ -26,21 +26,21 @@ def pre_enforce(fn, subject: str | () = None, action: str | () = None, resource:
         @wraps(fn)
         async def wrap(*args, **kwargs):
             enforcement_point = PolicyEnforcementPoint(fn, args, kwargs)
-            return await enforcement_point.pre_enforce(subject, action, resource, environment)
+            return await enforcement_point.pre_enforce(subject, action, resource, environment, scope)
 
         return wrap
     else:
         @wraps(fn)
         def sync_wrap(*args, **kwargs):
             enforcement_point = PolicyEnforcementPoint(fn, args, kwargs)
-            return enforcement_point.sync_pre_enforce(subject, action, resource, environment)
+            return enforcement_point.sync_pre_enforce(subject, action, resource, environment, scope)
 
         return sync_wrap
 
 
 @double_wrap
 def post_enforce(fn, subject: str | () = None, action: str | () = None, resource: str | () = None,
-                 environment: str | () = None):
+                 environment: str | () = None, scope: str = "default"):
     """
     Post_enforces a decorated function with SAPL.
     If the function returns a stream an exception is thrown.
@@ -57,7 +57,7 @@ def post_enforce(fn, subject: str | () = None, action: str | () = None, resource
         @wraps(fn)
         async def wrap(*args, **kwargs):
             enforcement_point = PolicyEnforcementPoint(fn, *args, **kwargs)
-            return await enforcement_point.post_enforce(subject, action, resource, environment)
+            return await enforcement_point.post_enforce(subject, action, resource, environment, scope)
 
         return wrap
     else:
@@ -65,7 +65,7 @@ def post_enforce(fn, subject: str | () = None, action: str | () = None, resource
         def sync_wrap(*args, **kwargs):
 
             enforcement_point = PolicyEnforcementPoint(fn, *args, **kwargs)
-            return enforcement_point.sync_post_enforce(subject, action, resource, environment)
+            return enforcement_point.sync_post_enforce(subject, action, resource, environment, scope)
 
         return sync_wrap
 
@@ -77,7 +77,7 @@ SAPL Decorators must be used as first Decorator to gather needed information of 
 
 @double_wrap
 def pre_and_post_enforce(fn, subject: str | () = None, action: str | () = None, resource: str | () = None,
-                         environment: str | () = None):
+                         environment: str | () = None, scope: str = "default"):
     """
     Pre- and post_enforces a decorated function with SAPL.
 
@@ -96,21 +96,21 @@ def pre_and_post_enforce(fn, subject: str | () = None, action: str | () = None, 
         @wraps(fn)
         async def wrap(*args, **kwargs):
             enforcement_point = PolicyEnforcementPoint(fn, *args, **kwargs)
-            return await enforcement_point.pre_and_post_enforce(subject, action, resource, environment)
+            return await enforcement_point.pre_and_post_enforce(subject, action, resource, environment, scope)
 
         return wrap
     else:
         @wraps(fn)
         def sync_wrap(*args, **kwargs):
             enforcement_point = PolicyEnforcementPoint(fn, *args, **kwargs)
-            return enforcement_point.sync_pre_and_post_enforce(subject, action, resource, environment)
+            return enforcement_point.sync_pre_and_post_enforce(subject, action, resource, environment, scope)
 
         return sync_wrap
 
 
 @double_wrap
 def enforce_drop_while_denied(fn, subject: str | () = None, action: str | () = None, resource: str | () = None,
-                              environment: str | () = None):
+                              environment: str | () = None, scope: str = "default"):
     """
     Enforces a stream and drops values, when the current decision is not PERMIT
 
@@ -129,7 +129,7 @@ def enforce_drop_while_denied(fn, subject: str | () = None, action: str | () = N
         @wraps(fn)
         async def wrap(*args, **kwargs):
             enforcement_point = PolicyEnforcementPoint(fn, args, kwargs)
-            return await enforcement_point.drop_while_denied(subject, action, resource, environment)
+            return await enforcement_point.drop_while_denied(subject, action, resource, environment, scope)
 
         return wrap
     else:
@@ -142,7 +142,7 @@ def enforce_drop_while_denied(fn, subject: str | () = None, action: str | () = N
 
 @double_wrap
 def enforce_recoverable_if_denied(fn, subject: str | () = None, action: str | () = None, resource: str | () = None,
-                                  environment: str | () = None):
+                                  environment: str | () = None, scope: str = "default"):
     """
     Enforces a stream and drops values, when the current decision is not PERMIT and notifys the client, that
     values are dropped, because they are not PERMITTED to receive them.
@@ -162,7 +162,7 @@ def enforce_recoverable_if_denied(fn, subject: str | () = None, action: str | ()
         @wraps(fn)
         async def wrap(*args, **kwargs):
             enforcement_point = PolicyEnforcementPoint(fn, args, kwargs)
-            return await enforcement_point.recoverable_if_denied(subject, action, resource, environment)
+            return await enforcement_point.recoverable_if_denied(subject, action, resource, environment, scope)
 
         return wrap
     else:
