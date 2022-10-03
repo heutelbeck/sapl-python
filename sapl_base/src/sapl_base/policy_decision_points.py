@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from base64 import b64encode
 
 import aiohttp
+import backoff
 import requests
 
 from sapl_base.authorization_subscriptions import AuthorizationSubscription
@@ -28,7 +29,7 @@ class PolicyDecisionPoint(ABC):
         return DummyPolicyDecisionPoint()
 
     @abstractmethod
-    async def decide(self, subscription, decision_events="decide"):
+    async def decide(self, subscription, pep_decision_stream, decision_events="decide"):
         """
         async function to make a request to a pdp with the given subscription and event to create a stream of decisions
 
@@ -78,12 +79,11 @@ class DummyPolicyDecisionPoint(PolicyDecisionPoint):
         #     "PURPOSE ONLY!"
         # )
 
-    async def decide(self, subscription, decision_events="decide"):
+    async def decide(self, subscription, pep_decision_stream, decision_events="decide"):
         """
         implementation of decide, which always yields a PERMIT
         """
-
-        yield {"decision": "PERMIT"}
+        pep_decision_stream.send({"decision": "PERMIT"})
 
     async def decide_once(
             self, subscription: AuthorizationSubscription, decision_events="decide"
@@ -100,6 +100,14 @@ class DummyPolicyDecisionPoint(PolicyDecisionPoint):
         return {"decision": "PERMIT"}
 
 
+def recreate_stream(details: dict):
+    """
+
+    :param details:
+    """
+    details['kwargs']['decision_stream'] = None
+
+
 class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
     headers = {"Content-type": "application/json"}
 
@@ -113,16 +121,7 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
             key_and_secret = b64encode(str.encode(f"{key}:{secret}")).decode("ascii")
             self.headers["Authorization"] = f"Basic {key_and_secret}"
 
-    # def _sync_request(self, subscription, decision_events):
-    #     stream_response = requests.post(
-    #         self.base_url + decision_events,
-    #         subscription,
-    #         stream=True,
-    #         verify=self.verify,
-    #         headers=self.headers
-    #     )
-    #     return stream_response
-
+    @backoff.on_exception(backoff.constant, Exception, max_time=20)
     def sync_decide(self, subscription: AuthorizationSubscription,
                     decision_events="decide"):
         """
@@ -160,13 +159,54 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
                         if response == {"decision": "INDETERMINATE"}:
                             return {"decision": "DENY"}
 
-    # def sync_decide_once(self, subscription: AuthorizationSubscription, decision_events="decide"):
-    #    decision = self.sync_decide(subscription, decision_events)
-    #    if decision == {"decision": "INDETERMINATE"}:
-    #        return {"decision": "DENY"}
-    #    return decision
+    async def decide(self, subscription, pep_decision_stream, decision_events="decide"):
+        """
 
-    async def decide(self, subscription, decision_events="decide"):
+        :param subscription:
+        :param pep_decision_stream:
+        :param decision_events:
+        :return:
+        """
+        try:
+            decision, decision_stream = self.get_first_decision_and_stream(subscription, decision_events)
+        except Exception:
+            decision = {"decision": "INDETERMINATE"}
+            decision_stream = None
+        return decision, self.update_stream(subscription, decision_stream, pep_decision_stream, decision_events)
+
+    @backoff.on_exception(backoff.expo, Exception, on_backoff=recreate_stream, max_value=100)
+    async def update_stream(self, subscription, decision_stream, pep_decision_stream, decision_events="decide"):
+        """
+
+        :param subscription:
+        :param decision_stream:
+        :param pep_decision_stream:
+        :param decision_events:
+        """
+        if decision_stream is None:
+            await pep_decision_stream.asend({"decision": "INDETERMINATE"})
+            _decision_stream = self.get_decision_stream(subscription, decision_events)
+        else:
+            _decision_stream = decision_stream
+        async for decision in decision_stream:
+            await pep_decision_stream.asend(decision)
+
+    @backoff.on_exception(backoff.constant, Exception, max_time=20)
+    async def get_first_decision_and_stream(self, subscription, decision_events):
+        """
+
+        :param subscription:
+        :param decision_events:
+        :return:
+        """
+        decision_stream = self.get_decision_stream(subscription, decision_events)
+        decision = await decision_stream.__anext__()
+        if decision == {"decision": "INDETERMINATE"}:
+            return {"decision": "DENY"}, decision_stream
+        return decision, decision_stream
+
+    @staticmethod
+    async def get_decision_stream(subscription, decision_events="decide"):
         """
         Makes a request to the set pdp and returns a stream of decisions for the sent authorization_subscription
 
@@ -197,6 +237,7 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
                             yield response
                             lines = b''
 
+    @backoff.on_exception(backoff.constant, Exception, max_time=20)
     async def decide_once(
             self, subscription: AuthorizationSubscription, decision_events="decide"
     ):
@@ -208,13 +249,10 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         and what kind of decision is expected
         :return: A decision for the given Authorization_Subscription
         """
-        decision_stream = self.decide(subscription, decision_events)
-        try:
-            decision = await decision_stream.__anext__()
-            await decision_stream.aclose()
-            if decision == {"decision": "INDETERMINATE"}:
-                return {"decision": "DENY"}
-        except Exception as e:
+        decision_stream = self.get_decision_stream(subscription, decision_events)
+        decision = await decision_stream.__anext__()
+        await decision_stream.aclose()
+        if decision == {"decision": "INDETERMINATE"}:
             return {"decision": "DENY"}
         return decision
 
