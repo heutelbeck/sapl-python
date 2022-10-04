@@ -1,13 +1,15 @@
 import asyncio
 from functools import wraps
 
-from sapl_base.policy_enforcement_point import PolicyEnforcementPoint
+from policy_enforcement_points.streaming_policy_enforcement_point import StreamingPolicyEnforcementPoint
+from sapl_base.policy_enforcement_points.async_policy_enforcement_point import AsyncPolicyEnforcementPoint
+from sapl_base.policy_enforcement_points.sync_policy_enforcement_point import SyncPolicyEnforcementPoint
 from sapl_base.sapl_util import double_wrap
 
 
 @double_wrap
-def pre_enforce(fn, subject: str  = None, action: str  = None, resource: str  = None,
-                environment: str  = None, scope: str = "automatic"):
+def pre_enforce(fn, subject: str = None, action: str = None, resource: str = None,
+                environment: str = None, scope: str = "automatic"):
     """
     Wraps the decorated resource action point function with a SAPL Policy Enforcement Point (PEP).
 
@@ -28,23 +30,23 @@ def pre_enforce(fn, subject: str  = None, action: str  = None, resource: str  = 
     """
     if asyncio.iscoroutinefunction(fn):
         @wraps(fn)
-        async def wrap(*args, **kwargs):
-            enforcement_point = PolicyEnforcementPoint(fn, args, kwargs)
+        async def async_wrap(*args, **kwargs):
+            enforcement_point = AsyncPolicyEnforcementPoint(fn, args, kwargs)
             return await enforcement_point.pre_enforce(subject, action, resource, environment, scope)
 
-        return wrap
+        return async_wrap
     else:
         @wraps(fn)
-        def sync_wrap(*args, **kwargs):
-            enforcement_point = PolicyEnforcementPoint(fn, args, kwargs)
-            return enforcement_point.sync_pre_enforce(subject, action, resource, environment, scope)
+        def wrap(*args, **kwargs):
+            enforcement_point = SyncPolicyEnforcementPoint(fn, args, kwargs)
+            return enforcement_point.pre_enforce(subject, action, resource, environment, scope)
 
-        return sync_wrap
+        return wrap
 
 
 @double_wrap
-def post_enforce(fn, subject: str  = None, action: str  = None, resource: str  = None,
-                 environment: str  = None, scope: str = "automatic"):
+def post_enforce(fn, subject: str = None, action: str = None, resource: str = None,
+                 environment: str = None, scope: str = "automatic"):
     """
     Post_enforces a decorated function with SAPL.
 
@@ -63,19 +65,19 @@ def post_enforce(fn, subject: str  = None, action: str  = None, resource: str  =
     """
     if asyncio.iscoroutinefunction(fn):
         @wraps(fn)
-        async def wrap(*args, **kwargs):
-            enforcement_point = PolicyEnforcementPoint(fn, *args, **kwargs)
+        async def async_wrap(*args, **kwargs):
+            enforcement_point = AsyncPolicyEnforcementPoint(fn, *args, **kwargs)
             return await enforcement_point.post_enforce(subject, action, resource, environment, scope)
 
-        return wrap
+        return async_wrap
     else:
         @wraps(fn)
-        def sync_wrap(*args, **kwargs):
+        def wrap(*args, **kwargs):
 
-            enforcement_point = PolicyEnforcementPoint(fn, *args, **kwargs)
-            return enforcement_point.sync_post_enforce(subject, action, resource, environment, scope)
+            enforcement_point = SyncPolicyEnforcementPoint(fn, *args, **kwargs)
+            return enforcement_point.post_enforce(subject, action, resource, environment, scope)
 
-        return sync_wrap
+        return wrap
 
 
 """
@@ -83,11 +85,9 @@ SAPL Decorators must be used as first Decorator to gather needed information of 
 """
 
 
-
-
 @double_wrap
-def pre_and_post_enforce(fn, subject: str  = None, action: str  = None, resource: str  = None,
-                 environment: str  = None, scope: str = "automatic"):
+def pre_and_post_enforce(fn, subject: str = None, action: str = None, resource: str = None,
+                         environment: str = None, scope: str = "automatic"):
     """
     Pre- and post_enforces a decorated function with SAPL.
 
@@ -107,23 +107,58 @@ def pre_and_post_enforce(fn, subject: str  = None, action: str  = None, resource
     """
     if asyncio.iscoroutinefunction(fn):
         @wraps(fn)
-        async def wrap(*args, **kwargs):
-            enforcement_point = PolicyEnforcementPoint(fn, *args, **kwargs)
+        async def async_wrap(*args, **kwargs):
+            enforcement_point = AsyncPolicyEnforcementPoint(fn, *args, **kwargs)
             return await enforcement_point.pre_and_post_enforce(subject, action, resource, environment, scope)
 
-        return wrap
+        return async_wrap
     else:
         @wraps(fn)
-        def sync_wrap(*args, **kwargs):
-            enforcement_point = PolicyEnforcementPoint(fn, *args, **kwargs)
-            return enforcement_point.sync_pre_and_post_enforce(subject, action, resource, environment, scope)
+        def wrap(*args, **kwargs):
+            enforcement_point = SyncPolicyEnforcementPoint(fn, *args, **kwargs)
+            return enforcement_point.pre_and_post_enforce(subject, action, resource, environment, scope)
 
-        return sync_wrap
+        return wrap
 
 
 @double_wrap
-def enforce_drop_while_denied(fn, subject: str  = None, action: str  = None, resource: str  = None,
-                 environment: str  = None, scope: str = "automatic"):
+def enforce_till_denied(fn, subject: str = None, action: str = None, resource: str = None,
+                        environment: str = None, scope: str = "automatic"):
+    """
+    Enforces a stream and cancels the Stream when the Decision is not PERMIT
+
+    SAPL Decorators must be used as first Decorator to gather needed information of the annotated Function.
+
+    If the function doesn't return a stream, an exception will be thrown
+
+    Identify if the function is a coroutine and will throw an exception, if it is not a coroutine.
+
+    :param fn:  decorated function
+    :param subject: subject of an authorization_subscription or a function to create the subject
+    :param action: action of an authorization_subscription or a function to create the action
+    :param resource: resource of an authorization_subscription or a function to create the resource
+    :param environment: environment of an authorization_subscription or a function to create the environment
+    :param scope: Argument which creates a AuthorizationSubscription according to the given scope instead of evaluating the scope based on other parameter
+    :return: The return_value of the decorated function with a generator which will enforce each value, which is sent with the stream
+    """
+    if asyncio.iscoroutinefunction(fn):
+        @wraps(fn)
+        async def async_wrap(*args, **kwargs):
+            enforcement_point = StreamingPolicyEnforcementPoint(fn, args, kwargs)
+            return await enforcement_point.enforce_till_denied(subject, action, resource, environment, scope)
+
+        return async_wrap
+    else:
+        @wraps(fn)
+        def wrap(*args, **kwargs):
+            raise Exception
+
+        return wrap
+
+
+@double_wrap
+def enforce_drop_while_denied(fn, subject: str = None, action: str = None, resource: str = None,
+                              environment: str = None, scope: str = "automatic"):
     """
     Enforces a stream and drops values, when the current decision is not PERMIT
 
@@ -143,22 +178,22 @@ def enforce_drop_while_denied(fn, subject: str  = None, action: str  = None, res
     """
     if asyncio.iscoroutinefunction(fn):
         @wraps(fn)
-        async def wrap(*args, **kwargs):
-            enforcement_point = PolicyEnforcementPoint(fn, args, kwargs)
+        async def async_wrap(*args, **kwargs):
+            enforcement_point = StreamingPolicyEnforcementPoint(fn, args, kwargs)
             return await enforcement_point.drop_while_denied(subject, action, resource, environment, scope)
 
-        return wrap
+        return async_wrap
     else:
         @wraps(fn)
-        def sync_wrap(*args, **kwargs):
+        def wrap(*args, **kwargs):
             raise Exception
 
-        return sync_wrap
+        return wrap
 
 
 @double_wrap
-def enforce_recoverable_if_denied(fn, subject: str  = None, action: str  = None, resource: str  = None,
-                 environment: str  = None, scope: str = "automatic"):
+def enforce_recoverable_if_denied(fn, subject: str = None, action: str = None, resource: str = None,
+                                  environment: str = None, scope: str = "automatic"):
     """
     Enforces a stream and drops values, when the current decision is not PERMIT and notify the client, that
     values are dropped, because they are not PERMITTED to receive them.
@@ -180,14 +215,14 @@ def enforce_recoverable_if_denied(fn, subject: str  = None, action: str  = None,
     """
     if asyncio.iscoroutinefunction(fn):
         @wraps(fn)
-        async def wrap(*args, **kwargs):
-            enforcement_point = PolicyEnforcementPoint(fn, *args, **kwargs)
+        async def async_wrap(*args, **kwargs):
+            enforcement_point = StreamingPolicyEnforcementPoint(fn, *args, **kwargs)
             return await enforcement_point.recoverable_if_denied(subject, action, resource, environment, scope)
 
-        return wrap
+        return async_wrap
     else:
         @wraps(fn)
-        def sync_wrap(*args, **kwargs):
+        def wrap(*args, **kwargs):
             raise Exception
 
-        return sync_wrap
+        return wrap

@@ -81,7 +81,7 @@ class BaseAuthorizationSubscriptionFactory(ABC):
         pass
 
     def create_authorization_subscription(self, values: dict, subject=None, action=None, resource=None,
-                                          environment=None, scope = "default"):
+                                          environment=None, scope="automatic"):
         """
         Create an authorization_subscription with the given dictionary and arguments
 
@@ -95,12 +95,16 @@ class BaseAuthorizationSubscriptionFactory(ABC):
         :param environment: environment with which the function was decorated. None if not specified
         :return: An authorization_subscription which can be sent to a pdp to get an authorization_decision
         """
-        fn_type = self._identify_type(values)
-        return self._create_subscription_for_type(fn_type, values, subject, action, resource, environment,scope)
+        fn_type : str
+        if scope == "automatic":
+            fn_type = self._identify_type(values)
+        else:
+            fn_type = scope
+        return self._create_subscription_for_type(fn_type, values, subject, action, resource, environment, scope)
 
     @abstractmethod
     def _create_subscription_for_type(self, fn_type, values: dict, subject, action, resource,
-                                      environment,scope) -> AuthorizationSubscription:
+                                      environment, scope) -> AuthorizationSubscription:
         """
         Calls implementations on how to create an authorization_subscription for the given type of called function
 
