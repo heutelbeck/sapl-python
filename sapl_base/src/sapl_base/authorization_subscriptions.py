@@ -34,19 +34,6 @@ class AuthorizationSubscription:
         representative = ",".join(element + "=" + repr(dictionary.get(element)) for element in dictionary)
         return f"{type(self).__name__}({representative})"
 
-    # def __eq__(self, other):
-    #     try:
-    #         return (self.subject == other.subject) and (
-    #                 self.action == other.action) and (
-    #                        self.resource == other.resource) and (
-    #                        self.environment == other.environment) and (
-    #                        self.subscription_id == other.subscription_id)
-    #     except AttributeError:
-    #         return False
-    #     except Exception as e:
-    #         logging.exception(e)
-    #         return False
-
     def __str__(self):
         """
         Sting representation returns this object in json format as a string
@@ -86,16 +73,3 @@ class MultiSubscription:
         Sting representation returns this object in json format as a string
         """
         return json.dumps(self.__dict__, indent=2, skipkeys=True, default=lambda o: str(o))
-
-    # def __eq__(self, other):
-    #     try:
-    #         return (self.subject == other.subject) and (
-    #                 self.action == other.action) and (
-    #                        self.resource == other.resource) and (
-    #                        self.environment == other.environment) and (
-    #                        self.authorization_subscriptions == other.authorization_subscriptions)
-    #     except AttributeError:
-    #         return False
-    #     except Exception as e:
-    #         logging.exception(e)
-    #         return False

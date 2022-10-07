@@ -80,13 +80,18 @@ class BaseAuthorizationSubscriptionFactory(ABC):
         """
         pass
 
-    def create_authorization_subscription(self, values: dict, subject=None, action=None, resource=None,
-                                          environment=None, scope="automatic"):
+    @abstractmethod
+    def _valid_combinations(self, fn_type, enforcement_type):
+        pass
+
+    def create_authorization_subscription(self, values: dict, subject, action, resource,
+                                          environment,  scope , enforcement_type):
         """
         Create an authorization_subscription with the given dictionary and arguments
 
         The returned authorization_subscription is dependent of the framework and the decorated function
 
+        :param enforcement_type:
         :param scope: Argument which creates a AuthorizationSubscription according to the given scope instead of evaluating the scope based on other parameter
         :param values: Dictionary which contains data related to the decorated function (class if present, function and dict with named args )
         :param subject: subject with which the function was decorated. None if not specified
@@ -95,11 +100,12 @@ class BaseAuthorizationSubscriptionFactory(ABC):
         :param environment: environment with which the function was decorated. None if not specified
         :return: An authorization_subscription which can be sent to a pdp to get an authorization_decision
         """
-        fn_type : str
+        fn_type: str
         if scope == "automatic":
             fn_type = self._identify_type(values)
         else:
             fn_type = scope
+        self._valid_combinations(fn_type, enforcement_type)
         return self._create_subscription_for_type(fn_type, values, subject, action, resource, environment, scope)
 
     @abstractmethod

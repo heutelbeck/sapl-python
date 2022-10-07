@@ -28,9 +28,9 @@ class BasePolicyEnforcementPoint:
         self.values_dict["return_value"] = await self._enforced_function(*self._function_args, **self._function_kwargs)
         return self.values_dict["return_value"]
 
-    def get_subscription(self, subject, action, resource, environment, scope):
+    def get_subscription(self, subject, action, resource, environment, scope, enforcement_type):
         return auth_factory.create_authorization_subscription(self.values_dict, subject, action, resource, environment,
-                                                              scope)
+                                                              scope,enforcement_type)
 
     def get_bundle(self, decision):
         self._constraint_handler_bundle = constraint_handler_service.create_constraint_handler_bundle(decision)
