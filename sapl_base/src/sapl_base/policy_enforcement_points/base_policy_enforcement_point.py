@@ -1,5 +1,5 @@
 from sapl_base.authorization_subscription_factory import BaseAuthorizationSubscriptionFactory
-from sapl_base.constraint_handler_service import constraint_handler_service
+from sapl_base.constraint_handling.constraint_handler_service import constraint_handler_service
 
 
 class BasePolicyEnforcementPoint:
