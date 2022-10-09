@@ -18,7 +18,7 @@ class ConstraintHandlerService:
     def __init__(self):
         pass
 
-    def build_post_enforce_bundle(self, decision):
+    def build_post_enforce_bundle(self, decision) -> ConstraintHandlerBundle:
         obligations, advices = self._get_obligations_and_advices(decision)
         unhandled_obligations = []
         for obligation in obligations:
@@ -30,7 +30,7 @@ class ConstraintHandlerService:
             raise Exception
         return ConstraintHandlerBundle(on_decision_handler, error_handler, result_handler)
 
-    def build_pre_enforce_bundle(self, decision):
+    def build_pre_enforce_bundle(self, decision) -> ConstraintHandlerBundle:
         obligations, advices = self._get_obligations_and_advices(decision)
         unhandled_obligations = []
         for obligation in obligations:

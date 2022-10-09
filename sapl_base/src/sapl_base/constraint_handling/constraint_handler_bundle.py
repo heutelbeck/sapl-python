@@ -21,19 +21,29 @@ class ConstraintHandlerBundle:
         self._error_handler = error_handler
 
     def execute_on_decision_handler(self, decision):
-        for handler in self._on_decision_handler:
-            handler(decision)
+        try:
+            for handler in self._on_decision_handler:
+                handler(decision)
+        except Exception as e:
+            raise self.execute_on_error_handler(e)
 
     def execute_on_error_handler(self, exception: Exception):
         for handler in self._error_handler:
-            handler(exception)
+            exception = handler(exception)
+        raise exception
 
     def execute_result_handler(self, result: Any) -> Any:
         current_result = result
-        for handler in self._result_handler:
-            current_result = handler(current_result)
+        try:
+            for handler in self._result_handler:
+                current_result = handler(current_result)
+        except Exception as e:
+            raise self.execute_on_error_handler(e)
         return current_result
 
     def execute_function_arguments_mapper(self, arguments: dict) -> None:
-        for handler in self._function_arguments_mapper:
-            handler(arguments)
+        try:
+            for handler in self._function_arguments_mapper:
+                handler(arguments)
+        except Exception as e:
+            raise self.execute_on_error_handler(e)
