@@ -1,3 +1,4 @@
+from sapl_base.constraint_handling.constraint_handler_service import constraint_handler_service
 from sapl_base.policy_decision_points import pdp
 from sapl_base.policy_enforcement_points.base_policy_enforcement_point import BasePolicyEnforcementPoint
 
@@ -6,39 +7,26 @@ class SyncPolicyEnforcementPoint(BasePolicyEnforcementPoint):
 
     def post_enforce(self, subject, action, resource, environment, scope):
         self.get_return_value()
-        subscription = self.get_subscription(subject, action, resource, environment, scope, "post_enforce")
-        decision = pdp.sync_decide(subscription)
-        self.get_bundle(decision)
-        self.check_if_denied(decision)
-        # bundle run runnables
-        # bundle run weitere Sachen
-        # return value
-        return
+        return self._post_enforce_handling(subject, action, resource, environment, scope)
 
     def pre_enforce(self, subject, action, resource, environment, scope):
         subscription = self.get_subscription(subject, action, resource, environment, scope, "pre_enforce")
         decision = pdp.sync_decide(subscription)
-        self.get_bundle(decision)
+        bundle = constraint_handler_service.build_pre_enforce_bundle(decision)
         self.check_if_denied(decision)
-        # bundle run runnables
-        self.get_return_value()
-        # bundle run weitere Sachen
-        # return value
-        return
+        bundle.execute_on_decision_handler(decision)
+        bundle.execute_function_arguments_mapper(self.values_dict["args"])
+        return_value = self.get_return_value()
+        return bundle.execute_result_handler(return_value)
 
     def pre_and_post_enforce(self, subject, action, resource, environment, scope):
-        subscription = self.get_subscription(subject, action, resource, environment, scope, "pre_enforce")
-        decision = pdp.sync_decide(subscription)
-        self.get_bundle(decision)
-        self.check_if_denied(decision)
-        # bundle run runnables
-        self.get_return_value()
-        # bundle run weitere Sachen
+        self.values_dict["return_value"] = self.pre_enforce(subject, action, resource, environment, scope)
+        return self._post_enforce_handling(subject, action, resource, environment, scope)
+
+    def _post_enforce_handling(self, subject, action, resource, environment, scope):
         subscription = self.get_subscription(subject, action, resource, environment, scope, "post_enforce")
         decision = pdp.sync_decide(subscription)
-        self.get_bundle(decision)
+        bundle = constraint_handler_service.build_post_enforce_bundle(decision)
         self.check_if_denied(decision)
-        # bundle run runnables
-        # bundle run weitere Sachen
-        # return value
-        return
+        bundle.execute_on_decision_handler(decision)
+        return bundle.execute_result_handler(self.values_dict["return_value"])

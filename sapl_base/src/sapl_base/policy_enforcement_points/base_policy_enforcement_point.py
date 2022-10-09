@@ -1,9 +1,10 @@
 from sapl_base.authorization_subscription_factory import BaseAuthorizationSubscriptionFactory
+from sapl_base.constraint_handling.constraint_handler_bundle import ConstraintHandlerBundle
 from sapl_base.constraint_handling.constraint_handler_service import constraint_handler_service
 
 
 class BasePolicyEnforcementPoint:
-    _constraint_handler_bundle = None
+    constraint_handler_bundle: ConstraintHandlerBundle = None
 
     def __init__(self, fn, *args, **kwargs):
         self._enforced_function = fn
@@ -21,27 +22,26 @@ class BasePolicyEnforcementPoint:
             self.values_dict = {"function": fn, "args": args_dict}
 
     def get_return_value(self):
-        self.values_dict["return_value"] = self._enforced_function(*self._function_args, **self._function_kwargs)
+        self.values_dict["return_value"] = self._enforced_function(**self.values_dict["args"])
         return self.values_dict["return_value"]
 
+
+
     async def async_get_return_value(self):
-        self.values_dict["return_value"] = await self._enforced_function(*self._function_args, **self._function_kwargs)
+        self.values_dict["return_value"] = await self._enforced_function(**self.values_dict["args"])
         return self.values_dict["return_value"]
 
     def get_subscription(self, subject, action, resource, environment, scope, enforcement_type):
         return auth_factory.create_authorization_subscription(self.values_dict, subject, action, resource, environment,
                                                               scope,enforcement_type)
 
-    def get_bundle(self, decision):
-        self._constraint_handler_bundle = constraint_handler_service.create_constraint_handler_bundle(decision)
-        pass
+    def fail_with_bundle(self,exception):
+        self.constraint_handler_bundle.execute_on_error_handler(exception)
 
-    def fail_with_bundle(self):
-        pass
 
     def check_if_denied(self, decision):
         if decision["decision"] == "DENY":
-            self.fail_with_bundle()
+            self.fail_with_bundle(Exception)
 
 
 def get_function_positional_args(fn, args):
