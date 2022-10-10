@@ -2,8 +2,7 @@ from typing import Any, Callable, Union
 
 
 class ConstraintHandlerBundle:
-    # TODO Use a Dictionary instead of an array to distinguish which handler shall be called at what stage
-    # TODO async handling of Constraints
+
     _on_decision_handler: list[Callable[[Any], None]]  # Change to decision
     _error_handler: list[Callable[[Exception], None]]
     _result_handler: list[Callable[[Any], Any]]

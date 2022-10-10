@@ -1,6 +1,5 @@
 from sapl_base.authorization_subscription_factory import BaseAuthorizationSubscriptionFactory
 from sapl_base.constraint_handling.constraint_handler_bundle import ConstraintHandlerBundle
-from sapl_base.constraint_handling.constraint_handler_service import constraint_handler_service
 
 
 class BasePolicyEnforcementPoint:
@@ -25,19 +24,16 @@ class BasePolicyEnforcementPoint:
         self.values_dict["return_value"] = self._enforced_function(**self.values_dict["args"])
         return self.values_dict["return_value"]
 
-
-
     async def async_get_return_value(self):
         self.values_dict["return_value"] = await self._enforced_function(**self.values_dict["args"])
         return self.values_dict["return_value"]
 
     def get_subscription(self, subject, action, resource, environment, scope, enforcement_type):
         return auth_factory.create_authorization_subscription(self.values_dict, subject, action, resource, environment,
-                                                              scope,enforcement_type)
+                                                              scope, enforcement_type)
 
-    def fail_with_bundle(self,exception):
+    def fail_with_bundle(self, exception):
         self.constraint_handler_bundle.execute_on_error_handler(exception)
-
 
     def check_if_denied(self, decision):
         if decision["decision"] == "DENY":

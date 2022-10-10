@@ -3,9 +3,6 @@ from typing import Any
 
 
 class ConstraintHandlerProvider(ABC):
-    """" BaseClass of a ConstraintHandler, which can be used as an Interface to create ConstraintHandler for the
-    ConstraintHandlerService
-    """
 
     @abstractmethod
     def priority(self) -> int:

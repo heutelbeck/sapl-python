@@ -42,7 +42,7 @@ class ConstraintHandlerService:
         function_arguments_mapper.extend(self._create_function_argument_mapper(advices))
         if unhandled_obligations is not None:
             raise Exception
-        ConstraintHandlerBundle(on_decision_handler, error_handler, result_handler, function_arguments_mapper)
+        return ConstraintHandlerBundle(on_decision_handler, error_handler, result_handler, function_arguments_mapper)
 
     def _build_basic_bundle(self, obligations, advices, unhandled_obligations):
         on_decision_handler = self._create_on_decision_handler(obligations, unhandled_obligations)
