@@ -1,9 +1,11 @@
+import json
 from abc import ABC, abstractmethod
 from base64 import b64encode
 
 import aiohttp
 import backoff
 import requests
+from backoff._typing import Details
 
 from sapl_base.authorization_subscriptions import AuthorizationSubscription
 
@@ -33,6 +35,7 @@ class PolicyDecisionPoint(ABC):
         """
         async function to make a request to a pdp with the given subscription and event to create a stream of decisions
 
+        :param pep_decision_stream:
         :param subscription: authorization_subscription which will be sent to a pdp to receive decisions based on it
         :param decision_events: what kind of decision will be requested from the pdp. defaults to 'decide'
         """
@@ -83,7 +86,10 @@ class DummyPolicyDecisionPoint(PolicyDecisionPoint):
         """
         implementation of decide, which always yields a PERMIT
         """
-        pep_decision_stream.send({"decision": "PERMIT"})
+        return {"decision": "PERMIT"}, self.yield_permits(pep_decision_stream)
+
+    async def yield_permits(self, pep_decision_stream):
+        await pep_decision_stream.asend({"decision": "PERMIT"})
 
     async def decide_once(
             self, subscription: AuthorizationSubscription, decision_events="decide"
@@ -100,7 +106,7 @@ class DummyPolicyDecisionPoint(PolicyDecisionPoint):
         return {"decision": "PERMIT"}
 
 
-def recreate_stream(details: dict):
+async def recreate_stream(details: Details):
     """
 
     :param details:
@@ -109,9 +115,9 @@ def recreate_stream(details: dict):
 
 
 class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
-    headers = {"Content-type": "application/json"}
+    headers = {"Content-Type": "application/json"}
 
-    def __init__(self, base_url="http://localhost:8443/api/pdp/",
+    def __init__(self, base_url="http://localhost:8080/api/pdp/",
                  key="YJidgyT2mfdkbmL", secret="Fa4zvYQdiwHZVXh", verify=False):
         self.base_url = base_url
         self.verify = verify
@@ -133,14 +139,11 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         """
         with requests.post(
                 self.base_url + decision_events,
-                subscription,
+                subscription.__str__(),
                 stream=True,
                 verify=self.verify,
                 headers=self.headers
         ) as stream_response:
-            # with self._sync_request(
-            #         subscription, decision_events
-            # ) as stream_response:
             if stream_response.status_code == 204:
                 return {"decision": "DENY"}
                 # return
@@ -168,11 +171,13 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         :return:
         """
         try:
-            decision, decision_stream = self.get_first_decision_and_stream(subscription, decision_events)
-        except Exception:
+            decision, decision_stream = await self.get_first_decision_and_stream(subscription=subscription,
+                                                                                 decision_events=decision_events)
+        except Exception as e:
             decision = {"decision": "INDETERMINATE"}
             decision_stream = None
-        return decision, self.update_stream(subscription, decision_stream, pep_decision_stream, decision_events)
+        return decision, self.update_stream(subscription=subscription, decision_stream=decision_stream,
+                                            pep_decision_stream=pep_decision_stream, decision_events=decision_events)
 
     @backoff.on_exception(backoff.expo, Exception, on_backoff=recreate_stream, max_value=100)
     async def update_stream(self, subscription, decision_stream, pep_decision_stream, decision_events="decide"):
@@ -185,13 +190,12 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         """
         if decision_stream is None:
             await pep_decision_stream.asend({"decision": "INDETERMINATE"})
-            _decision_stream = self.get_decision_stream(subscription, decision_events)
-        else:
-            _decision_stream = decision_stream
+            decision_stream = self.get_decision_stream(subscription=subscription, decision_events=decision_events)
+
         async for decision in decision_stream:
             await pep_decision_stream.asend(decision)
 
-    @backoff.on_exception(backoff.constant, Exception, max_time=20)
+    @backoff.on_exception(backoff.constant, Exception, max_time=10)
     async def get_first_decision_and_stream(self, subscription, decision_events):
         """
 
@@ -199,14 +203,13 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         :param decision_events:
         :return:
         """
-        decision_stream = self.get_decision_stream(subscription, decision_events)
+        decision_stream = self.get_decision_stream(subscription=subscription, decision_events=decision_events)
         decision = await decision_stream.__anext__()
         if decision == {"decision": "INDETERMINATE"}:
             return {"decision": "DENY"}, decision_stream
         return decision, decision_stream
 
-    @staticmethod
-    async def get_decision_stream(subscription, decision_events="decide"):
+    async def get_decision_stream(self, subscription, decision_events="decide"):
         """
         Makes a request to the set pdp and returns a stream of decisions for the sent authorization_subscription
 
@@ -214,11 +217,12 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         :param decision_events: Signal to tell the PDP what kind of Authorization_Subscription is sent
         and what kind of decisions is expected
         """
-        async with aiohttp.ClientSession(raise_for_status=True
+        async with aiohttp.ClientSession(headers=self.headers, raise_for_status=True
                                          ) as session:
-            async with session.get('http://localhost:8080/') as response:
-                # self.base_url + decision_events, data=subscription, verify_ssl=self.verify,
-                # headers=self.headers)
+
+            async with session.post(self.base_url + decision_events, data=subscription.__str__()
+                                    ) as response:
+
                 if response.status == 204:
                     yield {"decision": "INDETERMINATE"}
                     # return
@@ -234,7 +238,8 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
                             response = ''
                             for item in line_set:
                                 response += item.decode('utf-8')
-                            yield response
+                            data_begin = str.find(response, '{')
+                            yield json.loads(response[data_begin:])
                             lines = b''
 
     @backoff.on_exception(backoff.constant, Exception, max_time=20)
@@ -249,7 +254,7 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         and what kind of decision is expected
         :return: A decision for the given Authorization_Subscription
         """
-        decision_stream = self.get_decision_stream(subscription, decision_events)
+        decision_stream = self.get_decision_stream(subscription=subscription, decision_events=decision_events)
         decision = await decision_stream.__anext__()
         await decision_stream.aclose()
         if decision == {"decision": "INDETERMINATE"}:
