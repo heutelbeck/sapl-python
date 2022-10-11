@@ -13,7 +13,8 @@ license = { file = "LICENSE" }
 
 dependencies = [
     "backoff",
-    "aiohttp"
+    "aiohttp",
+    "requests"
 ]
 
 [project.optional-dependencies]
