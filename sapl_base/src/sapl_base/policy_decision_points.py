@@ -5,7 +5,7 @@ from base64 import b64encode
 import aiohttp
 import backoff
 import requests
-from backoff._typing import Details
+
 
 from sapl_base.authorization_subscriptions import AuthorizationSubscription
 
@@ -106,7 +106,7 @@ class DummyPolicyDecisionPoint(PolicyDecisionPoint):
         return {"decision": "PERMIT"}
 
 
-async def recreate_stream(details: Details):
+async def recreate_stream(details):
     """
 
     :param details:
