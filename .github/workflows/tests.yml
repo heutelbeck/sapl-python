@@ -73,6 +73,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install build
           pip install pytest
+          pip install pytest-asyncio
           pip install ./${{ matrix.project }}
 
       - name: Testing
