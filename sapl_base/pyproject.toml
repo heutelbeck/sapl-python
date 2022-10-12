@@ -14,12 +14,12 @@ license = { file = "LICENSE" }
 dependencies = [
     "backoff",
     "aiohttp",
-    "requests"
+    "requests",
+    "pytest",
 ]
 
 [project.optional-dependencies]
 tests = [
-    "pytest",
     "pytest-asyncio"
 ]
 
@@ -27,7 +27,9 @@ tests = [
 [tools.setuptools]
 packages = ["sapl_base"]
 
-[tools.pytest.ini_options]
+[tool.pytest.ini_options]
 testpaths = [
     "tests"
 ]
+
+
