@@ -1,8 +1,10 @@
+import sys
 from functools import wraps
 from pathlib import Path
 from typing import Optional, Iterable, Dict, Union, List
 
 import iniconfig
+from _pytest.config.findpaths import get_common_ancestor, get_dirs_from_args
 from _pytest.pathlib import absolutepath
 
 
@@ -33,21 +35,26 @@ def double_wrap(f):
 
 
 def get_configuration():
-    # arggs = parsearg
-    # print(sys.argv.__len__())
-    # print(str(sys.argv[0]))
-    # logging.error(sys.argv.__sizeof__())
-    # calling_method = sys.argv[0]
-    # dirs = get_dirs_from_args(calling_method)
-    # Path(".")
-    # ancestor = get_common_ancestor(dirs)
-    # inicfg = locate_config([Path(".")])
-    # print(inicfg)
-    # return inicfg
-    return {}
+    frame = sys._getframe()
+    filename: str
+    while frame.f_back:
+        frame = frame.f_back
+        filename = frame.f_code.co_filename
+        if filename.startswith('<frozen'):
+            continue
+        if filename.endswith(('sapl_util.py', 'sapl_base\\__init__.py')):
+            continue
+        break
+
+    filename = filename.replace('\\', '::')
+    dirs = get_dirs_from_args(filename)
+
+    ancestor = get_common_ancestor(dirs)
+    inicfg = _locate_config([ancestor])
+    return inicfg
 
 
-def locate_config(
+def _locate_config(
         args: Iterable[Path],
 ) -> Dict[str, Union[str, List[str]]]:
     """Search in the list of arguments for a valid ini-file for sapl,
@@ -67,13 +74,13 @@ def locate_config(
             for config_name in config_names:
                 p = base / config_name
                 if p.is_file():
-                    ini_config = load_config_dict_from_file(p)
+                    ini_config = _load_config_dict_from_file(p)
                     if ini_config is not None:
                         return ini_config
     return {}
 
 
-def load_config_dict_from_file(
+def _load_config_dict_from_file(
         filepath: Path,
 ) -> Optional[Dict[str, Union[str, List[str]]]]:
     """Load sapl configuration from the given file path, if supported.

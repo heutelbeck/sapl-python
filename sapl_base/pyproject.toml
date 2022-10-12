@@ -28,8 +28,8 @@ tests = [
 packages = ["sapl_base"]
 
 [tool.pytest.ini_options]
-testpaths = [
-    "tests"
-]
+testpaths = ["tests"]
+asyncio_mode='strict'
+
 
 
