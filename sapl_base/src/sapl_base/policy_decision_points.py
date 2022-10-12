@@ -6,22 +6,24 @@ import aiohttp
 import backoff
 import requests
 
-
 from sapl_base.authorization_subscriptions import AuthorizationSubscription
+from sapl_base.sapl_util import configuration
 
 
 class PolicyDecisionPoint(ABC):
-
-    # TODO: read how to get data from pyproject.toml file ( look at lib/site-packages/_pytest/config/findpaths.py )
-    # TODO: get configuration for from_settings(cls) from pyproject.toml
 
     @classmethod
     def from_settings(cls):
         """
         reads the configuration in the pyproject.toml file and creates a PolicyDecisionPoint depending on the configuration
         """
-        # TODO: read config from .toml file and decide which PDP
-        return RemotePolicyDecisionPoint()
+        if configuration.get("dummy", False):
+            return DummyPolicyDecisionPoint()
+        base_url = configuration.get("base_url", "http://localhost:8080/api/pdp/")
+        key = configuration.get("key", "YJidgyT2mfdkbmL")
+        secret = configuration.get("secret", "Fa4zvYQdiwHZVXh")
+        verify = configuration.get("verify", False)
+        return RemotePolicyDecisionPoint(base_url, key, secret, verify)
 
     @classmethod
     def dummy_pdp(cls):
@@ -31,7 +33,7 @@ class PolicyDecisionPoint(ABC):
         return DummyPolicyDecisionPoint()
 
     @abstractmethod
-    async def decide(self, subscription, pep_decision_stream, decision_events="decide"):
+    async def async_decide(self, subscription, pep_decision_stream, decision_events="decide"):
         """
         async function to make a request to a pdp with the given subscription and event to create a stream of decisions
 
@@ -42,7 +44,7 @@ class PolicyDecisionPoint(ABC):
         pass
 
     @abstractmethod
-    async def decide_once(self, subscription: AuthorizationSubscription, decision_events="decide"):
+    async def async_decide_once(self, subscription: AuthorizationSubscription, decision_events="decide"):
         """
         async function to make a request to a pdp with the given subscription and event to receive a
         single decision
@@ -53,7 +55,7 @@ class PolicyDecisionPoint(ABC):
         pass
 
     @abstractmethod
-    def sync_decide(self, subscription: AuthorizationSubscription, decision_events="decide"):
+    def decide(self, subscription: AuthorizationSubscription, decision_events="decide"):
         """
         synchronous function to make a request to a pdp with the given subscription and event to receive a
         single decision
@@ -62,10 +64,6 @@ class PolicyDecisionPoint(ABC):
         :param decision_events: what kind of decision will be requested from the pdp. defaults to 'decide'
         """
         pass
-
-    # @abstractmethod
-    # def sync_decide_once(self, subscription: AuthorizationSubscription, decision_events="decide"):
-    #    pass
 
 
 class DummyPolicyDecisionPoint(PolicyDecisionPoint):
@@ -82,16 +80,16 @@ class DummyPolicyDecisionPoint(PolicyDecisionPoint):
         #     "PURPOSE ONLY!"
         # )
 
-    async def decide(self, subscription, pep_decision_stream, decision_events="decide"):
+    async def async_decide(self, subscription, pep_decision_stream, decision_events="decide"):
         """
         implementation of decide, which always yields a PERMIT
         """
-        return {"decision": "PERMIT"}, self.yield_permits(pep_decision_stream)
+        return {"decision": "PERMIT"}, self.yield_permit(pep_decision_stream)
 
-    async def yield_permits(self, pep_decision_stream):
+    async def yield_permit(self, pep_decision_stream):
         await pep_decision_stream.asend({"decision": "PERMIT"})
 
-    async def decide_once(
+    async def async_decide_once(
             self, subscription: AuthorizationSubscription, decision_events="decide"
     ):
         """
@@ -99,7 +97,7 @@ class DummyPolicyDecisionPoint(PolicyDecisionPoint):
         """
         return {"decision": "PERMIT"}
 
-    def sync_decide(self, subscription: AuthorizationSubscription, decision_events="decide"):
+    def decide(self, subscription: AuthorizationSubscription, decision_events="decide"):
         """
         implementation of sync_decide, which always returns a PERMIT
         """
@@ -117,8 +115,7 @@ async def recreate_stream(details):
 class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
     headers = {"Content-Type": "application/json"}
 
-    def __init__(self, base_url="http://localhost:8080/api/pdp/",
-                 key="YJidgyT2mfdkbmL", secret="Fa4zvYQdiwHZVXh", verify=False):
+    def __init__(self, base_url, key, secret, verify):
         self.base_url = base_url
         self.verify = verify
         if (self.verify is None) or (self.base_url is None):
@@ -128,8 +125,8 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
             self.headers["Authorization"] = f"Basic {key_and_secret}"
 
     @backoff.on_exception(backoff.constant, Exception, max_time=20)
-    def sync_decide(self, subscription: AuthorizationSubscription,
-                    decision_events="decide"):
+    def decide(self, subscription: AuthorizationSubscription,
+               decision_events="decide"):
         """
         Makes a synchronous request to the set pdp and returns a decision for the sent authorization_subscription
 
@@ -159,10 +156,13 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
                         response = ''
                         for item in line_set:
                             response += item.decode('utf-8')
+                        data_begin = str.find(response, '{')
+                        response = json.loads(response[data_begin:])
                         if response == {"decision": "INDETERMINATE"}:
                             return {"decision": "DENY"}
+                        return response
 
-    async def decide(self, subscription, pep_decision_stream, decision_events="decide"):
+    async def async_decide(self, subscription, pep_decision_stream, decision_events="decide"):
         """
 
         :param subscription:
@@ -243,7 +243,7 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
                             lines = b''
 
     @backoff.on_exception(backoff.constant, Exception, max_time=20)
-    async def decide_once(
+    async def async_decide_once(
             self, subscription: AuthorizationSubscription, decision_events="decide"
     ):
         """

@@ -11,7 +11,7 @@ class SyncPolicyEnforcementPoint(BasePolicyEnforcementPoint):
 
     def pre_enforce(self, subject, action, resource, environment, scope):
         subscription = self.get_subscription(subject, action, resource, environment, scope, "pre_enforce")
-        decision = pdp.sync_decide(subscription)
+        decision = pdp.decide(subscription)
         bundle = constraint_handler_service.build_pre_enforce_bundle(decision)
         self.check_if_denied(decision)
         bundle.execute_on_decision_handler(decision)
@@ -25,7 +25,7 @@ class SyncPolicyEnforcementPoint(BasePolicyEnforcementPoint):
 
     def _post_enforce_handling(self, subject, action, resource, environment, scope):
         subscription = self.get_subscription(subject, action, resource, environment, scope, "post_enforce")
-        decision = pdp.sync_decide(subscription)
+        decision = pdp.decide(subscription)
         bundle = constraint_handler_service.build_post_enforce_bundle(decision)
         self.check_if_denied(decision)
         bundle.execute_on_decision_handler(decision)
