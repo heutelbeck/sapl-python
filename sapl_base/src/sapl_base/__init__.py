@@ -1,27 +1,19 @@
-imported_addon = None
+from sapl_base.sapl_util import configuration
 
-try:
-    from sapl_django import *
-    imported_addon = 'sapl_django'
-except ImportError:
-    pass
+framework = configuration.get("framework", None)
+if framework is not None:
+    match framework:
+        case 'django':
+            from sapl_django import *
+        case 'tornado':
+            from sapl_tornado import *
+        case 'flask':
+            from sapl_flask import *
 
-#try:
-  #  from sapl_flask import *
-  #  if not imported_addon:
-   #     imported_addon = 'sapl_flask'
-   # else:
-     #   sys.exit("%s is already imported, only one sapl_package can be installed" % imported_addon)
-#except ImportError:
-    #pass
 
-#try:
-    #from sapl_tornado import basic
-    #if not imported_addon:
-    #    imported_addon = 'sapl_tornado'
-    #else:
-    #    sys.exit("%s is already imported, only one sapl_package can be installed" % imported_addon)
-#except ImportError:
-    #pass
 
-del imported_addon
+
+
+
+
+
