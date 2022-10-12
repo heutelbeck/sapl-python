@@ -1,10 +1,8 @@
-import sys
 from functools import wraps
 from pathlib import Path
 from typing import Optional, Iterable, Dict, Union, List
 
 import iniconfig
-from _pytest.config.findpaths import get_dirs_from_args, get_common_ancestor
 from _pytest.pathlib import absolutepath
 
 
@@ -35,11 +33,18 @@ def double_wrap(f):
 
 
 def get_configuration():
-    calling_method = sys.argv[1]
-    dirs = get_dirs_from_args(calling_method)
-    ancestor = get_common_ancestor(dirs)
-    inicfg = locate_config([ancestor])
-    return inicfg
+    # arggs = parsearg
+    # print(sys.argv.__len__())
+    # print(str(sys.argv[0]))
+    # logging.error(sys.argv.__sizeof__())
+    # calling_method = sys.argv[0]
+    # dirs = get_dirs_from_args(calling_method)
+    # Path(".")
+    # ancestor = get_common_ancestor(dirs)
+    # inicfg = locate_config([Path(".")])
+    # print(inicfg)
+    # return inicfg
+    return {}
 
 
 def locate_config(
