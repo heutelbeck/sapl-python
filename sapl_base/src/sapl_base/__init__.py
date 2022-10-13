@@ -17,11 +17,11 @@ framework = configuration.get("framework", None)
 
 match framework:
     case 'django':
-        pass
+        from sapl_django import *
     case 'tornado':
-        pass
+        from sapl_tornado import *
     case 'flask':
-
+        from sapl_flask import *
         import sapl_base.policy_enforcement_points.policy_enforcement_point
         from sapl_base.policy_enforcement_points.base_streaming_pep import BaseStreamingPolicyEnforcementPoint
 
