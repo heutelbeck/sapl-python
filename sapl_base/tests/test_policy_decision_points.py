@@ -42,8 +42,8 @@ def test_instantiate_pdp_raises():
 class TestRemotePolicyDecisionPoint:
 
     @pytest.fixture(scope="class")
-    def pdp_from_configuration(self):
+    def pdp_from_config(self):
         return PolicyDecisionPoint.from_settings()
 
-    def test_create_default_pdp_from_config(self, pdp_from_configuration):
-        assert isinstance(pdp_from_configuration, RemotePolicyDecisionPoint)
+    def test_create_default_pdp_from_config(self, pdp_from_config):
+        assert isinstance(pdp_from_config, RemotePolicyDecisionPoint)

@@ -10,52 +10,12 @@ on:
   pull_request:
     branches: [ master ]
 jobs:
-  create-matrix:
-    outputs:
-      packagename: ${{ steps.packages.outputs.identifier }}
-      matrix: ${{ steps.packages.outputs.matrix }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - id: file-changes
-        run: |
-          array=$(git diff --name-only ${{github.event.before}} ${{github.event.after}})
-          echo $array
-          echo "identifier=$array" >> $GITHUB_OUTPUT
-      - id: packages
-        run: |
-          ARRAY=()
-          echo "${{ steps.file-changes.outputs.identifier }}"
-          if ${{ contains( steps.file-changes.outputs.identifier, 'sapl_base' ) }}
-          then
-            sapl_base="\"sapl_base\"",
-          fi
-          if ${{ contains( steps.file-changes.outputs.identifier, 'sapl_django' ) }}
-          then
-            sapl_django="\"sapl_django\"",
-          fi
-          if ${{ contains( steps.file-changes.outputs.identifier, 'sapl_tornado' ) }}
-          then
-            sapl_tornado="\"sapl_tornado\"",
-          fi
-          if ${{ contains( steps.file-changes.outputs.identifier, 'sapl_flask' ) }}
-          then
-            sapl_flask="\"sapl_flask\"",
-          fi
-          echo ${ARRAY[@]}
-          echo "identifier={ARRAY[@]}" >> $GITHUB_OUTPUT
-          echo "matrix={\"project\":[$sapl_base]}" >> $GITHUB_OUTPUT
-        shell: bash
   test-packages:
     needs: create-matrix
     runs-on: ubuntu-latest
-    strategy:
-      matrix: ${{fromJSON(needs.create-matrix.outputs.matrix)}}
+
     steps:
       - uses: actions/checkout@v3
-
       - name: Set up Python
         uses: actions/setup-python@v3
         with:
@@ -66,9 +26,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install build
           pip install pytest-asyncio
-          pip install ./${{ matrix.project }}
+          pip install ./sapl_base
 
       - name: Testing
         run: |
-          cd ${{ matrix.project }}
+          cd sapl_base
           python -m pytest
