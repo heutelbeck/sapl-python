@@ -23,7 +23,7 @@ jobs:
         run: |
           array=$(git diff --name-only ${{github.event.before}} ${{github.event.after}})
           echo $array
-          echo "identifier={array}" >> $GITHUB_OUTPUT
+          echo "identifier=$array" >> $GITHUB_OUTPUT
       - id: packages
         run: |
           ARRAY=()
