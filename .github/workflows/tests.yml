@@ -36,21 +36,21 @@ jobs:
           then
             sapl_base="\"sapl_base\"",
           fi
-#          if ${{ contains( steps.file-changes.outputs.identifier, 'sapl_django' ) }}
-#          then
-#            sapl_django="\"sapl_django\"",
-#          fi
-#          if ${{ contains( steps.file-changes.outputs.identifier, 'sapl_tornado' ) }}
-#          then
-#            sapl_tornado="\"sapl_tornado\"",
-#          fi
-#          if ${{ contains( steps.file-changes.outputs.identifier, 'sapl_flask' ) }}
-#          then
-#            sapl_flask="\"sapl_flask\"",
-#          fi
+          if ${{ contains( steps.file-changes.outputs.identifier, 'sapl_django' ) }}
+          then
+            sapl_django="\"sapl_django\"",
+          fi
+          if ${{ contains( steps.file-changes.outputs.identifier, 'sapl_tornado' ) }}
+          then
+            sapl_tornado="\"sapl_tornado\"",
+          fi
+          if ${{ contains( steps.file-changes.outputs.identifier, 'sapl_flask' ) }}
+          then
+            sapl_flask="\"sapl_flask\"",
+          fi
           echo "identifier=${ARRAY[@]}" >> $GITHUB_OUTPUT
           echo ${ARRAY[@]}
-          echo "matrix={\"project\":[$sapl_base$sapl_django$sapl_tornado$sapl_flask]}" $GITHUB_OUTPUT
+          echo "matrix={\"project\":[$sapl_base]}" $GITHUB_OUTPUT
 
         shell: bash
 

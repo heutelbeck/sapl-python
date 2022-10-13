@@ -1,5 +1,6 @@
 import pytest
-from sapl_base.policy_decision_points import PolicyDecisionPoint, DummyPolicyDecisionPoint
+
+from sapl_base.policy_decision_points import PolicyDecisionPoint, DummyPolicyDecisionPoint, RemotePolicyDecisionPoint
 
 
 class TestDummyPdp:
@@ -32,6 +33,17 @@ class TestDummyPdp:
         assert initial_decision == {"decision": "PERMIT"}
         await permit_stream
 
+
 def test_instantiate_pdp_raises():
     with pytest.raises(TypeError):
         PolicyDecisionPoint()
+
+
+class TestRemotePolicyDecisionPoint:
+
+    @pytest.fixture(scope="class")
+    def pdp_from_config(self):
+        return PolicyDecisionPoint.from_settings()
+
+    def test_create_default_pdp_from_config(self, pdp_from_config):
+        assert isinstance(pdp_from_config, RemotePolicyDecisionPoint)
