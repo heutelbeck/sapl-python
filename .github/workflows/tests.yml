@@ -1,5 +1,4 @@
 name: Test push and pull-request to Master
-
 on:
   push:
     branches: [ master ]
@@ -10,7 +9,6 @@ on:
       - '**.md'
   pull_request:
     branches: [ master ]
-
 jobs:
   create-matrix:
     outputs:
@@ -21,13 +19,11 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-
       - id: file-changes
         run: |
           array=$(git diff --name-only ${{github.event.before}} ${{github.event.after}})
           echo $array
-          echo "identifier=${{array}}" >> $GITHUB_OUTPUT
-
+          echo "identifier={array}" >> $GITHUB_OUTPUT
       - id: packages
         run: |
           ARRAY=()
@@ -48,13 +44,10 @@ jobs:
           then
             sapl_flask="\"sapl_flask\"",
           fi
-          echo "identifier={ARRAY[@]}" >> $GITHUB_OUTPUT
           echo ${ARRAY[@]}
+          echo "identifier={ARRAY[@]}" >> $GITHUB_OUTPUT
           echo "matrix={\"project\":[$sapl_base]}" >> $GITHUB_OUTPUT
-
         shell: bash
-
-
   test-packages:
     needs: create-matrix
     runs-on: ubuntu-latest
