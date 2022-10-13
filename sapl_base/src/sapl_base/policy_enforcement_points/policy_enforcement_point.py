@@ -1,8 +1,8 @@
-from sapl_base.authorization_subscription_factory import BaseAuthorizationSubscriptionFactory
+from sapl_base.authorization_subscription_factory import auth_factory
 from sapl_base.constraint_handling.constraint_handler_bundle import ConstraintHandlerBundle
 
 
-class BasePolicyEnforcementPoint:
+class PolicyEnforcementPoint:
     constraint_handler_bundle: ConstraintHandlerBundle = None
 
     def __init__(self, fn, *args, **kwargs):
@@ -71,4 +71,4 @@ def get_named_args_dict(fn, *args, **kwargs):
     return {**dict(zip(args_names, args)), **kwargs}
 
 
-auth_factory: BaseAuthorizationSubscriptionFactory
+streaming_pep = None

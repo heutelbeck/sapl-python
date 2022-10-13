@@ -3,7 +3,7 @@ from abc import abstractmethod, ABC
 from .authorization_subscriptions import AuthorizationSubscription, MultiSubscription
 
 
-class BaseAuthorizationSubscriptionFactory(ABC):
+class AuthorizationSubscriptionFactory(ABC):
     """
     Baseclass of an AuthorizationSubscriptionFactory, which can be inherited to create a framework specific
     AuthorizationSubscriptionFactory.
@@ -85,7 +85,7 @@ class BaseAuthorizationSubscriptionFactory(ABC):
         pass
 
     def create_authorization_subscription(self, values: dict, subject, action, resource,
-                                          environment,  scope , enforcement_type):
+                                          environment, scope, enforcement_type):
         """
         Create an authorization_subscription with the given dictionary and arguments
 
@@ -218,3 +218,6 @@ class MultiSubscriptionBuilder:
         return MultiSubscription(self._remove_empty_list(self.subject), self._remove_empty_list(self.action),
                                  self._remove_empty_list(self.resource), self._remove_empty_list(self.environment),
                                  self._remove_empty_list(self.authorization_subscription))
+
+
+auth_factory = None

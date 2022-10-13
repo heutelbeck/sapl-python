@@ -1,9 +1,9 @@
 from sapl_base.constraint_handling.constraint_handler_service import constraint_handler_service
 from sapl_base.policy_decision_points import pdp
-from sapl_base.policy_enforcement_points.base_policy_enforcement_point import BasePolicyEnforcementPoint
+from sapl_base.policy_enforcement_points.policy_enforcement_point import PolicyEnforcementPoint
 
 
-class AsyncPolicyEnforcementPoint(BasePolicyEnforcementPoint):
+class AsyncPolicyEnforcementPoint(PolicyEnforcementPoint):
 
     async def post_enforce(self, subject, action, resource, environment, scope):
         await self.async_get_return_value()

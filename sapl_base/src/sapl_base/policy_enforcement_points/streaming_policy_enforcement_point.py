@@ -1,10 +1,9 @@
-import types
+from abc import ABC, abstractmethod
 
-from sapl_base.policy_enforcement_points.base_policy_enforcement_point import BasePolicyEnforcementPoint
-from sapl_base.policy_decision_points import pdp
+from sapl_base.policy_enforcement_points.policy_enforcement_point import PolicyEnforcementPoint
 
 
-class StreamingPolicyEnforcementPoint(BasePolicyEnforcementPoint):
+class StreamingPolicyEnforcementPoint(PolicyEnforcementPoint, ABC):
     _current_decision: dict
 
     def __init__(self, fn, *args, **kwargs):
@@ -12,21 +11,15 @@ class StreamingPolicyEnforcementPoint(BasePolicyEnforcementPoint):
         self._decision_generator = self._update_decision()
         self._decision_generator.send(None)
 
+    @abstractmethod
     async def enforce_till_denied(self, subject, action, resource, environment, scope):
-        # subscription = self.get_subscription(subject, action, resource, environment, scope)
-        # first_decision,decision_update_coro = pdp.decide(subscription, self._decision_generator)
-        # self.get_bundle(first_decision)
-        # self.check_if_denied(first_decision)
-        # await self.get_return_value()
-        # bundle run weitere Sachen
-        # return value
-        # Gen ist bekannt
-        # Decisionstream ist vorhanden
         pass
 
+    @abstractmethod
     async def drop_while_denied(self, subject, action, resource, environment, scope):
         pass
 
+    @abstractmethod
     async def recoverable_if_denied(self, subject, action, resource, environment, scope):
         pass
 
