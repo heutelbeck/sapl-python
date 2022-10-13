@@ -26,7 +26,7 @@ jobs:
         run: |
           array=$(git diff --name-only ${{github.event.before}} ${{github.event.after}})
           echo $array
-          echo "identifier=$array" >> $GITHUB_OUTPUT
+          echo "identifier=${{array}}" >> $GITHUB_OUTPUT
 
       - id: packages
         run: |
@@ -48,9 +48,9 @@ jobs:
           then
             sapl_flask="\"sapl_flask\"",
           fi
-          echo "identifier=${ARRAY[@]}" >> $GITHUB_OUTPUT
+          echo "identifier={ARRAY[@]}" >> $GITHUB_OUTPUT
           echo ${ARRAY[@]}
-          echo "matrix={\"project\":[$sapl_base]}" $GITHUB_OUTPUT
+          echo "matrix={\"project\":[$sapl_base]}" >> $GITHUB_OUTPUT
 
         shell: bash
 
