@@ -12,6 +12,11 @@ from sapl_base.sapl_util import configuration
 
 class PolicyDecisionPoint(ABC):
 
+    def __new__(cls, *args, **kwargs):
+        if cls is PolicyDecisionPoint:
+            raise TypeError(f"only children of '{cls.__name__}' may be instantiated")
+        return object.__new__(cls)
+
     @classmethod
     def from_settings(cls):
         """

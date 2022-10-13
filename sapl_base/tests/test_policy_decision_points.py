@@ -31,3 +31,7 @@ class TestDummyPdp:
         initial_decision, permit_stream = await dummy_pdp.async_decide(None, collector_gen)
         assert initial_decision == {"decision": "PERMIT"}
         await permit_stream
+
+def test_instantiate_pdp_raises():
+    with pytest.raises(TypeError):
+        PolicyDecisionPoint()
