@@ -1,0 +1,11 @@
+import sapl_base.authorization_subscription_factory
+from sapl_tornado.src.sapl_tornado.tornado_authorization_subscription_factory import \
+    TornadoAuthorizationSubscriptionFactory
+
+sapl_base.authorization_subscription_factory.auth_factory = TornadoAuthorizationSubscriptionFactory()
+
+import sapl_base.policy_enforcement_points.policy_enforcement_point
+from sapl_tornado.src.sapl_tornado.tornado_streaming_policy_enforcement_point import \
+    TornadoStreamingPolicyEnforcementPoint
+
+sapl_base.policy_enforcement_points.base_policy_enforcement_point.auth_factory = TornadoStreamingPolicyEnforcementPoint

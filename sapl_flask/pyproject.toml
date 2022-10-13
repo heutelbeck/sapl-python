@@ -14,3 +14,10 @@ license = { file = "LICENSE" }
 
 [tools.setuptools]
 packages = ["sapl_flask"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode='strict'
+
+[tool.sapl.ini_options]
+framework = 'flask'
