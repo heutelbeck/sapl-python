@@ -8,6 +8,5 @@ class DjangoStreamingPolicyEnforcementPoint(StreamingPolicyEnforcementPoint):
     async def drop_while_denied(self, subject, action, resource, environment, scope):
         pass
 
-
     async def recoverable_if_denied(self, subject, action, resource, environment, scope):
         pass
