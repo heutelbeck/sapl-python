@@ -1,5 +1,6 @@
-from sapl_base.authorization_subscription_factory import AuthorizationSubscriptionFactory
+from sapl_base.authorization_subscription_factory import AuthorizationSubscriptionFactory, client_request
 from sapl_base.authorization_subscriptions import AuthorizationSubscription
+
 
 
 class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
@@ -13,4 +14,10 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
     def _identify_type(self, values: dict):
         pass
 
+    def _add_contextvar_to_values(self, values: dict):
+        request = client_request.get('request')
+        args: dict = values.get('args')
+        if 'request' in args:
+            return
+        args.update({'request': request})
 
