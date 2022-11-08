@@ -31,5 +31,8 @@ packages = ["sapl_base"]
 testpaths = ["tests"]
 asyncio_mode='strict'
 
+[tool.sapl.ini_options]
+
+
 
 

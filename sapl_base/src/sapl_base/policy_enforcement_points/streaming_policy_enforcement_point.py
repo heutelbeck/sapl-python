@@ -1,5 +1,8 @@
 from abc import ABC, abstractmethod
 
+import asgiref.sync
+
+from sapl_base.authorization_subscription_factory import auth_factory
 from sapl_base.policy_enforcement_points.policy_enforcement_point import PolicyEnforcementPoint
 
 
@@ -22,6 +25,23 @@ class StreamingPolicyEnforcementPoint(PolicyEnforcementPoint, ABC):
     @abstractmethod
     async def recoverable_if_denied(self, subject, action, resource, environment, scope):
         pass
+
+    async def get_subscription(self, subject, action, resource, environment, scope, enforcement_type):
+        """
+
+        :param subject:
+        :param action:
+        :param resource:
+        :param environment:
+        :param scope:
+        :param enforcement_type:
+        :return:
+        """
+
+        return await asgiref.sync.sync_to_async(auth_factory.create_authorization_subscription)(self.values_dict,
+                                                                                                subject, action,
+                                                                                                resource, environment,
+                                                                                                scope, enforcement_type)
 
     def _update_decision(self):
         while True:

@@ -1,6 +1,9 @@
+import contextvars
 from abc import abstractmethod, ABC
 
 from .authorization_subscriptions import AuthorizationSubscription, MultiSubscription
+
+client_request = contextvars.ContextVar('request')
 
 
 class AuthorizationSubscriptionFactory(ABC):
@@ -82,6 +85,7 @@ class AuthorizationSubscriptionFactory(ABC):
 
     @abstractmethod
     def _valid_combinations(self, fn_type, enforcement_type):
+
         pass
 
     def create_authorization_subscription(self, values: dict, subject, action, resource,
@@ -101,12 +105,17 @@ class AuthorizationSubscriptionFactory(ABC):
         :return: An authorization_subscription which can be sent to a pdp to get an authorization_decision
         """
         fn_type: str
+        self._add_contextvar_to_values(values)
         if scope == "automatic":
             fn_type = self._identify_type(values)
         else:
             fn_type = scope
         self._valid_combinations(fn_type, enforcement_type)
         return self._create_subscription_for_type(fn_type, values, subject, action, resource, environment, scope)
+
+    @abstractmethod
+    def _add_contextvar_to_values(self, values: dict):
+        pass
 
     @abstractmethod
     def _create_subscription_for_type(self, fn_type, values: dict, subject, action, resource,
