@@ -10,6 +10,7 @@ description = "initial upload to register the name for future development"
 readme = "README.md"
 authors = [{ name = "Dominic Heutelbeck", email = "dominic@heutelbeck.com"}]
 license = { file = "LICENSE" }
+dependencies = ['django','channels']
 
 
 [tools.setuptools]

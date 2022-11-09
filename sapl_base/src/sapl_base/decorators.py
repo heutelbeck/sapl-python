@@ -1,7 +1,7 @@
 import asyncio
 from functools import wraps
 
-from policy_enforcement_points.streaming_policy_enforcement_point import StreamingPolicyEnforcementPoint
+from sapl_base.policy_enforcement_points.streaming_policy_enforcement_point import StreamingPolicyEnforcementPoint
 from sapl_base.policy_enforcement_points.async_policy_enforcement_point import AsyncPolicyEnforcementPoint
 from sapl_base.policy_enforcement_points.sync_policy_enforcement_point import SyncPolicyEnforcementPoint
 from sapl_base.sapl_util import double_wrap
@@ -31,14 +31,14 @@ def pre_enforce(fn, subject: str = None, action: str = None, resource: str = Non
     if asyncio.iscoroutinefunction(fn):
         @wraps(fn)
         async def async_wrap(*args, **kwargs):
-            enforcement_point = AsyncPolicyEnforcementPoint(fn, args, kwargs)
+            enforcement_point = AsyncPolicyEnforcementPoint(fn, *args, **kwargs)
             return await enforcement_point.pre_enforce(subject, action, resource, environment, scope)
 
         return async_wrap
     else:
         @wraps(fn)
         def wrap(*args, **kwargs):
-            enforcement_point = SyncPolicyEnforcementPoint(fn, args, kwargs)
+            enforcement_point = SyncPolicyEnforcementPoint(fn, *args, **kwargs)
             return enforcement_point.pre_enforce(subject, action, resource, environment, scope)
 
         return wrap
@@ -144,7 +144,7 @@ def enforce_till_denied(fn, subject: str = None, action: str = None, resource: s
     if asyncio.iscoroutinefunction(fn):
         @wraps(fn)
         async def async_wrap(*args, **kwargs):
-            enforcement_point = StreamingPolicyEnforcementPoint(fn, args, kwargs)
+            enforcement_point = StreamingPolicyEnforcementPoint(fn, *args, **kwargs)
             return await enforcement_point.enforce_till_denied(subject, action, resource, environment, scope)
 
         return async_wrap
@@ -179,7 +179,7 @@ def enforce_drop_while_denied(fn, subject: str = None, action: str = None, resou
     if asyncio.iscoroutinefunction(fn):
         @wraps(fn)
         async def async_wrap(*args, **kwargs):
-            enforcement_point = StreamingPolicyEnforcementPoint(fn, args, kwargs)
+            enforcement_point = StreamingPolicyEnforcementPoint(fn, *args, **kwargs)
             return await enforcement_point.drop_while_denied(subject, action, resource, environment, scope)
 
         return async_wrap

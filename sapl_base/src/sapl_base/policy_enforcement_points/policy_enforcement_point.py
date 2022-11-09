@@ -12,39 +12,79 @@ class PolicyEnforcementPoint:
         self._function_kwargs = kwargs
 
         try:
-            class_object = args_dict.pop('self')
+            class_object = args_dict.get('self')
+            if class_object is None:
+                raise KeyError
             self._pos_args = get_class_positional_args(fn, args)
-            self.values_dict = {"function": fn, "class": class_object, "args": args_dict}
+            self.values_dict = {"function": fn, "self": class_object, "args": args_dict}
 
         except KeyError:
             self._pos_args = get_function_positional_args(fn, args)
             self.values_dict = {"function": fn, "args": args_dict}
 
     def get_return_value(self):
+        """
+
+        :return:
+        """
         self.values_dict["return_value"] = self._enforced_function(**self.values_dict["args"])
         return self.values_dict["return_value"]
 
     async def async_get_return_value(self):
+        """
+
+        :return:
+        """
         self.values_dict["return_value"] = await self._enforced_function(**self.values_dict["args"])
         return self.values_dict["return_value"]
 
     def get_subscription(self, subject, action, resource, environment, scope, enforcement_type):
+        """
+
+        :param subject:
+        :param action:
+        :param resource:
+        :param environment:
+        :param scope:
+        :param enforcement_type:
+        :return:
+        """
         return auth_factory.create_authorization_subscription(self.values_dict, subject, action, resource, environment,
                                                               scope, enforcement_type)
 
     def fail_with_bundle(self, exception):
+        """
+
+        :param exception:
+        """
         self.constraint_handler_bundle.execute_on_error_handler(exception)
 
     def check_if_denied(self, decision):
+        """
+
+        :param decision:
+        """
         if decision["decision"] == "DENY":
             self.fail_with_bundle(Exception)
 
 
 def get_function_positional_args(fn, args):
+    """
+
+    :param fn:
+    :param args:
+    :return:
+    """
     return args[0:fn.__code__.co_argcount]
 
 
 def get_class_positional_args(fn, args):
+    """
+
+    :param fn:
+    :param args:
+    :return:
+    """
     return args[1:fn.__code__.co_argcount]
 
 

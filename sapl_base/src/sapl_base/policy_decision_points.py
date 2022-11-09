@@ -12,6 +12,9 @@ from sapl_base.sapl_util import configuration
 
 class PolicyDecisionPoint(ABC):
 
+    INDETERMINATE_DECISION = {"decision": "INDETERMINATE"}
+    DENY_DECISION = {"decision": "INDETERMINATE"}
+
     def __new__(cls, *args, **kwargs):
         if cls is PolicyDecisionPoint:
             raise TypeError(f"only children of '{cls.__name__}' may be instantiated")
@@ -146,12 +149,8 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
                 verify=self.verify,
                 headers=self.headers
         ) as stream_response:
-            if stream_response.status_code == 204:
+            if stream_response.status_code != 200:
                 return {"decision": "DENY"}
-                # return
-            elif stream_response.status_code != 200:
-                return {"decision": "DENY"}
-                # return
             else:
                 lines = b''
                 for line in stream_response.content:
@@ -222,18 +221,13 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         :param decision_events: Signal to tell the PDP what kind of Authorization_Subscription is sent
         and what kind of decisions is expected
         """
-        async with aiohttp.ClientSession(headers=self.headers, raise_for_status=True
-                                         ) as session:
+        async with aiohttp.ClientSession(headers=self.headers, raise_for_status=True) as session:
 
             async with session.post(self.base_url + decision_events, data=subscription.__str__()
                                     ) as response:
 
-                if response.status == 204:
+                if response.status != 200:
                     yield {"decision": "INDETERMINATE"}
-                    # return
-                elif response.status != 200:
-                    yield {"decision": "INDETERMINATE"}
-                    # return
                 else:
                     lines = b''
                     async for line in response.content:
@@ -247,7 +241,7 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
                             yield json.loads(response[data_begin:])
                             lines = b''
 
-    @backoff.on_exception(backoff.constant, Exception, max_time=20)
+    @backoff.on_exception(backoff.constant, Exception, max_time=5, raise_on_giveup=False)
     async def async_decide_once(
             self, subscription: AuthorizationSubscription, decision_events="decide"
     ):
