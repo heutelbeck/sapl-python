@@ -12,10 +12,7 @@ class AuthorizationSubscriptionFactory(ABC):
     AuthorizationSubscriptionFactory.
     """
 
-    def _create_subscription(self, values: dict, subject=None, action=None, resource=None, environment=None,
-                             default_subject_function=None, default_action_function=None,
-                             default_resource_function=None,
-                             default_environment_function=None):
+    def _create_subscription(self, values: dict, subject=None, action=None, resource=None, environment=None):
         """
         Create an authorization_subscription for the decorated function with the arguments provided to the decorator
 
@@ -30,29 +27,26 @@ class AuthorizationSubscriptionFactory(ABC):
         :param default_environment_function: Function which will be called with values as parameter to define environment, if no environment was provided to the decorator
         :return: An authorization_subscription which can be sent to a pdp to get an authorization_decision
         """
-        if not all((default_subject_function, default_action_function, default_resource_function,
-                    default_environment_function)):
-            raise Exception
 
         if subject is not None:
             _subject = self._argument_is_callable(subject, values)
         else:
-            _subject = default_subject_function(values)
+            _subject = self._default_subject_function(values)
 
         if action is not None:
             _action = self._argument_is_callable(action, values)
         else:
-            _action = default_action_function(values)
+            _action = self._default_action_function(values)
 
         if resource is not None:
             _resource = self._argument_is_callable(resource, values)
         else:
-            _resource = default_resource_function(values)
+            _resource = self._default_resource_function(values)
 
         if environment is not None:
             _environment = self._argument_is_callable(environment, values)
         else:
-            _environment = default_environment_function(values)
+            _environment = {}
 
         return AuthorizationSubscription(self._remove_empty_dicts(_subject), self._remove_empty_dicts(_action),
                                          self._remove_empty_dicts(_resource),
@@ -81,6 +75,18 @@ class AuthorizationSubscriptionFactory(ABC):
 
         :param values: dictionary which contains class,function and named args of the decorated function
         """
+        pass
+
+    @abstractmethod
+    def _default_subject_function(self, values: dict) -> dict:
+        pass
+
+    @abstractmethod
+    def _default_action_function(self, values: dict) -> dict:
+        pass
+
+    @abstractmethod
+    def _default_resource_function(self, values: dict) -> dict:
         pass
 
     @abstractmethod

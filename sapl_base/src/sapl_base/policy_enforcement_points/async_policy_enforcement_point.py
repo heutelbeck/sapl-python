@@ -30,10 +30,11 @@ class AsyncPolicyEnforcementPoint(PolicyEnforcementPoint):
         :param scope:
         :return:
         """
-
         subscription = await asgiref.sync.sync_to_async(self.get_subscription)(subject, action, resource, environment,
                                                                                scope, "pre_enforce")
         decision = await pdp.async_decide_once(subscription)
+        if decision is None:
+            decision = pdp.DENY_DECISION
         bundle = constraint_handler_service.build_pre_enforce_bundle(decision)
         self.check_if_denied(decision)
         bundle.execute_on_decision_handler(decision)
@@ -64,9 +65,11 @@ class AsyncPolicyEnforcementPoint(PolicyEnforcementPoint):
         :param scope:
         :return:
         """
-        subscription = asgiref.sync.sync_to_async(self.get_subscription)(subject, action, resource, environment, scope,
-                                                                         "post_enforce")
+        subscription = await asgiref.sync.sync_to_async(self.get_subscription)(subject, action, resource, environment,
+                                                                               scope, "post_enforce")
         decision = await pdp.async_decide_once(subscription)
+        if decision is None:
+            decision = pdp.DENY_DECISION
         bundle = constraint_handler_service.build_post_enforce_bundle(decision)
         self.check_if_denied(decision)
         bundle.execute_on_decision_handler(decision)
