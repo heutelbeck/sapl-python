@@ -1,11 +1,16 @@
+import types
+from typing import Type, Union
+
 from sapl_base.authorization_subscription_factory import auth_factory
+from sapl_base.authorization_subscriptions import AuthorizationSubscription
 from sapl_base.constraint_handling.constraint_handler_bundle import ConstraintHandlerBundle
+from sapl_base.exceptions import PermissionDenied
 
 
 class PolicyEnforcementPoint:
     constraint_handler_bundle: ConstraintHandlerBundle = None
 
-    def __init__(self, fn, *args, **kwargs):
+    def __init__(self, fn: types.FunctionType, *args, **kwargs):
         self._enforced_function = fn
         args_dict = get_named_args_dict(fn, *args, **kwargs)
         self._function_args = args
@@ -22,7 +27,7 @@ class PolicyEnforcementPoint:
             self._pos_args = get_function_positional_args(fn, args)
             self.values_dict = {"function": fn, "args": args_dict}
 
-    def get_return_value(self):
+    def get_return_value(self) -> dict:
         """
 
         :return:
@@ -30,7 +35,7 @@ class PolicyEnforcementPoint:
         self.values_dict["return_value"] = self._enforced_function(**self.values_dict["args"])
         return self.values_dict["return_value"]
 
-    async def async_get_return_value(self):
+    async def async_get_return_value(self) -> dict:
         """
 
         :return:
@@ -38,7 +43,9 @@ class PolicyEnforcementPoint:
         self.values_dict["return_value"] = await self._enforced_function(**self.values_dict["args"])
         return self.values_dict["return_value"]
 
-    def get_subscription(self, subject, action, resource, environment, scope, enforcement_type):
+    def get_subscription(self, subject: Union[str, callable], action: Union[str, callable],
+                         resource: Union[str, callable], environment: Union[str, callable], scope: str,
+                         enforcement_type: str) -> AuthorizationSubscription:
         """
 
         :param subject:
@@ -52,20 +59,26 @@ class PolicyEnforcementPoint:
         return auth_factory.create_authorization_subscription(self.values_dict, subject, action, resource, environment,
                                                               scope, enforcement_type)
 
-    def fail_with_bundle(self, exception):
+    def fail_with_bundle(self, exception: Exception) -> None:
         """
-
         :param exception:
         """
-        self.constraint_handler_bundle.execute_on_error_handler(exception)
 
-    def check_if_denied(self, decision):
+        try:
+            self.constraint_handler_bundle.execute_on_error_handler(exception)
+        except Exception as e:
+            if isinstance(e, PermissionDenied):
+                raise permission_denied_exception
+            else:
+                raise e
+
+    def check_if_denied(self, decision) -> None:
         """
 
         :param decision:
         """
         if decision["decision"] == "DENY":
-            self.fail_with_bundle(Exception)
+            self.fail_with_bundle(permission_denied_exception())
 
 
 def get_function_positional_args(fn, args):
@@ -88,7 +101,7 @@ def get_class_positional_args(fn, args):
     return args[1:fn.__code__.co_argcount]
 
 
-def get_named_args_dict(fn, *args, **kwargs):
+def get_named_args_dict(fn, *args, **kwargs) -> dict:
     """
     The method get the dictionary of arguments  of the function use the decorator.
 
@@ -111,4 +124,5 @@ def get_named_args_dict(fn, *args, **kwargs):
     return {**dict(zip(args_names, args)), **kwargs}
 
 
-streaming_pep = None
+streaming_pep: PolicyEnforcementPoint
+permission_denied_exception: Type[Exception] = PermissionDenied
