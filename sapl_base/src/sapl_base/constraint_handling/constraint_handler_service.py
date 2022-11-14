@@ -12,10 +12,16 @@ class ConstraintHandlerService:
     responsible ConstraintHandlerProvider to handle the Obligations and Advices of a Decision
     """
 
-    _on_decision_handler: list[OnDecisionConstraintHandlerProvider] = []
-    _error_handler: list[ErrorConstraintHandlerProvider] = []
-    _result_handler: list[ResultConstraintHandlerProvider] = []
-    _function_arguments_mapper: list[FunctionArgumentsConstraintHandlerProvider] = []
+    on_decision_handler: list[OnDecisionConstraintHandlerProvider]
+    error_handler: list[ErrorConstraintHandlerProvider]
+    result_handler: list[ResultConstraintHandlerProvider]
+    function_arguments_mapper: list[FunctionArgumentsConstraintHandlerProvider]
+
+    def __init__(self):
+        self.on_decision_handler = []
+        self.error_handler = []
+        self.result_handler = []
+        self.function_arguments_mapper = []
 
     def build_post_enforce_bundle(self, decision: Decision) -> ConstraintHandlerBundle:
         """
@@ -34,7 +40,7 @@ class ConstraintHandlerService:
             unhandled_obligations.append(obligation)
         on_decision_handler, error_handler, result_handler = self._build_basic_bundle(decision.obligations, decision.advice,
                                                                                       unhandled_obligations)
-        if unhandled_obligations is not None:
+        if unhandled_obligations:
             raise permission_denied_exception
         return ConstraintHandlerBundle(on_decision_handler, error_handler, result_handler)
 
@@ -96,7 +102,7 @@ class ConstraintHandlerService:
 
         handler_list = []
         for constraint in constraints:
-            for handler in self._on_decision_handler:
+            for handler in self.on_decision_handler:
                 self._add_responsible_handler(handler, constraint, handler_list, unhandled_obligations)
         handler_list.sort(key=lambda provider: provider.priority())
         return handler_list
@@ -114,7 +120,7 @@ class ConstraintHandlerService:
         handler_list = []
 
         for constraint in constraints:
-            for handler in self._error_handler:
+            for handler in self.error_handler:
                 self._add_responsible_handler(handler, constraint, handler_list, unhandled_obligations)
         handler_list.sort(key=lambda provider: provider.priority())
         return handler_list
@@ -131,7 +137,7 @@ class ConstraintHandlerService:
 
         handler_list = []
         for constraint in constraints:
-            for handler in self._result_handler:
+            for handler in self.result_handler:
                 self._add_responsible_handler(handler, constraint, handler_list, unhandled_obligations)
         handler_list.sort(key=lambda provider: provider.priority())
         return handler_list
@@ -148,7 +154,7 @@ class ConstraintHandlerService:
 
         handler_list = []
         for constraint in constraints:
-            for handler in self._function_arguments_mapper:
+            for handler in self.function_arguments_mapper:
                 self._add_responsible_handler(handler, constraint, handler_list, unhandled_obligations)
         handler_list.sort(key=lambda provider: provider.priority())
         return handler_list
