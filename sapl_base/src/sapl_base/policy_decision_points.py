@@ -52,7 +52,7 @@ class PolicyDecisionPoint(ABC):
 
     @abstractmethod
     async def async_decide(self, subscription: AuthorizationSubscription,
-                           pep_decision_stream: types.AsyncGeneratorType,
+                           pep_decision_stream: types.GeneratorType,
                            decision_events: str = "decide") -> (Decision, Coroutine):
         """
         Request Decisions based on the given AuthorizationSubscription and decision_event
@@ -103,8 +103,8 @@ class DummyPolicyDecisionPoint(PolicyDecisionPoint):
         #     "PURPOSE ONLY!"
         # )
 
-    async def async_decide(self, subscription: AuthorizationSubscription, pep_decision_stream: types.AsyncGeneratorType,
-                           decision_events="decide") -> (Decision, Coroutine):
+    async def async_decide(self, subscription: AuthorizationSubscription, pep_decision_stream: types.GeneratorType,
+                           decision_events:str="decide") -> (Decision, Coroutine):
         """
         implementation of decide, which returns a tuple of a Decision with Permit and a Coroutine which will send a
         Permit to the provided Generator
@@ -112,13 +112,13 @@ class DummyPolicyDecisionPoint(PolicyDecisionPoint):
         return Decision.permit_decision(), self._yield_permit(pep_decision_stream)
 
     @staticmethod
-    async def _yield_permit(pep_decision_stream):
+    async def _yield_permit(pep_decision_stream: types.GeneratorType):
         """
         Send a Permit to the given Generator
 
         :param pep_decision_stream:  Generator to which the Decision is sent
         """
-        await pep_decision_stream.asend(Decision.permit_decision())
+        pep_decision_stream.send(Decision.permit_decision())
 
     async def async_decide_once(
             self, subscription: AuthorizationSubscription = None, decision_events: str = None
@@ -202,7 +202,7 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
                             return Decision.deny_decision()
                         return Decision(response)
 
-    async def async_decide(self, subscription: AuthorizationSubscription, pep_decision_stream: types.AsyncGeneratorType,
+    async def async_decide(self, subscription: AuthorizationSubscription, pep_decision_stream: types.GeneratorType,
                            decision_events: str = "decide")->(Decision,types.CoroutineType):
         """
         Establish a connection to the RemotePDP and receive new Decisions, which are send to the provided Generator.
@@ -225,7 +225,7 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
 
     @backoff.on_exception(backoff.expo, Exception, on_backoff=recreate_stream, max_value=100)
     async def _update_decision(self, subscription: AuthorizationSubscription, decision_stream: types.AsyncGeneratorType,
-                               pep_decision_stream: types.AsyncGeneratorType, decision_events: str = "decide") -> None:
+                               pep_decision_stream: types.GeneratorType, decision_events: str = "decide") -> None:
         """
         Returns a Coroutine, which will send new Decisions to the provided Generator.
         When an Exception occurs this method sends a INDETERMINATE Decision to the Generator and trys to reestablish a
@@ -237,11 +237,11 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         :param decision_events: For what kind of AuthorizationSubscription should a Decision be returned
         """
         if decision_stream is None:
-            await pep_decision_stream.asend({"decision": "INDETERMINATE"})
+            await pep_decision_stream.send({"decision": "INDETERMINATE"})
             decision_stream = self._get_decision_stream(subscription=subscription, decision_events=decision_events)
 
         async for decision in decision_stream:
-            await pep_decision_stream.asend(decision)
+            await pep_decision_stream.send(decision)
 
     @backoff.on_exception(backoff.constant, Exception, max_time=10)
     async def _get_first_decision_and_stream(self, subscription: AuthorizationSubscription, decision_events: str) -> (

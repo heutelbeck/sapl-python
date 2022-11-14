@@ -25,13 +25,13 @@ class TestDummyPdp:
 
     @pytest.mark.asyncio
     async def test_async_decide_yields_permit(self, event_loop, dummy_pdp):
-        async def decision_collector_gen():
+        def decision_collector_gen():
             while True:
                 decision = yield
                 assert decision.decision == Decision.permit_decision().decision
 
         collector_gen = decision_collector_gen()
-        await collector_gen.asend(None)
+        collector_gen.send(None)
         initial_decision, permit_stream = await dummy_pdp.async_decide(None, collector_gen)
         assert initial_decision.decision == Decision.permit_decision().decision
         await permit_stream
