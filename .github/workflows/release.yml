@@ -18,7 +18,7 @@ jobs:
   # Set output variables for the subsequent jobs, depending on the triggering tag
   identify-package:
     outputs:
-      packagename: ${{ steps.identifier.outputs.packagename }}
+      packagename: ${{ steps.packagename.outputs.packagename }}
     runs-on: ubuntu-latest
     steps:
       - name: allow only push to master
@@ -42,10 +42,10 @@ jobs:
         shell: bash
 
       - name: notag
-        if: ${{ !steps.identifier.outputs.packagename }}
+        if: ${{ !steps.packagename.outputs.packagename }}
         run: exit 1
 
-      - run: echo ${{ steps.identifier.outputs.packagename }}
+      - run: echo ${{ steps.packagename.outputs.packagename }}
 
 
 # Build the package and run tests
