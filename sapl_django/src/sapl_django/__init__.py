@@ -1,10 +1,11 @@
+from django.core.exceptions import PermissionDenied
+
 import sapl_base.authorization_subscription_factory
 from sapl_django.django_authorization_subscription_factory import DjangoAuthorizationSubscriptionFactory
-
 sapl_base.authorization_subscription_factory.auth_factory = DjangoAuthorizationSubscriptionFactory()
-
 
 import sapl_base.policy_enforcement_points.policy_enforcement_point
 from sapl_django.django_streaming_policy_enforcement_point import DjangoStreamingPolicyEnforcementPoint
 
 sapl_base.policy_enforcement_points.policy_enforcement_point.streaming_pep = DjangoStreamingPolicyEnforcementPoint
+sapl_base.policy_enforcement_points.policy_enforcement_point.permission_denied_exception = PermissionDenied

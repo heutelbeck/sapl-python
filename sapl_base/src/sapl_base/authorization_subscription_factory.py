@@ -83,7 +83,7 @@ class AuthorizationSubscriptionFactory(ABC):
         pass
 
     @abstractmethod
-    def _default_action_function(self, values: dict) -> dict:
+    def _default_action_function(self, values: dict, fn_type: str) -> dict:
         """
         Default method which is called to create the action of the AuthorizationSubscription, if no function is
         provided as argument to the decorator of a decorated function

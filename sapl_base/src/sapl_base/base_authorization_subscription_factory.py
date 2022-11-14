@@ -9,7 +9,7 @@ class BaseAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
     def _default_subject_function(self, values: dict) -> dict:
         pass
 
-    def _default_action_function(self, values: dict) -> dict:
+    def _default_action_function(self, values: dict, fn_type: str) -> dict:
         pass
 
     def _default_resource_function(self, values: dict) -> dict:
