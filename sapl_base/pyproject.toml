@@ -16,6 +16,7 @@ dependencies = [
     "aiohttp",
     "requests",
     "pytest",
+    "asgiref"
 ]
 
 [project.optional-dependencies]
