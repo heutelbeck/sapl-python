@@ -49,35 +49,35 @@ jobs:
 
 
 # Build the package and run tests
-  run-tests:
-    needs: identify-package
-    runs-on: ubuntu-latest
-    env:
-      identifier: ${{ needs.identify-package.outputs.packagename }}
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v3
-        with:
-          python-version: '3.10'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install build
-          pip install pytest-asyncio
-          pip install ./${{ env.identifier }}
-
-      - name: Testing
-        run: |
-          cd ${{ env.identifier }}
-          python -m pytest
+#  run-tests:
+#    needs: identify-package
+#    runs-on: ubuntu-latest
+#    env:
+#      identifier: ${{ needs.identify-package.outputs.packagename }}
+#    steps:
+#      - uses: actions/checkout@v3
+#
+#      - name: Set up Python
+#        uses: actions/setup-python@v3
+#        with:
+#          python-version: '3.10'
+#
+#      - name: Install dependencies
+#        run: |
+#          python -m pip install --upgrade pip
+#          pip install build
+#          pip install pytest-asyncio
+#          pip install ./${{ env.identifier }}
+#
+#      - name: Testing
+#        run: |
+#          cd ${{ env.identifier }}
+#          python -m pytest
 
 
 # Release the package on PyPI
   release:
-    needs: [ identify-package, run-tests]
+    needs: [ identify-package]
 
     runs-on: ubuntu-latest
     env:
