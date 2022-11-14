@@ -12,20 +12,16 @@ class AuthorizationSubscriptionFactory(ABC):
     AuthorizationSubscriptionFactory.
     """
 
-    def _create_subscription(self, values: dict, subject=None, action=None, resource=None, environment=None):
+    def _create_subscription(self, values: dict, subject=None, action=None, resource=None, environment=None) -> AuthorizationSubscription:
         """
-        Create an authorization_subscription for the decorated function with the arguments provided to the decorator
+        Create an AuthorizationSubscription for the decorated function, with the arguments provided to the decorator
 
-       :param values: Dictionary which contains data related to the decorated function (class if present, function and dict with named args )
-        :param subject: subject with which the function was decorated. None if not specified
-        :param action:  action with which the function was decorated. None if not specified
-        :param resource: resource with which the function was decorated. None if not specified
-        :param environment: environment with which the function was decorated. None if not specified
-        :param default_subject_function: Function which will be called with values as parameter to define subject, if no subject was provided to the decorator
-        :param default_action_function: Function which will be called with values as parameter to define action, if no action was provided to the decorator
-        :param default_resource_function: Function which will be called with values as parameter to define resource, if no resource was provided to the decorator
-        :param default_environment_function: Function which will be called with values as parameter to define environment, if no environment was provided to the decorator
-        :return: An authorization_subscription which can be sent to a pdp to get an authorization_decision
+       :param values: Dictionary which contains data related to the decorated function
+       :param subject: subject with which the function was decorated. None if not specified
+       :param action:  action with which the function was decorated. None if not specified
+       :param resource: resource with which the function was decorated. None if not specified
+       :param environment: environment with which the function was decorated. None if not specified
+       :return: An authorization_subscription which can be sent to a pdp to get an authorization_decision
         """
 
         if subject is not None:
@@ -67,11 +63,9 @@ class AuthorizationSubscriptionFactory(ABC):
             return argument
 
     @abstractmethod
-    def _identify_type(self, values: dict):
+    def _identify_type(self, values: dict) -> str:
         """
         Identify depending on the used Framework, which kind of function was decorated.
-
-        Depending on the function create an according authorization_subscription for the PDP
 
         :param values: dictionary which contains class,function and named args of the decorated function
         """
@@ -79,29 +73,55 @@ class AuthorizationSubscriptionFactory(ABC):
 
     @abstractmethod
     def _default_subject_function(self, values: dict) -> dict:
+        """
+        Default method which is called to create the subject of the AuthorizationSubscription, if no function is
+        provided as argument to the decorator of a decorated function
+
+        :param values: dictionary containing all values from which a subject can be created.
+        :return: A dictionary which will be provided as subject, when an AuthorizationSubscription is created
+        """
         pass
 
     @abstractmethod
     def _default_action_function(self, values: dict) -> dict:
+        """
+        Default method which is called to create the action of the AuthorizationSubscription, if no function is
+        provided as argument to the decorator of a decorated function
+
+        :param values: dictionary containing all values from which an action can be created.
+        :return: A dictionary which will be provided as action, when an AuthorizationSubscription is created
+        """
         pass
 
     @abstractmethod
     def _default_resource_function(self, values: dict) -> dict:
+        """
+        Default method which is called to create the resource of the AuthorizationSubscription, if no function is
+        provided as argument to the decorator of a decorated function
+
+        :param values: dictionary containing all values from which a resource can be created.
+        :return: A dictionary which will be provided as resource, when an AuthorizationSubscription is created
+        """
         pass
 
     @abstractmethod
-    def _valid_combinations(self, fn_type, enforcement_type):
+    def _valid_combination(self, fn_type, enforcement_type):
+        """
+        Is the type of decorated function compatible with the type of decorator?
 
+        :param fn_type: Type of the function which is decorated
+        :param enforcement_type: Type of enforcement, with which the function is decorated
+        """
         pass
 
     def create_authorization_subscription(self, values: dict, subject, action, resource,
                                           environment, scope, enforcement_type):
         """
-        Create an authorization_subscription with the given dictionary and arguments
+        Create an AuthorizationSubscription with the given dictionary and arguments
 
-        The returned authorization_subscription is dependent of the framework and the decorated function
+        The returned AuthorizationSubscription is dependent of the framework and the decorated function
 
-        :param enforcement_type:
+        :param enforcement_type: the type of enforcement, with which the function is decorated
         :param scope: Argument which creates a AuthorizationSubscription according to the given scope instead of evaluating the scope based on other parameter
         :param values: Dictionary which contains data related to the decorated function (class if present, function and dict with named args )
         :param subject: subject with which the function was decorated. None if not specified
@@ -116,11 +136,16 @@ class AuthorizationSubscriptionFactory(ABC):
             fn_type = self._identify_type(values)
         else:
             fn_type = scope
-        self._valid_combinations(fn_type, enforcement_type)
+        self._valid_combination(fn_type, enforcement_type)
         return self._create_subscription_for_type(fn_type, values, subject, action, resource, environment, scope)
 
     @abstractmethod
     def _add_contextvar_to_values(self, values: dict):
+        """
+        Set contextVars can be added to the values dict.
+
+        :param values: dictionary containing the values, which are used to create the AuthorizationSubscription
+        """
         pass
 
     @abstractmethod

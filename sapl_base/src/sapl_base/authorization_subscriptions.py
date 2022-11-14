@@ -3,21 +3,28 @@ import json
 
 class AuthorizationSubscription:
     """
-    Build the authorization subscription for the SAPL-Server in json-format
+    AuthorizationSubscriptions are sent to the PolicyDecisionPoint and based on their data a Decision is returned.
     """
 
-    def __init__(self, subject=None, action=None, resource=None,
-                 environment=None,
+    def __init__(self, subject, action, resource, environment=None,
                  subscription_id: int = None):
+        """
+        Create an AuthorizationSubscription Object with the given arguments
+
+        :param subject: Subject, which describes for whom a Decision shall be made. This can be the logged in User for example
+        :param action:  For which action shall a Decision be made? This can be a Requesttype like GET or POST for example
+        :param resource: The resources for which a Decision shall be made. This can be for example the parameter of a GET request
+        :param environment: Optional argument, which describes the environment. This can be for example the current time or location
+        :param subscription_id: ID for the object. If no ID is provided an ID is created
+        """
         if not (isinstance(subscription_id, int) or subscription_id is None):
             raise TypeError(
                 f"subscription_id must be an int, was {subscription_id} type of {subscription_id.__class__}")
-        if subject is not None:
-            self.subject = subject
-        if action is not None:
-            self.action = action
-        if resource is not None:
-            self.resource = resource
+
+        self.subject = subject if subject else {}
+        self.action = action if action else {}
+        self.resource = resource if resource else {}
+
         if environment is not None:
             self.environment = environment
         if subscription_id is not None:
@@ -27,8 +34,7 @@ class AuthorizationSubscription:
 
     def __repr__(self):
         """
-        representation of an AuthorizationSubscription,
-        eval will convert it to an object
+        representative of the object.
         """
         dictionary = self.__dict__.copy()
         representative = ",".join(element + "=" + repr(dictionary.get(element)) for element in dictionary)
@@ -44,6 +50,12 @@ class AuthorizationSubscription:
 
 
 class MultiSubscription:
+    """
+    Multiple AuthorizationSubscriptions can be gathered in a MultiSubscription, which can be sent to a
+    PolicyDecisionPoint.The PDP will create individuell Decisions for each AuthorizationSubscription, but only one
+    request is needed for all Decisions.
+    """
+
     def __init__(
             self, subject=None, action=None, resource=None,
             environment=None,
@@ -62,8 +74,7 @@ class MultiSubscription:
 
     def __repr__(self):
         """
-        representation of an AuthorizationSubscription,
-        eval will convert it to an object
+        representative of the object.
         """
         representative = ",".join(element + "=" + repr(self.__dict__.get(element)) for element in self.__dict__)
         return f"{type(self).__name__}({representative})"

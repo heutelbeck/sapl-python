@@ -3,34 +3,27 @@ from sapl_base.authorization_subscriptions import AuthorizationSubscription
 
 
 class BaseAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
+    """
+    Basic implementation of an AuthorizationSubscriptionFactory, which is used, when the used framework is not set.
+    """
+    def _default_subject_function(self, values: dict) -> dict:
+        pass
+
+    def _default_action_function(self, values: dict) -> dict:
+        pass
+
+    def _default_resource_function(self, values: dict) -> dict:
+        pass
+
     def _add_contextvar_to_values(self, values: dict):
         pass
 
     def _identify_type(self, values: dict):
-        """
-
-        :param values:
-        """
         pass
 
-    def _valid_combinations(self, fn_type, enforcement_type):
-        """
-
-        :param fn_type:
-        :param enforcement_type:
-        """
+    def _valid_combination(self, fn_type, enforcement_type):
         pass
 
     def _create_subscription_for_type(self, fn_type, values: dict, subject, action, resource, environment,
                                       scope) -> AuthorizationSubscription:
-        """
-
-        :param fn_type:
-        :param values:
-        :param subject:
-        :param action:
-        :param resource:
-        :param environment:
-        :param scope:
-        """
         pass
