@@ -6,27 +6,63 @@ from sapl_base.policy_enforcement_points.policy_enforcement_point import PolicyE
 class SyncPolicyEnforcementPoint(PolicyEnforcementPoint):
 
     def post_enforce(self, subject, action, resource, environment, scope):
-        self.get_return_value()
+        """
+
+        :param subject:
+        :param action:
+        :param resource:
+        :param environment:
+        :param scope:
+        :return:
+        """
+        self._get_return_value()
         return self._post_enforce_handling(subject, action, resource, environment, scope)
 
     def pre_enforce(self, subject, action, resource, environment, scope):
-        subscription = self.get_subscription(subject, action, resource, environment, scope, "pre_enforce")
+        """
+
+        :param subject:
+        :param action:
+        :param resource:
+        :param environment:
+        :param scope:
+        :return:
+        """
+        subscription = self._get_subscription(subject, action, resource, environment, scope, "pre_enforce")
         decision = pdp.decide(subscription)
         bundle = constraint_handler_service.build_pre_enforce_bundle(decision)
-        self.check_if_denied(decision)
+        self._check_if_denied(decision)
         bundle.execute_on_decision_handler(decision)
         bundle.execute_function_arguments_mapper(self.values_dict["args"])
-        return_value = self.get_return_value()
+        return_value = self._get_return_value()
         return bundle.execute_result_handler(return_value)
 
     def pre_and_post_enforce(self, subject, action, resource, environment, scope):
+        """
+
+        :param subject:
+        :param action:
+        :param resource:
+        :param environment:
+        :param scope:
+        :return:
+        """
         self.values_dict["return_value"] = self.pre_enforce(subject, action, resource, environment, scope)
         return self._post_enforce_handling(subject, action, resource, environment, scope)
 
     def _post_enforce_handling(self, subject, action, resource, environment, scope):
-        subscription = self.get_subscription(subject, action, resource, environment, scope, "post_enforce")
+        """
+
+        :param subject:
+        :param action:
+        :param resource:
+        :param environment:
+        :param scope:
+        :return:
+        """
+        subscription = self._get_subscription(subject, action, resource, environment, scope, "post_enforce")
         decision = pdp.decide(subscription)
         bundle = constraint_handler_service.build_post_enforce_bundle(decision)
-        self.check_if_denied(decision)
+        self._check_if_denied(decision)
         bundle.execute_on_decision_handler(decision)
         return bundle.execute_result_handler(self.values_dict["return_value"])

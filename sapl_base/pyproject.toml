@@ -5,8 +5,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "SAPL-Base"
-version = "0.0.2"
-description = "initial upload to register the name for future development"
+version = "0.1.0"
+description = "First version"
 readme = "README.md"
 authors = [{ name = "Dominic Heutelbeck", email = "dominic@heutelbeck.com" }]
 license = { file = "LICENSE" }
