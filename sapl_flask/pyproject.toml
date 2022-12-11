@@ -5,12 +5,20 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "SAPL-Flask"
-version = "0.0.2"
-description = "initial upload to register the name for future development"
+version = "0.1.0"
+description = "Library to integrate SAPL into a Flask project"
 readme = "README.md"
 authors = [{ name = "Dominic Heutelbeck", email = "dominic@heutelbeck.com"}]
 license = { file = "LICENSE" }
+dependencies = [
+    'flask',
+    'sapl-base'
+]
 
+[project.urls]
+"Homepage" ="https://sapl.io/"
+"Documentation" = "https://sapl.io/documentation"
+"Source" = "https://github.com/heutelbeck/sapl-python/tree/master/sapl_base"
 
 [tools.setuptools]
 packages = ["sapl_flask"]
