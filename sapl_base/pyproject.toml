@@ -5,8 +5,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "SAPL-Base"
-version = "0.1.1"
-description = "First version"
+version = "0.2.0"
+description = "Base library to create SAPL Integrations for Python Frameworks"
 readme = "README.md"
 authors = [{ name = "Dominic Heutelbeck", email = "dominic@heutelbeck.com" }]
 license = { file = "LICENSE" }
@@ -19,6 +19,11 @@ dependencies = [
     "asgiref",
     "sseclient-py"
 ]
+
+[project.urls]
+"Homepage" ="https://sapl.io/"
+"Documentation" = "https://sapl.io/documentation"
+"Source" = "https://github.com/heutelbeck/sapl-python/tree/master/sapl_base"
 
 [project.optional-dependencies]
 tests = [
@@ -33,7 +38,6 @@ packages = ["sapl_base"]
 testpaths = ["tests"]
 asyncio_mode='strict'
 
-[tool.sapl.ini_options]
 
 
 
