@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "SAPL-Base"
-version = "0.1.0"
+version = "0.1.1"
 description = "First version"
 readme = "README.md"
 authors = [{ name = "Dominic Heutelbeck", email = "dominic@heutelbeck.com" }]
@@ -16,7 +16,8 @@ dependencies = [
     "aiohttp",
     "requests",
     "pytest",
-    "asgiref"
+    "asgiref",
+    "sseclient-py"
 ]
 
 [project.optional-dependencies]
