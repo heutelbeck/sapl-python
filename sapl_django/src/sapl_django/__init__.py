@@ -1,7 +1,19 @@
+import importlib
+
 from django.core.exceptions import PermissionDenied
+from django.conf import settings
+import sapl_base.policy_decision_points
+
+if settings.POLICY_DECISION_POINT:
+    pdp_config = settings.POLICY_DECISION_POINT
+else:
+    pdp_config = {}
+
+sapl_base.policy_decision_points.pdp = sapl_base.policy_decision_points.PolicyDecisionPoint.from_settings(pdp_config)
 
 import sapl_base.authorization_subscription_factory
 from sapl_django.django_authorization_subscription_factory import DjangoAuthorizationSubscriptionFactory
+
 sapl_base.authorization_subscription_factory.auth_factory = DjangoAuthorizationSubscriptionFactory()
 
 import sapl_base.policy_enforcement_points.policy_enforcement_point

@@ -1,12 +1,12 @@
+from typing import Callable
+
 from channels.consumer import AsyncConsumer
-from django.contrib.auth.models import User
 from django.db.models import QuerySet, Manager, Model
 from django.forms import model_to_dict
 from django.urls import ResolverMatch
 from django.views import View
 
 from sapl_base.authorization_subscription_factory import AuthorizationSubscriptionFactory, client_request
-from sapl_base.authorization_subscriptions import AuthorizationSubscription
 
 
 class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
@@ -14,10 +14,11 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
     AuthorizationSubscriptionFactory for Django projects
     Creates AuthorizationSubscription, when SAPL is used in a Django project.
     """
+
     STREAMING_ENFORCEMENTS = ('enforce_till_denied', 'enforce_while_denied', 'drop_while_denied')
     POST_ENFORCE_CLASSES = ('Manager', 'Queryset')
 
-    def _default_action_function(self, values: dict, fn_type: str) -> dict:
+    def _default_action_function(self, values: dict) -> dict:
         """
         Create a dict which is used as action to create an AuthorizationSubscription
         :param values: dict containing all values needed to create an AuthorizationSubscription
@@ -32,8 +33,7 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
         if 'self' in values:
             function_para.update({'class': values['self'].__class__.__name__})
         function_para.update({'function_name': values['function'].__name__})
-        function_para.update({'type': fn_type})
-
+        function_para.update({'type': values['type']})
         request_para = {}
         request_para.update({'path': request.path})
         request_para.update({'method': request.method})
@@ -99,7 +99,7 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
         :return: A dictionary which will be provided as subject, when an AuthorizationSubscription is created
         """
         request = values['request']
-        user: User = request.user
+        user = request.user
         if user.is_anonymous:
             return 'anonymous'
         subj = {}
@@ -116,22 +116,33 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
                      })
         return subj
 
-    def _create_subscription_for_type(self, fn_type, values: dict, subject, action, resource, environment,
-                                      scope) -> AuthorizationSubscription:
+    def create_authorization_subscription(self, values: dict, subject, action, resource,
+                                          environment, scope, enforcement_type):
         """
-        Creates an AuthorizationSubscription from the provided arguments
+        Create an AuthorizationSubscription with the given dictionary and arguments
 
-        :param fn_type: Type of the decorated function
-        :param values: dict containing all values needed to create an AuthorizationSubscription
-        :param subject: subject which was provided to the decorator as argument if present
-        :param action: action which was provided to the decorator as argument if present
-        :param resource: resource which was provided to the decorator as argument if present
-        :param environment: environment which was provided to the decorator as argument if present
-        :param scope:
-        :return: An AuthorizationSubscription constructed from the provided arguments
+        The returned AuthorizationSubscription is dependent of the framework and the decorated function
+
+        :param enforcement_type: the type of enforcement, with which the function is decorated
+        :param scope: Argument which creates a AuthorizationSubscription according to the given scope instead of evaluating the scope based on other parameter
+        :param values: Dictionary which contains data related to the decorated function (class if present, function and dict with named args )
+        :param subject: subject with which the function was decorated. None if not specified
+        :param action:  action with which the function was decorated. None if not specified
+        :param resource: resource with which the function was decorated. None if not specified
+        :param environment: environment with which the function was decorated. None if not specified
+        :return: An authorization_subscription which can be sent to a pdp to get an authorization_decision
         """
+        fn_type: str
+        self._add_contextvar_to_values(values)
+        if scope == "automatic":
+            fn_type = self._identify_type(values)
+        else:
+            fn_type = scope
+
+        self._valid_combination(fn_type, enforcement_type)
+        values.update({'type': fn_type})
         subject = self._default_subject_function(values)
-        action = self._default_action_function(values, fn_type)
+        action = self._default_action_function(values)
         resource = self._default_resource_function(values)
 
         authz = self._create_subscription(values, subject, action, resource, environment)
