@@ -7,10 +7,10 @@ from typing import Coroutine
 import aiohttp
 import backoff
 import requests
+from sseclient import SSEClient
 
 from sapl_base.authorization_subscriptions import AuthorizationSubscription
 from sapl_base.decision import Decision
-from sapl_base.sapl_util import configuration
 
 
 class PolicyDecisionPoint(ABC):
@@ -19,13 +19,13 @@ class PolicyDecisionPoint(ABC):
     Configurations can be provided by a pyproject.toml file
 
     A PDP returns a Decision, based on the type of PDP, the called method and the
-    provided AuthorzationSubscription as argument
+    provided AuthorizationSubscription as argument
 
     The PDP is a Singleton, which is created on startup can be instantiated directly
     """
 
     @classmethod
-    def from_settings(cls):
+    def from_settings(cls,configuration: dict):
         """
         reads the configuration in the pyproject.toml file and creates a PolicyDecisionPoint(PDP) depending on the
         configuration.
@@ -104,7 +104,7 @@ class DummyPolicyDecisionPoint(PolicyDecisionPoint):
         # )
 
     async def async_decide(self, subscription: AuthorizationSubscription, pep_decision_stream: types.GeneratorType,
-                           decision_events:str="decide") -> (Decision, Coroutine):
+                           decision_events: str = "decide") -> (Decision, Coroutine):
         """
         implementation of decide, which returns a tuple of a Decision with Permit and a Coroutine which will send a
         Permit to the provided Generator
@@ -187,23 +187,11 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         ) as stream_response:
             if stream_response.status_code != 200:
                 return Decision.deny_decision()
-            else:
-                lines = b''
-                for line in stream_response.content:
-                    lines += line
-                    if lines.endswith(b'\n\n'):
-                        line_set = lines.splitlines(False)
-                        response = ''
-                        for item in line_set:
-                            response += item.decode('utf-8')
-                        data_begin = str.find(response, '{')
-                        response = json.loads(response[data_begin:])
-                        if response == {"decision": "INDETERMINATE"}:
-                            return Decision.deny_decision()
-                        return Decision(response)
+            for event in SSEClient(stream_response).events():
+                return Decision(json.loads(event.data))
 
     async def async_decide(self, subscription: AuthorizationSubscription, pep_decision_stream: types.GeneratorType,
-                           decision_events: str = "decide")->(Decision,types.CoroutineType):
+                           decision_events: str = "decide") -> (Decision, types.CoroutineType):
         """
         Establish a connection to the RemotePDP and receive new Decisions, which are send to the provided Generator.
         When the connection to the RemotePDP fails, an INDETERMINATE Decision is sent to the Generator and it is
@@ -311,4 +299,4 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         return Decision(decision)
 
 
-pdp = PolicyDecisionPoint.from_settings()
+pdp: PolicyDecisionPoint
