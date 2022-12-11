@@ -6,10 +6,15 @@ class BaseAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
     """
     Basic implementation of an AuthorizationSubscriptionFactory, which is used, when the used framework is not set.
     """
+
+    def create_authorization_subscription(self, values: dict, subject, action, resource, environment, scope,
+                                          enforcement_type):
+        pass
+
     def _default_subject_function(self, values: dict) -> dict:
         pass
 
-    def _default_action_function(self, values: dict, fn_type: str) -> dict:
+    def _default_action_function(self, values: dict) -> dict:
         pass
 
     def _default_resource_function(self, values: dict) -> dict:

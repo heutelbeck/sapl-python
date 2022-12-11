@@ -1,5 +1,6 @@
 import contextvars
 from abc import abstractmethod, ABC
+from typing import Callable
 
 from .authorization_subscriptions import AuthorizationSubscription, MultiSubscription
 
@@ -11,8 +12,13 @@ class AuthorizationSubscriptionFactory(ABC):
     Baseclass of an AuthorizationSubscriptionFactory, which can be inherited to create a framework specific
     AuthorizationSubscriptionFactory.
     """
+    subject_functions: list[Callable[[dict], dict]] = None
 
-    def _create_subscription(self, values: dict, subject=None, action=None, resource=None, environment=None) -> AuthorizationSubscription:
+    def init_factory(self, subject_functions: list[[Callable[[dict], dict]]] = None):
+        self.subject_functions = subject_functions
+
+    def _create_subscription(self, values: dict, subject=None, action=None, resource=None,
+                             environment=None) -> AuthorizationSubscription:
         """
         Create an AuthorizationSubscription for the decorated function, with the arguments provided to the decorator
 
@@ -28,6 +34,11 @@ class AuthorizationSubscriptionFactory(ABC):
             _subject = self._argument_is_callable(subject, values)
         else:
             _subject = self._default_subject_function(values)
+            if self.subject_functions:
+                for fun in self.subject_functions:
+                    _subject.update(fun(values))
+            if not _subject:
+                _subject = "anonymous"
 
         if action is not None:
             _action = self._argument_is_callable(action, values)
@@ -63,15 +74,6 @@ class AuthorizationSubscriptionFactory(ABC):
             return argument
 
     @abstractmethod
-    def _identify_type(self, values: dict) -> str:
-        """
-        Identify depending on the used Framework, which kind of function was decorated.
-
-        :param values: dictionary which contains class,function and named args of the decorated function
-        """
-        pass
-
-    @abstractmethod
     def _default_subject_function(self, values: dict) -> dict:
         """
         Default method which is called to create the subject of the AuthorizationSubscription, if no function is
@@ -83,7 +85,7 @@ class AuthorizationSubscriptionFactory(ABC):
         pass
 
     @abstractmethod
-    def _default_action_function(self, values: dict, fn_type: str) -> dict:
+    def _default_action_function(self, values: dict) -> dict:
         """
         Default method which is called to create the action of the AuthorizationSubscription, if no function is
         provided as argument to the decorator of a decorated function
@@ -105,15 +107,6 @@ class AuthorizationSubscriptionFactory(ABC):
         pass
 
     @abstractmethod
-    def _valid_combination(self, fn_type, enforcement_type):
-        """
-        Is the type of decorated function compatible with the type of decorator?
-
-        :param fn_type: Type of the function which is decorated
-        :param enforcement_type: Type of enforcement, with which the function is decorated
-        """
-        pass
-
     def create_authorization_subscription(self, values: dict, subject, action, resource,
                                           environment, scope, enforcement_type):
         """
@@ -129,38 +122,6 @@ class AuthorizationSubscriptionFactory(ABC):
         :param resource: resource with which the function was decorated. None if not specified
         :param environment: environment with which the function was decorated. None if not specified
         :return: An authorization_subscription which can be sent to a pdp to get an authorization_decision
-        """
-        fn_type: str
-        self._add_contextvar_to_values(values)
-        if scope == "automatic":
-            fn_type = self._identify_type(values)
-        else:
-            fn_type = scope
-        self._valid_combination(fn_type, enforcement_type)
-        return self._create_subscription_for_type(fn_type, values, subject, action, resource, environment, scope)
-
-    @abstractmethod
-    def _add_contextvar_to_values(self, values: dict):
-        """
-        Set contextVars can be added to the values dict.
-
-        :param values: dictionary containing the values, which are used to create the AuthorizationSubscription
-        """
-        pass
-
-    @abstractmethod
-    def _create_subscription_for_type(self, fn_type, values: dict, subject, action, resource,
-                                      environment, scope) -> AuthorizationSubscription:
-        """
-        Calls implementations on how to create an authorization_subscription for the given type of called function
-
-        :param scope: Argument which creates a AuthorizationSubscription according to the given scope instead of evaluating the scope based on other parameter
-        :param fn_type: What type of function was annotated e.g. function which renders a view, or a function which makes a database call to get values for a view.
-        :param values: Dictionary which contains data related to the decorated function (class if present, function and dict with named args )
-        :param subject: subject with which the function was decorated. None if not specified
-        :param action:  action with which the function was decorated. None if not specified
-        :param resource: resource with which the function was decorated. None if not specified
-        :param environment: environment with which the function was decorated. None if not specified
         """
         pass
 
