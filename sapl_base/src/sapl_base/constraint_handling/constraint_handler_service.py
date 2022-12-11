@@ -23,6 +23,24 @@ class ConstraintHandlerService:
         self.result_handler = []
         self.function_arguments_mapper = []
 
+    def append_decision_constraint_handler_provider(self, providers:
+    list[OnDecisionConstraintHandlerProvider]):
+        for provider in providers:
+            self.on_decision_handler.append(provider)
+
+    def append_error_constraint_handler_provider(self, providers: list[ErrorConstraintHandlerProvider]):
+        for provider in providers:
+            self.error_handler.append(provider)
+
+    def append_result_constraint_handler_provider(self, providers: list[ResultConstraintHandlerProvider]):
+        for provider in providers:
+            self.result_handler.append(provider)
+
+    def append_function_arguments_constraint_handler_provider(self, providers: list[
+        FunctionArgumentsConstraintHandlerProvider]):
+        for provider in providers:
+            self.function_arguments_mapper.append(provider)
+
     def build_post_enforce_bundle(self, decision: Decision) -> ConstraintHandlerBundle:
         """
         Create a ConstraintHandlerBundle for a function, which was decorated with @post_enforce, or
@@ -38,7 +56,8 @@ class ConstraintHandlerService:
         unhandled_obligations = []
         for obligation in decision.obligations:
             unhandled_obligations.append(obligation)
-        on_decision_handler, error_handler, result_handler = self._build_basic_bundle(decision.obligations, decision.advice,
+        on_decision_handler, error_handler, result_handler = self._build_basic_bundle(decision.obligations,
+                                                                                      decision.advice,
                                                                                       unhandled_obligations)
         if unhandled_obligations:
             raise permission_denied_exception
@@ -70,7 +89,7 @@ class ConstraintHandlerService:
 
     def _build_basic_bundle(self, obligations: list, advices: list, unhandled_obligations: list) \
             -> tuple[list[OnDecisionConstraintHandlerProvider], list[ErrorConstraintHandlerProvider],
-                     list[ResultConstraintHandlerProvider]]:
+            list[ResultConstraintHandlerProvider]]:
         """
         Create lists of ConstraintHandlerProvider which are responsible for the given obligations and advices
 
