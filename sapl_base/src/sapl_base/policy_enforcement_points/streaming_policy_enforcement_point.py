@@ -26,7 +26,7 @@ class StreamingPolicyEnforcementPoint(PolicyEnforcementPoint, ABC):
     async def recoverable_if_denied(self, subject, action, resource, environment, scope):
         pass
 
-    async def get_subscription(self, subject, action, resource, environment, scope, enforcement_type):
+    async def _get_subscription(self, subject, action, resource, environment, scope, enforcement_type):
         """
 
         :param subject:

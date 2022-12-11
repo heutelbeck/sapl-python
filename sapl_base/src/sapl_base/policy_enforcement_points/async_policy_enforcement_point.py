@@ -20,7 +20,6 @@ class AsyncPolicyEnforcementPoint(PolicyEnforcementPoint):
         :param resource: resource which was provided to the decorator as argument if present
         :param environment: environment which was provided to the decorator as argument if present
         :param scope:
-        :return:
 
         :return: The return-value of the decorated function after it was enforced
 
@@ -63,7 +62,7 @@ class AsyncPolicyEnforcementPoint(PolicyEnforcementPoint):
         :param scope:
         :return: The return-value of the decorated function after it was enforced
         """
-        self.values_dict["return_value"] = self.pre_enforce(subject, action, resource, environment, scope)
+        self.values_dict["return_value"] = await self.pre_enforce(subject, action, resource, environment, scope)
         return await self._post_enforce_handling(subject, action, resource, environment, scope)
 
     async def _post_enforce_handling(self, subject, action, resource, environment, scope):

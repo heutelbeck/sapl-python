@@ -127,5 +127,5 @@ def get_named_args_dict(fn, *args, **kwargs) -> dict:
     return {**dict(zip(args_names, args)), **kwargs}
 
 
-streaming_pep: PolicyEnforcementPoint
+streaming_pep: PolicyEnforcementPoint = None
 permission_denied_exception: Type[Exception] = PermissionDenied
