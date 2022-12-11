@@ -42,27 +42,7 @@ def test_instantiate_pdp_raises():
         PolicyDecisionPoint()
 
 
-@patch.dict('sapl_base.sapl_util.configuration', {'dummy': True})
-def test_dummy_configuration_creates_dummy_pdp():
-    dummy_pdp = PolicyDecisionPoint.from_settings()
-    assert isinstance(dummy_pdp, DummyPolicyDecisionPoint)
 
 
-class TestRemotePolicyDecisionPoint:
 
-    @patch.dict('sapl_base.sapl_util.configuration', {'verify': None})
-    def test_when_verify_none_raise_exception(self):
-        with pytest.raises(Exception):
-            PolicyDecisionPoint.from_settings()
 
-    @patch.dict('sapl_base.sapl_util.configuration', {'base_url': None})
-    def test_when_url_none_raise_exception(self):
-        with pytest.raises(Exception):
-            PolicyDecisionPoint.from_settings()
-
-    @pytest.fixture(scope="class")
-    def pdp_from_configuration(self):
-        return PolicyDecisionPoint.from_settings()
-
-    def test_create_default_pdp_from_config(self, pdp_from_configuration):
-        assert isinstance(pdp_from_configuration, RemotePolicyDecisionPoint)
