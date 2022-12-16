@@ -1,7 +1,7 @@
 import types
 from typing import Type, Union
 
-from sapl_base.authorization_subscription_factory import auth_factory
+import sapl_base.authorization_subscription_factory
 from sapl_base.authorization_subscriptions import AuthorizationSubscription
 from sapl_base.constraint_handling.constraint_handler_bundle import ConstraintHandlerBundle
 from sapl_base.exceptions import PermissionDenied
@@ -63,7 +63,7 @@ class PolicyEnforcementPoint:
         :param enforcement_type: Type of enforcement, with which the function is decorated
         :return: An AuthorizationSubscription
         """
-        return auth_factory.create_authorization_subscription(self.values_dict, subject, action, resource, environment,
+        return sapl_base.authorization_subscription_factory.auth_factory.create_authorization_subscription(self.values_dict, subject, action, resource, environment,
                                                               scope, enforcement_type)
 
     def _fail_with_bundle(self, exception: Exception) -> None:
