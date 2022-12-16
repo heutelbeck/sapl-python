@@ -1,6 +1,7 @@
 from sapl_base.constraint_handling.constraint_handler_service import constraint_handler_service
 from sapl_base.decision import Decision
-from sapl_base.policy_decision_points import pdp
+import sapl_base.policy_decision_points
+#from sapl_base.policy_decision_points import pdp
 from sapl_base.policy_enforcement_points.policy_enforcement_point import PolicyEnforcementPoint
 
 
@@ -30,7 +31,7 @@ class SyncPolicyEnforcementPoint(PolicyEnforcementPoint):
         :return:
         """
         subscription = self._get_subscription(subject, action, resource, environment, scope, "pre_enforce")
-        decision = pdp.decide(subscription)
+        decision = sapl_base.policy_decision_points.pdp.decide(subscription)
         if decision is None:
             decision = Decision.deny_decision()
         self.constraint_handler_bundle = constraint_handler_service.build_pre_enforce_bundle(decision)
@@ -64,7 +65,7 @@ class SyncPolicyEnforcementPoint(PolicyEnforcementPoint):
         :return:
         """
         subscription = self._get_subscription(subject, action, resource, environment, scope, "post_enforce")
-        decision = pdp.decide(subscription)
+        decision = sapl_base.policy_decision_points.pdp.decide(subscription)
         if decision is None:
             decision = Decision.deny_decision()
         self.constraint_handler_bundle = constraint_handler_service.build_post_enforce_bundle(decision)

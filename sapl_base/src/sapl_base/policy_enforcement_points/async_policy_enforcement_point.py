@@ -2,7 +2,8 @@ import asgiref.sync
 
 from sapl_base.constraint_handling.constraint_handler_service import constraint_handler_service
 from sapl_base.decision import Decision
-from sapl_base.policy_decision_points import pdp
+import sapl_base.policy_decision_points
+#from sapl_base.policy_decision_points import pdp
 from sapl_base.policy_enforcement_points.policy_enforcement_point import PolicyEnforcementPoint
 
 
@@ -40,7 +41,7 @@ class AsyncPolicyEnforcementPoint(PolicyEnforcementPoint):
         """
         subscription = await asgiref.sync.sync_to_async(self._get_subscription)(subject, action, resource, environment,
                                                                                 scope, "pre_enforce")
-        decision = await pdp.async_decide_once(subscription)
+        decision = await sapl_base.policy_decision_points.pdp.async_decide_once(subscription)
         if decision is None:
             decision = Decision.deny_decision()
         self.constraint_handler_bundle = constraint_handler_service.build_pre_enforce_bundle(decision)
@@ -78,7 +79,7 @@ class AsyncPolicyEnforcementPoint(PolicyEnforcementPoint):
         """
         subscription = await asgiref.sync.sync_to_async(self._get_subscription)(subject, action, resource, environment,
                                                                                 scope, "post_enforce")
-        decision = await pdp.async_decide_once(subscription)
+        decision = await sapl_base.policy_decision_points.pdp.async_decide_once(subscription)
         if decision is None:
             decision = Decision.deny_decision()
         self.constraint_handler_bundle = constraint_handler_service.build_post_enforce_bundle(decision)

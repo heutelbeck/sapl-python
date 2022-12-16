@@ -299,4 +299,4 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         return Decision(decision)
 
 
-pdp: PolicyDecisionPoint
+pdp: PolicyDecisionPoint = PolicyDecisionPoint.from_settings({})
