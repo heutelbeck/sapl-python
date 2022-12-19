@@ -156,16 +156,6 @@ async def recreate_stream(details) -> None:
     """
     details['kwargs']['decision_stream'] = None
 
-
-def log_give_up(details: dict) -> None:
-    """
-    On give up the Exception is logged, when debugging is enabled
-    :param details:
-    """
-    logger = logging.getLogger(__name__)
-    logger.debug(details.get('exception'))
-
-
 def set_const_max_time():
     """
     Set the max amount of retrys for a constant backoff from the configuration
