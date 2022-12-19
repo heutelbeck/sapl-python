@@ -1,4 +1,5 @@
 import json
+import logging
 import types
 from abc import ABC, abstractmethod
 from base64 import b64encode
@@ -23,9 +24,12 @@ class PolicyDecisionPoint(ABC):
 
     The PDP is a Singleton, which is created on startup can be instantiated directly
     """
+    logger: logging.Logger = logging.getLogger(__name__)
+    backoff_const_max_time: int
+    backoff_expo_max_value: int
 
     @classmethod
-    def from_settings(cls,configuration: dict):
+    def from_settings(cls, configuration: dict):
         """
         reads the configuration in the pyproject.toml file and creates a PolicyDecisionPoint(PDP) depending on the
         configuration.
@@ -33,13 +37,18 @@ class PolicyDecisionPoint(ABC):
         parameters to connect to a SAPL-Server-lt docker container.
         https://github.com/heutelbeck/sapl-policy-engine/tree/master/sapl-server-lt
         """
+        logging.basicConfig()
         if configuration.get("dummy", False):
             return DummyPolicyDecisionPoint()
+        debug = configuration.get("debug", False)
         base_url = configuration.get("base_url", "http://localhost:8080/api/pdp/")
         key = configuration.get("key", "YJidgyT2mfdkbmL")
         secret = configuration.get("secret", "Fa4zvYQdiwHZVXh")
         verify = configuration.get("verify", False)
-        return RemotePolicyDecisionPoint(base_url, key, secret, verify)
+        backoff_const_max_time = configuration.get("backoff_const_max_time", 3)
+        backoff_expo_max_value = configuration.get("backoff_expo_max_value", 50)
+        return RemotePolicyDecisionPoint(base_url, key, secret, verify, debug, backoff_const_max_time,
+                                         backoff_expo_max_value)
 
     @classmethod
     def dummy_pdp(cls):
@@ -96,12 +105,11 @@ class DummyPolicyDecisionPoint(PolicyDecisionPoint):
 
     def __init__(self):
         super(DummyPolicyDecisionPoint, self).__init__()
-        # self.logger = logging.getLogger(__name__)
-        # self.logger.warning(
-        #     "ATTENTION THE APPLICATION USES A DUMMY PDP. ALL AUTHORIZATION REQUEST WILL RESULT IN A SINGLE "
-        #     "PERMIT DECISION. DO NOT USE THIS IN PRODUCTION! THIS IS A PDP FOR TESTING AND DEVELOPING "
-        #     "PURPOSE ONLY!"
-        # )
+        self.logger.warning(
+            "ATTENTION THE APPLICATION USES A DUMMY PDP. ALL AUTHORIZATION REQUEST WILL RESULT IN A SINGLE "
+            "PERMIT DECISION. DO NOT USE THIS IN PRODUCTION! THIS IS A PDP FOR TESTING AND DEVELOPING "
+            "PURPOSE ONLY!"
+        )
 
     async def async_decide(self, subscription: AuthorizationSubscription, pep_decision_stream: types.GeneratorType,
                            decision_events: str = "decide") -> (Decision, Coroutine):
@@ -142,11 +150,34 @@ class DummyPolicyDecisionPoint(PolicyDecisionPoint):
 async def recreate_stream(details) -> None:
     """
     Function to remove the current Connection to a RemotePDP when an Exception occurs, to establish a new Connection and
-    retry a connect.
+    try to reconnect.
 
     :param details: dictionary of the function which has thrown an Exception
     """
     details['kwargs']['decision_stream'] = None
+
+
+def log_give_up(details: dict) -> None:
+    """
+    On give up the Exception is logged, when debugging is enabled
+    :param details:
+    """
+    logger = logging.getLogger(__name__)
+    logger.debug(details.get('exception'))
+
+
+def set_const_max_time():
+    """
+    Set the max amount of retrys for a constant backoff from the configuration
+    """
+    return pdp.backoff_const_max_time
+
+
+def set_expo_max_value():
+    """
+    Set the max intervall for an exponential backoff from the configuration
+    """
+    return pdp.backoff_expo_max_value
 
 
 class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
@@ -156,16 +187,28 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
     """
     headers = {"Content-Type": "application/json"}
 
-    def __init__(self, base_url, key, secret, verify):
-        self.base_url = base_url
+    def __init__(self, base_url: str, key, secret, verify, debug, backoff_const_max_time, backoff_expo_max_value):
+        self.debug = debug
+        if self.debug:
+            self.logger.setLevel('DEBUG')
+        if not base_url.endswith('/'):
+            self.base_url = base_url + '/'
+        else:
+            self.base_url = base_url
         self.verify = verify
         if (self.verify is None) or (self.base_url is None):
             raise Exception("No valid configuration for the PDP")
         if key is not None:
             key_and_secret = b64encode(str.encode(f"{key}:{secret}")).decode("ascii")
             self.headers["Authorization"] = f"Basic {key_and_secret}"
+        self.logger.info("PDP initialized. \n base url: %s \n key: %s \n secret: %s \n verify: %s", base_url, key,
+                         secret, verify)
+        self.backoff_const_max_time = backoff_const_max_time
+        self.backoff_expo_max_value = backoff_expo_max_value
 
-    @backoff.on_exception(backoff.constant, Exception, max_time=5, raise_on_giveup=False)
+    @backoff.on_exception(backoff.constant, Exception, max_time=set_const_max_time, raise_on_giveup=False,
+                          on_giveup=log_give_up,
+                          logger=__name__)
     def decide(self, subscription: AuthorizationSubscription,
                decision_events="decide") -> Decision:
         """
@@ -178,6 +221,8 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         :param decision_events: For what kind of AuthorizationSubscription should a Decision be returned
         :return: Decision for the given AuthorizationSubscription, or None when no Decision could be evaluated in time.
         """
+        if self.debug:
+            self.logger.debug("Requesting decision for AuthorizationSubscription: %s", subscription.__str__())
         with requests.post(
                 self.base_url + decision_events,
                 subscription.__str__(),
@@ -186,9 +231,15 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
                 headers=self.headers
         ) as stream_response:
             if stream_response.status_code != 200:
+                if self.debug:
+                    self.logger.debug("Responsecode != 200, was %s . Decision defaults to DENY",
+                                      stream_response.status_code)
                 return Decision.deny_decision()
             for event in SSEClient(stream_response).events():
-                return Decision(json.loads(event.data))
+                decision = Decision(json.loads(event.data))
+                if self.debug:
+                    self.logger.debug("Decision : %s", json.dumps(decision))
+                return decision
 
     async def async_decide(self, subscription: AuthorizationSubscription, pep_decision_stream: types.GeneratorType,
                            decision_events: str = "decide") -> (Decision, types.CoroutineType):
@@ -206,12 +257,13 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
             decision, decision_stream = await self._get_first_decision_and_stream(subscription=subscription,
                                                                                   decision_events=decision_events)
         except Exception as e:
+            self.logger.debug("An Error occured while getting the first Decision. Decision defaults to INDETERMINATE")
             decision = {"decision": "INDETERMINATE"}
             decision_stream = None
         return decision, self._update_decision(subscription=subscription, decision_stream=decision_stream,
                                                pep_decision_stream=pep_decision_stream, decision_events=decision_events)
 
-    @backoff.on_exception(backoff.expo, Exception, on_backoff=recreate_stream, max_value=100)
+    @backoff.on_exception(backoff.expo, Exception, on_backoff=recreate_stream, max_value=set_expo_max_value)
     async def _update_decision(self, subscription: AuthorizationSubscription, decision_stream: types.AsyncGeneratorType,
                                pep_decision_stream: types.GeneratorType, decision_events: str = "decide") -> None:
         """
@@ -225,13 +277,14 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         :param decision_events: For what kind of AuthorizationSubscription should a Decision be returned
         """
         if decision_stream is None:
+            self.logger.debug("Stream to PDP was cancelled. Retrying to connect to the PDP")
             await pep_decision_stream.send({"decision": "INDETERMINATE"})
             decision_stream = self._get_decision_stream(subscription=subscription, decision_events=decision_events)
 
         async for decision in decision_stream:
             await pep_decision_stream.send(decision)
 
-    @backoff.on_exception(backoff.constant, Exception, max_time=10)
+    @backoff.on_exception(backoff.constant, Exception, max_time=set_const_max_time)
     async def _get_first_decision_and_stream(self, subscription: AuthorizationSubscription, decision_events: str) -> (
             Decision, types.AsyncGeneratorType):
         """
@@ -246,6 +299,7 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         decision_stream = self._get_decision_stream(subscription=subscription, decision_events=decision_events)
         decision = await decision_stream.__anext__()
         if decision == {"decision": "INDETERMINATE"}:
+            self.logger.debug("First Decision was INDETERMINATE. Defaulting to DENY")
             return Decision.deny_decision(), decision_stream
         return Decision(decision), decision_stream
 
@@ -264,6 +318,8 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
                                     ) as response:
 
                 if response.status != 200:
+                    self.logger.debug("Responsecode != 200, was %s . Decision defaults to INDETERMINATE",
+                                      response.status)
                     yield {"decision": "INDETERMINATE"}
                 else:
                     lines = b''
@@ -275,10 +331,13 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
                             for item in line_set:
                                 response += item.decode('utf-8')
                             data_begin = str.find(response, '{')
-                            yield json.loads(response[data_begin:])
+                            decision = json.loads(response[data_begin:])
+                            self.logger.debug("Decision: %s", response[data_begin:])
+                            yield decision
                             lines = b''
 
-    @backoff.on_exception(backoff.constant, Exception, max_time=5, raise_on_giveup=False)
+    @backoff.on_exception(backoff.constant, Exception, max_time=set_const_max_time, raise_on_giveup=False,
+                          on_giveup=log_give_up)
     async def async_decide_once(
             self, subscription: AuthorizationSubscription, decision_events: str = "decide") -> Decision:
         """
@@ -295,8 +354,9 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         decision = await decision_stream.__anext__()
         await decision_stream.aclose()
         if decision == {"decision": "INDETERMINATE"}:
+            self.logger.debug("Decision was INDETERMINATE. Defaulting to DENY")
             return Decision.deny_decision()
         return Decision(decision)
 
 
-pdp: PolicyDecisionPoint = PolicyDecisionPoint.from_settings({})
+pdp: PolicyDecisionPoint
