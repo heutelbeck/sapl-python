@@ -197,7 +197,6 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         self.backoff_expo_max_value = backoff_expo_max_value
 
     @backoff.on_exception(backoff.constant, Exception, max_time=set_const_max_time, raise_on_giveup=False,
-                          on_giveup=log_give_up,
                           logger=__name__)
     def decide(self, subscription: AuthorizationSubscription,
                decision_events="decide") -> Decision:
@@ -326,8 +325,7 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
                             yield decision
                             lines = b''
 
-    @backoff.on_exception(backoff.constant, Exception, max_time=set_const_max_time, raise_on_giveup=False,
-                          on_giveup=log_give_up)
+    @backoff.on_exception(backoff.constant, Exception, max_time=set_const_max_time, raise_on_giveup=False)
     async def async_decide_once(
             self, subscription: AuthorizationSubscription, decision_events: str = "decide") -> Decision:
         """
