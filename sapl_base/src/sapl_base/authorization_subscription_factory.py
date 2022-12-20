@@ -125,13 +125,15 @@ class AuthorizationSubscriptionFactory(ABC):
         """
         pass
 
-    def _remove_empty_dicts(self, dictionary: dict):
+    def _remove_empty_dicts(self, dictionary):
         """
         A helper function to prevent empty dictionary's from being added to the authorization_subscription
 
         :param dictionary: A dictionary which will be stripped of it's empty dictionary's
         :return: The given dictionary stripped of empty dictionary's inside itself, or None if the given dictionary is empty
         """
+        if not isinstance(dictionary,dict):
+            return dictionary
         dict_copy = dictionary.copy()
         for k, v in dictionary.items():
             if isinstance(v, dict):
