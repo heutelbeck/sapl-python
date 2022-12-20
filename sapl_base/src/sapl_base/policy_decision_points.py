@@ -220,14 +220,13 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
                 headers=self.headers
         ) as stream_response:
             if stream_response.status_code != 200:
-                if self.debug:
-                    self.logger.debug("Responsecode != 200, was %s . Decision defaults to DENY",
+                self.logger.debug("Responsecode != 200, was %s . Decision defaults to DENY",
                                       stream_response.status_code)
                 return Decision.deny_decision()
             for event in SSEClient(stream_response).events():
                 decision = Decision(json.loads(event.data))
-                if self.debug:
-                    self.logger.debug("Decision : %s", json.dumps(decision))
+
+                self.logger.debug("Decision : %s", json.dumps(decision.__dict__, indent=2, skipkeys=True, default=lambda o: str(o)))
                 return decision
 
     async def async_decide(self, subscription: AuthorizationSubscription, pep_decision_stream: types.GeneratorType,
@@ -321,7 +320,8 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
                                 response += item.decode('utf-8')
                             data_begin = str.find(response, '{')
                             decision = json.loads(response[data_begin:])
-                            self.logger.debug("Decision: %s", response[data_begin:])
+                            self.logger.debug("Decision : %s",json.dumps(decision.__dict__, indent=2, skipkeys=True,
+                                                             default=lambda o: str(o)))
                             yield decision
                             lines = b''
 
