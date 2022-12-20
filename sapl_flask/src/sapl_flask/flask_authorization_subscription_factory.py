@@ -1,4 +1,5 @@
 from flask import current_app, request
+from werkzeug.exceptions import BadRequest
 
 from sapl_base.authorization_subscription_factory import AuthorizationSubscriptionFactory
 
@@ -51,7 +52,7 @@ class FlaskAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
             try:
                 classname = current_app.view_functions.get(request.endpoint).view_class
                 function_para.update({'class': classname.__name__})
-            except Exception:
+            except AttributeError:
                 pass
         function_para.update({'function_name': values['function'].__name__})
         request_para = {}
@@ -81,10 +82,12 @@ class FlaskAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
             request_resources.update({'GET': request.args})
         if request_method == 'POST':
             if request.is_json:
-                request_resources.update({'POST': request.json})
+                try:
+                    request_resources.update({'POST': request.json})
+                except BadRequest:
+                    pass
             elif request.form:
                 request_resources.update({'POST': request.form})
-
         if 'return_value' in values:
             return_value = values['return_value']
             resource.update({'return_value': return_value})

@@ -5,14 +5,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "SAPL-Flask"
-version = "0.1.0"
+version = "0.1.1"
 description = "Library to integrate SAPL into a Flask project"
 readme = "README.md"
 authors = [{ name = "Dominic Heutelbeck", email = "dominic@heutelbeck.com"}]
 license = { file = "LICENSE" }
 dependencies = [
     'flask',
-    'sapl-base'
+    'sapl_base'
 ]
 
 [project.urls]
@@ -26,6 +26,3 @@ packages = ["sapl_flask"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode='strict'
-
-[tool.sapl.ini_options]
-framework = 'flask'
