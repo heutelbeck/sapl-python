@@ -8,7 +8,7 @@ from sapl_base.sapl_util import double_wrap
 
 
 @double_wrap
-def pre_enforce(fn, subject: str = None, action: str = None, resource: str = None,
+def pre_enforce(fn, subject: str = None, action: str = None, resource = None,
                 environment: str = None, scope: str = "automatic"):
     """
     Wraps the decorated resource action point function with a SAPL Policy Enforcement Point (PEP).

@@ -23,23 +23,35 @@ class ConstraintHandlerService:
         self.result_handler = []
         self.function_arguments_mapper = []
 
-    def append_decision_constraint_handler_provider(self, providers:
-    list[OnDecisionConstraintHandlerProvider]):
-        for provider in providers:
-            self.on_decision_handler.append(provider)
+    def register_decision_constraint_handler_provider(self, providers:
+    list[OnDecisionConstraintHandlerProvider] | OnDecisionConstraintHandlerProvider):
+        try:
+            for provider in providers:
+                self.on_decision_handler.append(provider)
+        except TypeError:
+            self.on_decision_handler.append(providers)
 
-    def append_error_constraint_handler_provider(self, providers: list[ErrorConstraintHandlerProvider]):
-        for provider in providers:
-            self.error_handler.append(provider)
+    def register_error_constraint_handler_provider(self, providers: list[ErrorConstraintHandlerProvider] | ErrorConstraintHandlerProvider):
+        try:
+            for provider in providers:
+                self.error_handler.append(provider)
+        except TypeError:
+            self.error_handler.append(providers)
 
-    def append_result_constraint_handler_provider(self, providers: list[ResultConstraintHandlerProvider]):
-        for provider in providers:
-            self.result_handler.append(provider)
+    def register_result_constraint_handler_provider(self, providers: list[ResultConstraintHandlerProvider] | ResultConstraintHandlerProvider):
+        try:
+            for provider in providers:
+                self.result_handler.append(provider)
+        except TypeError:
+            self.result_handler.append(providers)
 
-    def append_function_arguments_constraint_handler_provider(self, providers: list[
-        FunctionArgumentsConstraintHandlerProvider]):
-        for provider in providers:
-            self.function_arguments_mapper.append(provider)
+    def register_function_arguments_constraint_handler_provider(self, providers: list[
+        FunctionArgumentsConstraintHandlerProvider] | FunctionArgumentsConstraintHandlerProvider):
+        try:
+            for provider in providers:
+                self.function_arguments_mapper.append(provider)
+        except TypeError:
+            self.function_arguments_mapper.append(providers)
 
     def build_post_enforce_bundle(self, decision: Decision) -> ConstraintHandlerBundle:
         """

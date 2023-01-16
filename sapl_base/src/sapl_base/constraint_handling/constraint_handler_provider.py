@@ -33,7 +33,8 @@ class ConstraintHandlerProvider(ABC):
     def handle(self, argument):
         """
         Abstractmethod, which needs to be implemented by a ConstraintHandlerProvider
-        :param argument:
+        :param argument: The argument, which is provided to the ConstraintHandler, when it is called. This argument can
+        be an Exception, function, decision, or the result of the executed function.
         """
         pass
 
@@ -58,6 +59,8 @@ class ErrorConstraintHandlerProvider(ConstraintHandlerProvider, ABC):
         pass
 
 
+
+
 class OnDecisionConstraintHandlerProvider(ConstraintHandlerProvider, ABC):
     """
     A Class, which can be inherited to create a ConstraintHandlerProvider which can handle a Decision,
@@ -73,6 +76,9 @@ class OnDecisionConstraintHandlerProvider(ConstraintHandlerProvider, ABC):
         :param decision: Decision which should be handled
         pass
         """
+
+
+
 
 
 class FunctionArgumentsConstraintHandlerProvider(ConstraintHandlerProvider, ABC):

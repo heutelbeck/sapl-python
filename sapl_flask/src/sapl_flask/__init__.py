@@ -7,7 +7,7 @@ import sapl_base.policy_decision_points
 import sapl_flask.flask_authorization_subscription_factory
 
 
-def init_sapl(config: Config, subject_functions: list[[Callable[[dict], dict]]] = None):
+def init_sapl(config: Config, subject_functions: list[[Callable[[dict], dict]]]):
     """
     Sets the configuration of the Policy Decision Point and the functions which are used to evaluate the subject of an
     AuthorizationSubscription.
