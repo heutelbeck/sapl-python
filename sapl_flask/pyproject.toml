@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "SAPL-Flask"
-version = "0.1.1"
+version = "0.1.2"
 description = "Library to integrate SAPL into a Flask project"
 readme = "README.md"
 authors = [{ name = "Dominic Heutelbeck", email = "dominic@heutelbeck.com"}]
@@ -14,6 +14,16 @@ dependencies = [
     'flask',
     'sapl_base'
 ]
+classifiers = [
+    'Framework :: Flask',
+    'Programming Language :: Python :: ']
+keywords = [
+    'SAPL',
+    'ABAC',
+    'Security',
+    'Access control'
+]
+
 
 [project.urls]
 "Homepage" ="https://sapl.io/"
