@@ -16,7 +16,7 @@ dependencies = [
 ]
 classifiers = [
     'Framework :: Flask',
-    'Programming Language :: Python :: ']
+    'Programming Language :: Python :: 3']
 keywords = [
     'SAPL',
     'ABAC',
