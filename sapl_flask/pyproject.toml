@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "SAPL-Flask"
-version = "0.1.2"
+version = "0.1.3"
 description = "Library to integrate SAPL into a Flask project"
 readme = "README.md"
 authors = [{ name = "Dominic Heutelbeck", email = "dominic@heutelbeck.com"}]
