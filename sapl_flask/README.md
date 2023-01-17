@@ -20,7 +20,7 @@ A complete documentation of SAPL can be found at [https://sapl.io](https://sapl.
 write policies.
 
 
-## how to install (Done)
+## how to install
 
 The SAPL Flask integration library is released on PyPI and can be installed with the Package Manager pip.
 
@@ -127,7 +127,7 @@ if __name__ == "__main__":
     sapl_flask.init_sapl(app.config, [subject_function])
     app.run()
 ```
-# how to use it (TODO inhalt der authz)
+# How to use it
 
 To implement SAPL into a Flask project the functions, which shall be enforced by SAPL have to be decorated with SAPL decorators.
 The decorator have to be the first decorator of a function. There are 3 possible decorators, which can be used for a function.
