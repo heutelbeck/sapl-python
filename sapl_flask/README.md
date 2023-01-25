@@ -37,6 +37,7 @@ The 2nd argument is a list of functions, which take a dictionary as argument and
 What these functions are and how to write them is explained in the section [How to write subject functions](#how-to-write-subject-functions).
 
 A simple project, which initializes SAPL_Flask and starts a Flask application would look like this:
+<!--- Ich würde hier Beispiele zeigen, die auch irgendie einen Sinn ergeben, so dass man die Funktionalität besser versteht -->
 ```Python
 import sapl_flask
 from flask import Flask
@@ -76,13 +77,12 @@ The default configuration in JSON Format looks like this:
 - base_url: The URL, where your PDP Server is located. This has to include the path `'/api/pdp/'` of the PDP Server. 
 - key: Access to the API of the SAPL PDP Server requires "Basic Auth". The client key (username) can be set with this parameter.
   The default is the default implemented credentials of a [SAPL-Server-lt](https://github.com/heutelbeck/sapl-policy-engine/tree/master/sapl-server-lt)
-- secret: The password which is used to get access to the API. Please note that the secret has to be BCrypt encoded.
-- dummy: Enables a dummy PDP, which is used instead of a remote PDP. This PDP always grants access and should never be 
-used in production.
-- verify: 
+- secret: The password which is used to get access to the API. Please note that the secret has to be BCrypt encoded. <!--- auf dieser Seite ist es doch nicht BCrypt encoded -->
+- dummy: Enables a dummy PDP, which is used instead of a remote PDP. This PDP always grants access and should never be used in production. 
+- verify: <!--- was passiert hier? -->
 - debug: Enables debugging , which adds logging.
 - backoff_const_max_time: When an error occurs, while requesting a Decision from the PDP SAPL_Flask does a retry. 
-  This parameter determines, how long the library should retry to connect, before it aborts and denies the access.
+  This parameter determines, how long the library should retry to connect, before it aborts and denies the access. <!--- welche Einheit? Anzahl Versuche? Sekunden? -->
 
 # Subject functions
 
@@ -114,6 +114,9 @@ def subject_function(values:dict):
 ```
 If multiple subject_functions are provided, the dictionarys are merged into one dictionary.
 
+<!--- Auch hier finde ich die Beispiele wenig hilfreich. Wie oben beschrieben beschreib das subject das who. Ein function_name ist das wohl eher ein schlechtes Beispiel. Sinvoller ist vielleicht so etwas wie {'username: get_username_from_session()} --> 
+
+<!--- Ist das mit der subject_function Liste wirklich sinnvoll. Einfacher fände ich es nur eine Funktion zuzulassen. Das kombinieren kann man dann ja selbst übernehmen und kann damit auf Kollisionen direkt vermeiden -->
 A Flask project, which uses SAPL_Flask, which is initialized with default configuration and this subject_function would be:
 ```Python
 import sapl_flask
@@ -154,6 +157,7 @@ If no subject_functions are provided the subject is always "anonymous".
 
 subject, action and resources are dictionarys, which are json dumped with a default JSON Converter.
 These 3 dictionarys json formatted contain these values:
+<!--- hilfreich wäre hier ein Beispiel (siehe oben) mit dem daraus resultierenden JSON -->
 
 ```json
 {
@@ -216,10 +220,10 @@ from flask import request
 from sapl_base.decorators import pre_enforce
 
 def create_action():
-  action = dict
-  action.update({"method": request.method,"path":request.path})
-  return action
+  # python ist eine einfache Sprache ;-)
+  return {"method": request.method, "path": request.path}
 
+# Beispiel ist nicht sehr selbs sprechen
 @pre_enforce(action=create_action)
 def pre_enforced_function(*args,**kwargs):
     return_value = "Do something"
@@ -228,6 +232,8 @@ def pre_enforced_function(*args,**kwargs):
 
 
 # Obligations and Advices
+<!--- hier ist irgendwie noch ein Doppler mit dem Text unten "How to create ConstraintHandlerProvider" -->
+
 
 Decisions received from the PDP can contain Obligations and Advices, which have to, or should be handled.
 These two categories are called constraints, for which this library offers abstract classes from which can be inherited to 
@@ -295,6 +301,8 @@ class ConstraintHandlerProvider(ABC):
         :param argument: The argument, which is provided to the ConstraintHandler, when it is called. This argument can 
         be an Exception, function, decision, or the result of the executed function.
         """
+        # Verstehe ich nicht, warum sollte ein ConstraingHandlerProvider Exception oder function handeln. Verstehe nicht den Sinn wann und warum er aufgerufen werden sollte.
+        # Bei Decisions macht es Sinnd, das kennen wir ja aus der Java implementierung
 ```
 
 When a Decision contains a Constraints the library checks all registered ConstraintHandlerProvider, if their 
@@ -310,7 +318,8 @@ equals to "log decision" would be:
 class LogNewDecisionConstraintHandler(OnDecisionConstraintHandlerProvider):
 
     def handle(self, decision: Decision) -> None:
-        logging.info(decision.__str__())
+        # .__str__() ist private undsollte nicht notwendig sein. Im zweifel str() verwenden.
+        logging.info(decision)
 
     def priority(self) -> int:
         return 0
@@ -339,10 +348,12 @@ from flask import Flask
 
 app = Flask(__name__)
 def subject_function(values:dict):
+  # function_name ist fachlich kein subject, siehe oben
   return {"function_name" : values.get("function").__name__}
 
 if __name__ == "__main__":
     sapl_flask.init_sapl(app.config, [subject_function])
+    # woher kommt hier der LogNewDecisionConstraintHandler? Import fehlt
     constraint_handler_service.register_decision_constraint_handler_provider(LogNewDecisionConstraintHandler())
     app.run()
 ```
