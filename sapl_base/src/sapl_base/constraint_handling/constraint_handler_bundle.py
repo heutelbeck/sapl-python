@@ -1,4 +1,4 @@
-from typing import Any, Callable
+from typing import Any
 
 from sapl_base.constraint_handling.constraint_handler_provider import FunctionArgumentsConstraintHandlerProvider, \
     ErrorConstraintHandlerProvider, OnDecisionConstraintHandlerProvider, ResultConstraintHandlerProvider, \
@@ -13,11 +13,6 @@ class ConstraintHandlerBundle:
     is only created, when for every obligation is at least one ConstraintHandlerProvider responsible, otherwise an
     Exception is thrown.
     """
-
-    _on_decision_handler: list[Callable[[Decision], None]]
-    _error_handler: list[Callable[[Exception], Exception]]
-    _result_handler: list[Callable[[Any], Any]]
-    _function_arguments_mapper: list[Callable[[dict], dict]]
 
     def __init__(self,
                  on_decision_handler: list[OnDecisionConstraintHandlerProvider],

@@ -12,16 +12,12 @@ class ConstraintHandlerService:
     responsible ConstraintHandlerProvider to handle the Obligations and Advices of a Decision
     """
 
-    on_decision_handler: list[OnDecisionConstraintHandlerProvider]
-    error_handler: list[ErrorConstraintHandlerProvider]
-    result_handler: list[ResultConstraintHandlerProvider]
-    function_arguments_mapper: list[FunctionArgumentsConstraintHandlerProvider]
 
     def __init__(self):
-        self.on_decision_handler = []
-        self.error_handler = []
-        self.result_handler = []
-        self.function_arguments_mapper = []
+        self.on_decision_handler : list[OnDecisionConstraintHandlerProvider]= []
+        self.error_handler : list[ErrorConstraintHandlerProvider]= []
+        self.result_handler : list[ResultConstraintHandlerProvider]= []
+        self.function_arguments_mapper : list[FunctionArgumentsConstraintHandlerProvider]= []
 
     def register_decision_constraint_handler_provider(self, providers:
     list[OnDecisionConstraintHandlerProvider] | OnDecisionConstraintHandlerProvider):
