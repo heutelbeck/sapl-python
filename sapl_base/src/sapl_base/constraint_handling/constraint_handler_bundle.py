@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Callable
 
 from sapl_base.constraint_handling.constraint_handler_provider import FunctionArgumentsConstraintHandlerProvider, \
     ErrorConstraintHandlerProvider, OnDecisionConstraintHandlerProvider, ResultConstraintHandlerProvider, \
@@ -13,6 +13,7 @@ class ConstraintHandlerBundle:
     is only created, when for every obligation is at least one ConstraintHandlerProvider responsible, otherwise an
     Exception is thrown.
     """
+
 
     def __init__(self,
                  on_decision_handler: list[OnDecisionConstraintHandlerProvider],
@@ -42,9 +43,9 @@ class ConstraintHandlerBundle:
         self._error_handler = self._add_handler_to_bundle(error_handler)
 
     @staticmethod
-    def _add_handler_to_bundle(handler_provider_list: list[ConstraintHandlerProvider]) -> list[callable]:
+    def _add_handler_to_bundle(handler_provider_list: list[ConstraintHandlerProvider]) -> list[Callable]:
         """
-        Creates a list[callable] of the handle() methods from the provided list[ConstraintHandlerProvider]
+        Creates a list[Callable] of the handle() methods from the provided list[ConstraintHandlerProvider]
 
         :param handler_provider_list: List of ConstraintHandlerProvider, of which the handle() methods are added to a
         list[callable]
