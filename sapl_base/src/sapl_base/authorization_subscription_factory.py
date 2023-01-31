@@ -1,6 +1,6 @@
 import contextvars
 from abc import abstractmethod, ABC
-from typing import Callable
+
 
 from .authorization_subscriptions import AuthorizationSubscription, MultiSubscription
 
@@ -12,10 +12,6 @@ class AuthorizationSubscriptionFactory(ABC):
     Baseclass of an AuthorizationSubscriptionFactory, which can be inherited to create a framework specific
     AuthorizationSubscriptionFactory.
     """
-    subject_functions: list[Callable[[dict], dict]] = None
-
-    def init_factory(self, subject_functions: list[[Callable[[dict], dict]]] = None):
-        self.subject_functions = subject_functions
 
     def _create_subscription(self, values: dict, subject=None, action=None, resource=None,
                              environment=None) -> AuthorizationSubscription:
@@ -34,11 +30,8 @@ class AuthorizationSubscriptionFactory(ABC):
             _subject = self._argument_is_callable(subject, values)
         else:
             _subject = self._default_subject_function(values)
-            if self.subject_functions:
-                for fun in self.subject_functions:
-                    _subject.update(fun(values))
-            if not _subject:
-                _subject = "anonymous"
+        if not _subject:
+            _subject = "anonymous"
 
         if action is not None:
             _action = self._argument_is_callable(action, values)

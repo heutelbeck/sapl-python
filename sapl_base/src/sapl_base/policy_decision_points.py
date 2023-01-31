@@ -320,8 +320,11 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
                                 response += item.decode('utf-8')
                             data_begin = str.find(response, '{')
                             decision = json.loads(response[data_begin:])
-                            self.logger.debug("Decision : %s",json.dumps(decision.__dict__, indent=2, skipkeys=True,
+                            try:
+                                self.logger.debug("Decision : %s",json.dumps(decision, indent=2, skipkeys=True,
                                                              default=lambda o: str(o)))
+                            except Exception:
+                                pass
                             yield decision
                             lines = b''
 

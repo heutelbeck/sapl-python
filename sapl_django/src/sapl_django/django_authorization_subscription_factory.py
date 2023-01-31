@@ -99,6 +99,7 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
         :return: A dictionary which will be provided as subject, when an AuthorizationSubscription is created
         """
         request = values['request']
+
         user = request.user
         if user.is_anonymous:
             return 'anonymous'
@@ -114,6 +115,10 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
                      'last_login': user.last_login,
                      'is_authenticated': user.is_authenticated,
                      })
+        try:
+            subj.update({'authorization':request.headers.get("Authorization")})
+        except Exception:
+            pass
         return subj
 
     def create_authorization_subscription(self, values: dict, subject, action, resource,
