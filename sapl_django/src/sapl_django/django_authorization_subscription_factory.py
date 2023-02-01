@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Dict
 
 from channels.consumer import AsyncConsumer
 from django.db.models import QuerySet, Manager, Model
@@ -18,7 +18,7 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
     STREAMING_ENFORCEMENTS = ('enforce_till_denied', 'enforce_while_denied', 'drop_while_denied')
     POST_ENFORCE_CLASSES = ('Manager', 'Queryset')
 
-    def _default_action_function(self, values: dict) -> dict:
+    def _default_action_function(self, values: Dict) -> Dict:
         """
         Create a dict which is used as action to create an AuthorizationSubscription
         :param values: dict containing all values needed to create an AuthorizationSubscription
@@ -45,7 +45,7 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
         action.update({'function': function_para})
         return action
 
-    def _default_resource_function(self, values: dict) -> dict:
+    def _default_resource_function(self, values: Dict) -> Dict:
         """
         Create a dict which is used as resource to create an AuthorizationSubscription
         :param values: dict containing all values needed to create an AuthorizationSubscription
@@ -81,7 +81,7 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
         return resource
 
     @staticmethod
-    def _map_model_to_dict(kwargs: dict) -> dict:
+    def _map_model_to_dict(kwargs: Dict) -> Dict:
         """
         Creates a dict from a Model object to make it serializable
         :param kwargs: dict which can contain object of Model class
@@ -92,7 +92,7 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
                 kwargs.update({k: model_to_dict(v)})
         return kwargs
 
-    def _default_subject_function(self, values: dict):
+    def _default_subject_function(self, values: Dict):
         """
         Create a dict which is used as subject to create an AuthorizationSubscription
         :param values: dict containing all values needed to create an AuthorizationSubscription
@@ -100,9 +100,12 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
         """
         request = values['request']
 
-        user = request.user
-        if user.is_anonymous:
-            return 'anonymous'
+        try:
+            user = request.user
+            if user.is_anonymous:
+                return 'anonymous'
+        except Exception:
+            return 'anonymous'   
         subj = {}
         subj.update({'user_id': user.id,
                      'username': user.username,
@@ -121,7 +124,7 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
             pass
         return subj
 
-    def create_authorization_subscription(self, values: dict, subject, action, resource,
+    def create_authorization_subscription(self, values: Dict, subject, action, resource,
                                           environment, scope, enforcement_type):
         """
         Create an AuthorizationSubscription with the given dictionary and arguments
@@ -168,7 +171,7 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
             return
         raise
 
-    def _identify_type(self, values: dict) -> str:
+    def _identify_type(self, values: Dict) -> str:
         """
         Identifies the type of the decorated function
 
@@ -190,7 +193,7 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
                 pass
         return 'View'
 
-    def _add_contextvar_to_values(self, values: dict) -> None:
+    def _add_contextvar_to_values(self, values: Dict) -> None:
         """
         Adds the request made to the dict which is used to create the AuthorizationSubscription
         :param values: A dict object containing all values needed to create an AuthorizationSubscription
