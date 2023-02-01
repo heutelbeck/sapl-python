@@ -1,6 +1,6 @@
 import contextvars
 from abc import abstractmethod, ABC
-
+from typing import Dict
 
 from .authorization_subscriptions import AuthorizationSubscription, MultiSubscription
 
@@ -13,7 +13,7 @@ class AuthorizationSubscriptionFactory(ABC):
     AuthorizationSubscriptionFactory.
     """
 
-    def _create_subscription(self, values: dict, subject=None, action=None, resource=None,
+    def _create_subscription(self, values: Dict, subject=None, action=None, resource=None,
                              environment=None) -> AuthorizationSubscription:
         """
         Create an AuthorizationSubscription for the decorated function, with the arguments provided to the decorator
@@ -53,7 +53,7 @@ class AuthorizationSubscriptionFactory(ABC):
                                          self._remove_empty_dicts(_environment))
 
     @staticmethod
-    def _argument_is_callable(argument, values: dict):
+    def _argument_is_callable(argument, values: Dict):
         """
         Checks if the given argument is a callable and calls it with the given dictionary of values as argument
 
@@ -67,7 +67,7 @@ class AuthorizationSubscriptionFactory(ABC):
             return argument
 
     @abstractmethod
-    def _default_subject_function(self, values: dict) -> dict:
+    def _default_subject_function(self, values: Dict) -> Dict:
         """
         Default method which is called to create the subject of the AuthorizationSubscription, if no function is
         provided as argument to the decorator of a decorated function
@@ -78,7 +78,7 @@ class AuthorizationSubscriptionFactory(ABC):
         pass
 
     @abstractmethod
-    def _default_action_function(self, values: dict) -> dict:
+    def _default_action_function(self, values: Dict) -> Dict:
         """
         Default method which is called to create the action of the AuthorizationSubscription, if no function is
         provided as argument to the decorator of a decorated function
@@ -89,7 +89,7 @@ class AuthorizationSubscriptionFactory(ABC):
         pass
 
     @abstractmethod
-    def _default_resource_function(self, values: dict) -> dict:
+    def _default_resource_function(self, values: Dict) -> Dict:
         """
         Default method which is called to create the resource of the AuthorizationSubscription, if no function is
         provided as argument to the decorator of a decorated function
@@ -100,7 +100,7 @@ class AuthorizationSubscriptionFactory(ABC):
         pass
 
     @abstractmethod
-    def create_authorization_subscription(self, values: dict, subject, action, resource,
+    def create_authorization_subscription(self, values: Dict, subject, action, resource,
                                           environment, scope, enforcement_type):
         """
         Create an AuthorizationSubscription with the given dictionary and arguments
@@ -171,22 +171,22 @@ class MultiSubscriptionBuilder:
         self._add_environment(authorization_subscription, dic)
         self.authorization_subscription.append({authorization_subscription.subscription_id: dic})
 
-    def _add_subject(self, authorization_subscription: AuthorizationSubscription, dictionary: dict):
+    def _add_subject(self, authorization_subscription: AuthorizationSubscription, dictionary: Dict):
         if authorization_subscription.subject:
             self.subject.append(authorization_subscription.subject)
             dictionary[self.SUBJECT_ID] = len(self.subject) - 1
 
-    def _add_action(self, authorization_subscription: AuthorizationSubscription, dictionary: dict):
+    def _add_action(self, authorization_subscription: AuthorizationSubscription, dictionary: Dict):
         if authorization_subscription.action:
             self.action.append(authorization_subscription.action)
             dictionary[self.ACTION_ID] = len(self.action) - 1
 
-    def _add_resource(self, authorization_subscription: AuthorizationSubscription, dictionary: dict):
+    def _add_resource(self, authorization_subscription: AuthorizationSubscription, dictionary: Dict):
         if authorization_subscription.resource:
             self.resource.append(authorization_subscription.resource)
             dictionary[self.RESOURCE_ID] = len(self.resource) - 1
 
-    def _add_environment(self, authorization_subscription: AuthorizationSubscription, dictionary: dict):
+    def _add_environment(self, authorization_subscription: AuthorizationSubscription, dictionary: Dict):
         if authorization_subscription.environment:
             self.environment.append(authorization_subscription.environment)
             dictionary[self.ENVIRONMENT_ID] = len(self.environment) - 1

@@ -1,3 +1,5 @@
+from typing import List, Union, Tuple
+
 from sapl_base.constraint_handling.constraint_handler_bundle import ConstraintHandlerBundle
 from sapl_base.constraint_handling.constraint_handler_provider import OnDecisionConstraintHandlerProvider, \
     ErrorConstraintHandlerProvider, FunctionArgumentsConstraintHandlerProvider, ResultConstraintHandlerProvider, \
@@ -11,38 +13,40 @@ class ConstraintHandlerService:
     Class, which contains all available ConstraintHandlerProvider and creates ConstraintHandlerBundle with
     responsible ConstraintHandlerProvider to handle the Obligations and Advices of a Decision
     """
-
+    on_decision_handler: List[OnDecisionConstraintHandlerProvider]
+    error_handler: List[ErrorConstraintHandlerProvider]
+    result_handler: List[ResultConstraintHandlerProvider]
+    function_arguments_mapper: List[FunctionArgumentsConstraintHandlerProvider]
 
     def __init__(self):
-        self.on_decision_handler : list[OnDecisionConstraintHandlerProvider]= []
-        self.error_handler : list[ErrorConstraintHandlerProvider]= []
-        self.result_handler : list[ResultConstraintHandlerProvider]= []
-        self.function_arguments_mapper : list[FunctionArgumentsConstraintHandlerProvider]= []
+        self.on_decision_handler : List[OnDecisionConstraintHandlerProvider]= []
+        self.error_handler : List[ErrorConstraintHandlerProvider]= []
+        self.result_handler : List[ResultConstraintHandlerProvider]= []
+        self.function_arguments_mapper : List[FunctionArgumentsConstraintHandlerProvider]= []
 
-    def register_decision_constraint_handler_provider(self, providers:
-    list[OnDecisionConstraintHandlerProvider] | OnDecisionConstraintHandlerProvider):
+    def register_decision_constraint_handler_provider(self, providers: Union[List[OnDecisionConstraintHandlerProvider], OnDecisionConstraintHandlerProvider]) -> None:
         try:
             for provider in providers:
                 self.on_decision_handler.append(provider)
         except TypeError:
             self.on_decision_handler.append(providers)
 
-    def register_error_constraint_handler_provider(self, providers: list[ErrorConstraintHandlerProvider] | ErrorConstraintHandlerProvider):
+    def register_error_constraint_handler_provider(self, providers: Union[List[ErrorConstraintHandlerProvider] ,ErrorConstraintHandlerProvider]) -> None:
         try:
             for provider in providers:
                 self.error_handler.append(provider)
         except TypeError:
             self.error_handler.append(providers)
 
-    def register_result_constraint_handler_provider(self, providers: list[ResultConstraintHandlerProvider] | ResultConstraintHandlerProvider):
+    def register_result_constraint_handler_provider(self, providers: Union[List[ResultConstraintHandlerProvider] ,ResultConstraintHandlerProvider])-> None:
         try:
             for provider in providers:
                 self.result_handler.append(provider)
         except TypeError:
             self.result_handler.append(providers)
 
-    def register_function_arguments_constraint_handler_provider(self, providers: list[
-        FunctionArgumentsConstraintHandlerProvider] | FunctionArgumentsConstraintHandlerProvider):
+    def register_function_arguments_constraint_handler_provider(self, providers: Union[List[
+        FunctionArgumentsConstraintHandlerProvider], FunctionArgumentsConstraintHandlerProvider]) -> None:
         try:
             for provider in providers:
                 self.function_arguments_mapper.append(provider)
@@ -95,9 +99,9 @@ class ConstraintHandlerService:
             raise permission_denied_exception
         return ConstraintHandlerBundle(on_decision_handler, error_handler, result_handler, function_arguments_mapper)
 
-    def _build_basic_bundle(self, obligations: list, advices: list, unhandled_obligations: list) \
-            -> tuple[list[OnDecisionConstraintHandlerProvider], list[ErrorConstraintHandlerProvider],
-            list[ResultConstraintHandlerProvider]]:
+    def _build_basic_bundle(self, obligations: List, advices: List, unhandled_obligations: List) \
+            -> Tuple[List[OnDecisionConstraintHandlerProvider], List[ErrorConstraintHandlerProvider],
+            List[ResultConstraintHandlerProvider]]:
         """
         Create lists of ConstraintHandlerProvider which are responsible for the given obligations and advices
 
@@ -117,8 +121,8 @@ class ConstraintHandlerService:
 
         return on_decision_handler, error_handler, result_handler
 
-    def _create_on_decision_handler(self, constraints: list, unhandled_obligations: list) -> \
-            list[OnDecisionConstraintHandlerProvider]:
+    def _create_on_decision_handler(self, constraints: List, unhandled_obligations: List) -> \
+            List[OnDecisionConstraintHandlerProvider]:
         """
         Creates a list with OnDecisionConstraintHandlerProvider, which are responsible for the given constraints
 
@@ -134,8 +138,8 @@ class ConstraintHandlerService:
         handler_list.sort(key=lambda provider: provider.priority())
         return handler_list
 
-    def _create_on_error_handler(self, constraints: list, unhandled_obligations: list) -> \
-            list[ErrorConstraintHandlerProvider]:
+    def _create_on_error_handler(self, constraints: List, unhandled_obligations: List) -> \
+            List[ErrorConstraintHandlerProvider]:
         """
         Creates a list with ErrorConstraintHandlerProvider, which are responsible for the given constraints
 
@@ -152,8 +156,8 @@ class ConstraintHandlerService:
         handler_list.sort(key=lambda provider: provider.priority())
         return handler_list
 
-    def _create_result_handler(self, constraints: list, unhandled_obligations: list) -> \
-            list[ResultConstraintHandlerProvider]:
+    def _create_result_handler(self, constraints: List, unhandled_obligations: List) -> \
+            List[ResultConstraintHandlerProvider]:
         """
         Creates a list with ResultConstraintHandlerProvider, which are responsible for the given constraints
 
@@ -169,8 +173,8 @@ class ConstraintHandlerService:
         handler_list.sort(key=lambda provider: provider.priority())
         return handler_list
 
-    def _create_function_argument_mapper(self, constraints: list, unhandled_obligations: list) -> \
-            list[FunctionArgumentsConstraintHandlerProvider]:
+    def _create_function_argument_mapper(self, constraints: List, unhandled_obligations: List) -> \
+            List[FunctionArgumentsConstraintHandlerProvider]:
         """
         Creates a list with FunctionArgumentsConstraintHandlerProvider, which are responsible for the given constraints
 
@@ -187,8 +191,8 @@ class ConstraintHandlerService:
         return handler_list
 
     @staticmethod
-    def _add_responsible_handler(handler: ConstraintHandlerProvider, constraint, handler_list: list,
-                                 unhandled_obligations: list) -> None:
+    def _add_responsible_handler(handler: ConstraintHandlerProvider, constraint, handler_list: List,
+                                 unhandled_obligations: List) -> None:
         """
         Checks if the given ConstraintHandlerProvider is responsible to handle the given constraint. When the
         ConstraintHandlerProvider is responsible, it is added to a list of ConstraintHandlerProvider, which are used to
@@ -212,4 +216,4 @@ class ConstraintHandlerService:
 
 
 constraint_handler_service = ConstraintHandlerService()
-framework_permission_denied: ErrorConstraintHandlerProvider | None = None
+framework_permission_denied: Union[ErrorConstraintHandlerProvider, None] = None

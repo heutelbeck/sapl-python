@@ -1,5 +1,5 @@
 import types
-from typing import Type, Union
+from typing import Type, Union, Callable, Dict
 
 import sapl_base.authorization_subscription_factory
 from sapl_base.authorization_subscriptions import AuthorizationSubscription
@@ -31,7 +31,7 @@ class PolicyEnforcementPoint:
             self._pos_args = get_function_positional_args(fn, args)
             self.values_dict = {"function": fn, "args": args_dict}
 
-    def _get_return_value(self) -> dict:
+    def _get_return_value(self) -> Dict:
         """
         Call the decorated function and get the return-value
 
@@ -40,7 +40,7 @@ class PolicyEnforcementPoint:
         self.values_dict["return_value"] = self._enforced_function(**self.values_dict["args"])
         return self.values_dict["return_value"]
 
-    async def _async_get_return_value(self) -> dict:
+    async def _async_get_return_value(self) -> Dict:
         """
         Call the decorated function and get the return-value
 
@@ -49,8 +49,8 @@ class PolicyEnforcementPoint:
         self.values_dict["return_value"] = await self._enforced_function(**self.values_dict["args"])
         return self.values_dict["return_value"]
 
-    def _get_subscription(self, subject: Union[str, callable], action: Union[str, callable],
-                          resource: Union[str, callable], environment: Union[str, callable], scope: str,
+    def _get_subscription(self, subject: Union[str, Callable], action: Union[str, Callable],
+                          resource: Union[str, Callable], environment: Union[str, Callable], scope: str,
                           enforcement_type: str) -> AuthorizationSubscription:
         """
         Create an AuthorizationSubscription for the decorated function
@@ -110,7 +110,7 @@ def get_class_positional_args(fn, args):
     return args[1:fn.__code__.co_argcount]
 
 
-def get_named_args_dict(fn, *args, **kwargs) -> dict:
+def get_named_args_dict(fn, *args, **kwargs) -> Dict:
     """
     Create a dictionary from the args of the function and merge it with the kwargs
 
@@ -127,5 +127,5 @@ def get_named_args_dict(fn, *args, **kwargs) -> dict:
     return {**dict(zip(args_names, args)), **kwargs}
 
 
-streaming_pep: PolicyEnforcementPoint = None
+streaming_pep: Union[PolicyEnforcementPoint,None] = None
 permission_denied_exception: Type[Exception] = PermissionDenied

@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Dict
 
 import asgiref.sync
 
@@ -7,7 +8,7 @@ from sapl_base.policy_enforcement_points.policy_enforcement_point import PolicyE
 
 
 class StreamingPolicyEnforcementPoint(PolicyEnforcementPoint, ABC):
-    _current_decision: dict
+    _current_decision: Dict
 
     def __init__(self, fn, *args, **kwargs):
         super().__init__(fn, *args, **kwargs)

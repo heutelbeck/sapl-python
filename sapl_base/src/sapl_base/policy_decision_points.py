@@ -3,7 +3,7 @@ import logging
 import types
 from abc import ABC, abstractmethod
 from base64 import b64encode
-from typing import Coroutine
+from typing import Coroutine, Dict
 
 import aiohttp
 import backoff
@@ -29,7 +29,7 @@ class PolicyDecisionPoint(ABC):
     backoff_expo_max_value: int
 
     @classmethod
-    def from_settings(cls, configuration: dict):
+    def from_settings(cls, configuration: Dict):
         """
         reads the configuration in the pyproject.toml file and creates a PolicyDecisionPoint(PDP) depending on the
         configuration.
@@ -302,7 +302,7 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         """
         async with aiohttp.ClientSession(headers=self.headers, raise_for_status=True) as session:
 
-            async with session.post(self.base_url + decision_events, data=subscription.__str__()
+            async with session.post(self.base_url + decision_events, data=str(subscription)
                                     ) as response:
 
                 if response.status != 200:

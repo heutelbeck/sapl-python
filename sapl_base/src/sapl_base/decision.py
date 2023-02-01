@@ -1,12 +1,15 @@
+from typing import List, Dict
+
+
 class Decision:
     """
     Class to represent a response from a policy decision point
     """
-    obligations: list
-    advice: list
+    obligations: List
+    advice: List
     decision: str
 
-    def __init__(self, decision_dict: dict):
+    def __init__(self, decision_dict: Dict):
         self.decision = decision_dict["decision"]
 
         self.obligations = decision_dict.get("obligations")

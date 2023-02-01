@@ -1,4 +1,4 @@
-from typing import Any, Callable
+from typing import Any, Callable, List, Dict
 
 from sapl_base.constraint_handling.constraint_handler_provider import FunctionArgumentsConstraintHandlerProvider, \
     ErrorConstraintHandlerProvider, OnDecisionConstraintHandlerProvider, ResultConstraintHandlerProvider, \
@@ -13,13 +13,16 @@ class ConstraintHandlerBundle:
     is only created, when for every obligation is at least one ConstraintHandlerProvider responsible, otherwise an
     Exception is thrown.
     """
-
+    _on_decision_handler: List[Callable[[Decision], None]]
+    _error_handler: List[Callable[[Exception], Exception]]
+    _result_handler: List[Callable[[Any], Any]]
+    _function_arguments_mapper: List[Callable[[Dict], Dict]]
 
     def __init__(self,
-                 on_decision_handler: list[OnDecisionConstraintHandlerProvider],
-                 error_handler: list[ErrorConstraintHandlerProvider],
-                 result_handler: list[ResultConstraintHandlerProvider],
-                 function_arguments_mapper: list[FunctionArgumentsConstraintHandlerProvider] = None):
+                 on_decision_handler: List[OnDecisionConstraintHandlerProvider],
+                 error_handler: List[ErrorConstraintHandlerProvider],
+                 result_handler: List[ResultConstraintHandlerProvider],
+                 function_arguments_mapper: List[FunctionArgumentsConstraintHandlerProvider] = None):
         """
         :param on_decision_handler: sorted List of OnDecisionConstraintHandlerProvider, of which their handle()
         methods are saved as a list[Callable[[Decision], None]]
@@ -43,7 +46,7 @@ class ConstraintHandlerBundle:
         self._error_handler = self._add_handler_to_bundle(error_handler)
 
     @staticmethod
-    def _add_handler_to_bundle(handler_provider_list: list[ConstraintHandlerProvider]) -> list[Callable]:
+    def _add_handler_to_bundle(handler_provider_list: List[ConstraintHandlerProvider]) -> List[Callable]:
         """
         Creates a list[Callable] of the handle() methods from the provided list[ConstraintHandlerProvider]
 
@@ -99,7 +102,7 @@ class ConstraintHandlerBundle:
         except Exception as e:
             raise self.execute_on_error_handler(e)
 
-    def execute_function_arguments_mapper(self, arguments: dict) -> dict:
+    def execute_function_arguments_mapper(self, arguments: Dict) -> Dict:
         """
         calls the handle() method of every responsible FunctionArgumentsConstraintHandlerProvider with the given dict as
         argument.

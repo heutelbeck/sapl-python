@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Dict
 
 from sapl_base.decision import Decision
 
@@ -88,7 +88,7 @@ class FunctionArgumentsConstraintHandlerProvider(ConstraintHandlerProvider, ABC)
     """
 
     @abstractmethod
-    def handle(self, function_arguments: dict) -> dict:
+    def handle(self, function_arguments: Dict) -> dict:
         """
         Abstractmethod, which needs to be implemented by an FunctionArgumentsConstraintHandlerProvider, which will be
         called by the ConstraintHandlerBundle if the FunctionArgumentsConstraintHandlerProvider is responsible for a
