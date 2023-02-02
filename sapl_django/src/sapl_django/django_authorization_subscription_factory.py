@@ -103,6 +103,8 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
         try:
             user = request.user
             if user.is_anonymous:
+                if request.headers.get("Authorization") is not None:
+                    return self._get_authorization(request)
                 return 'anonymous'
         except Exception:
             return 'anonymous'   
@@ -119,10 +121,19 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
                      'is_authenticated': user.is_authenticated,
                      })
         try:
-            subj.update({'authorization':request.headers.get("Authorization")})
+            subj.update({'authorization':self._get_authorization(request)})
         except Exception:
             pass
         return subj
+
+
+    def _get_authorization(self,request):
+        if request.headers.get("Authorization") is not None:
+            authorization = request.headers.get("Authorization")
+            if authorization.find('Bearer ') == 0:
+                return authorization[7:]
+            else:
+                return None
 
     def create_authorization_subscription(self, values: Dict, subject, action, resource,
                                           environment, scope, enforcement_type):
