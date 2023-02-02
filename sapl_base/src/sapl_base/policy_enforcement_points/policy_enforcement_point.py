@@ -76,8 +76,8 @@ class PolicyEnforcementPoint:
         try:
             self.constraint_handler_bundle.execute_on_error_handler(exception)
         except Exception as e:
-            if isinstance(e, PermissionDenied):
-                raise permission_denied_exception
+            if isinstance(e, type(permission_denied_exception())):
+                raise permission_denied_exception(sapl_base.authorization_subscription_factory.authorization_subscription.get())
             else:
                 raise e
 

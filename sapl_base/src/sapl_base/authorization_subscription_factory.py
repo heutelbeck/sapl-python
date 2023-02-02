@@ -5,7 +5,7 @@ from typing import Dict
 from .authorization_subscriptions import AuthorizationSubscription, MultiSubscription
 
 client_request = contextvars.ContextVar('request')
-
+authorization_subscription = contextvars.ContextVar('authorization_subscription')
 
 class AuthorizationSubscriptionFactory(ABC):
     """

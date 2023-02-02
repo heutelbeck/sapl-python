@@ -6,7 +6,7 @@ from django.forms import model_to_dict
 from django.urls import ResolverMatch
 from django.views import View
 
-from sapl_base.authorization_subscription_factory import AuthorizationSubscriptionFactory, client_request
+from sapl_base.authorization_subscription_factory import AuthorizationSubscriptionFactory, client_request, authorization_subscription
 
 
 class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
@@ -165,6 +165,7 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
         resource = self._default_resource_function(values)
 
         authz = self._create_subscription(values, subject, action, resource, environment)
+        authorization_subscription.set(authz)
         return authz
 
     def _valid_combination(self, fn_type: str, enforcement_type: str) -> None:
