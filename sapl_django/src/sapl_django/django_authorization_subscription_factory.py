@@ -160,9 +160,6 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
 
         self._valid_combination(fn_type, enforcement_type)
         values.update({'type': fn_type})
-        subject = self._default_subject_function(values)
-        action = self._default_action_function(values)
-        resource = self._default_resource_function(values)
 
         authz = self._create_subscription(values, subject, action, resource, environment)
         authorization_subscription.set(authz)
