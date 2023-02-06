@@ -30,23 +30,33 @@ To install SAPL_Flask you can use `pip install sapl_flask`.
 
 To initialize the library, the `init_sapl` function, which takes two arguments has to be called.
 
-`def init_sapl(config: Config, subject_functions: list[[Callable[[dict], dict]]]):`
+`def init_sapl(config: Config, subject_function: Callable[[], Any]):`
 
 The first argument is an argument of the type Configuration, which works exactly like a dictionary.
-The 2nd argument is a list of functions, which take a dictionary as argument and returns a dictionary.
-What these functions are and how to write them is explained in the section [How to write subject functions](#how-to-write-subject-functions).
+The 2nd argument is a function, which returns Any, which will be the Subject of the Authorization Subscription.
+What these functions are and how to write them is explained in the section [How to write subject function](#how-to-write-subject-function).
 
-A simple project, which initializes SAPL_Flask and starts a Flask application would look like this:
+A simple project, which uses pre_enforce for a route, initializes SAPL_Flask and starts a Flask application would look like this:
 ```Python
 import sapl_flask
 from flask import Flask
-
+from flask import session
+from sapl_base.decorators import pre_enforce
 app = Flask(__name__)
-def subject_function(values:dict):
-    return {"return_value": "subject"}
+
+def subject_function():
+  try:
+    return session['access_token']
+  except KeyError:
+    return None
+
+@app.route('/')
+@pre_enforce
+def hello_world():
+  return "Hello World!"
 
 if __name__ == "__main__":
-    sapl_flask.init_sapl(app.config, [subject_function])
+    sapl_flask.init_sapl(app.config, subject_function)
     app.run()
 ```
 
@@ -76,60 +86,66 @@ The default configuration in JSON Format looks like this:
 - base_url: The URL, where your PDP Server is located. This has to include the path `'/api/pdp/'` of the PDP Server. 
 - key: Access to the API of the SAPL PDP Server requires "Basic Auth". The client key (username) can be set with this parameter.
   The default is the default implemented credentials of a [SAPL-Server-lt](https://github.com/heutelbeck/sapl-policy-engine/tree/master/sapl-server-lt)
-- secret: The password which is used to get access to the API. Please note that the secret has to be BCrypt encoded.
-- dummy: Enables a dummy PDP, which is used instead of a remote PDP. This PDP always grants access and should never be 
-used in production.
+- secret: The password which is used to get access to the API.
+- dummy: Enables a dummy PDP, which is used instead of a remote PDP. This PDP always grants access and should never be used in production.
 - verify: 
 - debug: Enables debugging , which adds logging.
 - backoff_const_max_time: When an error occurs, while requesting a Decision from the PDP SAPL_Flask does a retry. 
-  This parameter determines, how long the library should retry to connect, before it aborts and denies the access.
+  This parameter determines, how many seconds the library should retry to connect, before it aborts and denies the access.
 
 # Subject functions
 
 For authentication, it has to be known who(subject) does the request. Flask does not have authentication built in 
 from which the library could gather information about who did the request.
-To determine who is requesting something you need to provide functions, which create the subject for an Authorization 
-Subscription. These functions are called, whenever an Authorization Subscription is created. 
-The dictionarys these functions return are merged to create the subject for the Authorization Subscription.
+To determine who is requesting something you need to provide a function, which creates the subject for an Authorization 
+Subscription. This function is called, whenever an Authorization Subscription is created. 
+The value this function returns is used to create the subject for the Authorization Subscription.
 
-## How to write subject functions
+## How to write a subject function
 
-Subject functions can be any functions which take a dictionary as argument and return a dictionary.
-These functions are called, when an Authorization Subscription is created and are called with a dictionary as argument.
-The given dictionary contains the function, which shall be enforced and the arguments with which this function is called.
-The given dictionary JSON formatted would look like this:
-```json
-{
-  "values" : {
-    "function" : function,
-    "args" : {"arg_1": "argument", "arg_2":  "another argument"}
-  }
-}
-```
+Subject function can be any function without parameter, which returns Any.
+This function is called, when an Authorization Subscription is created.
 
-An example for a subject function, where the name of the enforced function is used to create the subject could be:
+An example for a subject function, where the subject is the access token of a session, if it is available.
 ```Python
-def subject_function(values:dict):
-  return {"function_name" : values.get("function").__name__}
+from flask import session
+
+def subject_function():
+  try:
+    return session['access_token']
+  except KeyError:
+    return None
 ```
-If multiple subject_functions are provided, the dictionarys are merged into one dictionary.
+If the function does return None, or an empty list, or dict, the subject will be set to "anonymous"
 
 A Flask project, which uses SAPL_Flask, which is initialized with default configuration and this subject_function would be:
+
 ```Python
 import sapl_flask
 from flask import Flask
-
+from flask import session
+from sapl_base.decorators import pre_enforce
 app = Flask(__name__)
-def subject_function(values:dict):
-  return {"function_name" : values.get("function").__name__}
+
+def subject_function():
+  try:
+    return session['access_token']
+  except KeyError:
+    return None
+
+@app.route('/')
+@pre_enforce
+def hello_world():
+  return "Hello World!"
 
 if __name__ == "__main__":
-    sapl_flask.init_sapl(app.config, [subject_function])
+    sapl_flask.init_sapl(app.config, subject_function)
     app.run()
 ```
+
 # How to use it
 
-To implement SAPL into a Flask project the functions, which shall be enforced by SAPL have to be decorated with SAPL decorators.
+To implement SAPL into a Flask project, the functions, which shall be enforced by SAPL have to be decorated with SAPL decorators.
 The decorator have to be the first decorator of a function. There are 3 possible decorators, which can be used for a function.
 
 - `pre_enforce` when a function shall be enforced, before it is called.
@@ -179,7 +195,7 @@ These 3 dictionarys json formatted contain these values:
       "GET" : "Arguments of the GET Request",
       "POST" : "Arguments of the POST Request"
     },
-    "return_value": "Returnvalue of the decorated function"
+    "return_value": "Return value of the decorated function"
   }
 }
 ```
@@ -197,17 +213,17 @@ Subscription, as well as providing values for these parameters, which replaces t
 
 Instead of using the default implementation on how the subject,action and/or resources are created, it is possible to 
 use values, or create your own functions to determine these values.
-An example on how a create a constant value for 'action' for a decorated function would be:
+An example on how to use a constant as the value for the `action` argument would be
 ```Python
 from sapl_base.decorators import pre_enforce
 
-@pre_enforce(action="custom action")
-def pre_enforced_function(*args,**kwargs):
-    return_value = "Do something"
+@pre_enforce(action="retrieve data")
+def pre_enforced_function():
+    return_value = "You are granted access to these data"
     return return_value
 ```
 Whenever this function is called, it will be enforced before it is executed.
-The value of 'action' parameter of the Authorization Subscription will always be "custom action"
+The value of the 'action' parameter of the Authorization Subscription will always be "retrieve data"
 
 A more dynamic approach could get the type and path of the request, create a dictionary from these values and set this 
 dictionary as action.
@@ -216,9 +232,7 @@ from flask import request
 from sapl_base.decorators import pre_enforce
 
 def create_action():
-  action = dict
-  action.update({"method": request.method,"path":request.path})
-  return action
+  return {"method": request.method,"path":request.path}
 
 @pre_enforce(action=create_action)
 def pre_enforced_function(*args,**kwargs):
@@ -229,26 +243,13 @@ def pre_enforced_function(*args,**kwargs):
 
 # Obligations and Advices
 
-Decisions received from the PDP can contain Obligations and Advices, which have to, or should be handled.
-These two categories are called constraints, for which this library offers abstract classes from which can be inherited to 
-handle these constraints. The Abstract classes are:
-
-- `ErrorConstraintHandlerProvider`
-- `OnDecisionConstraintHandlerProvider`
-- `FunctionArgumentsConstraintHandlerProvider`
-- `ResultConstraintHandlerProvider`
-
-They all inherit from the class `ConstraintHandlerProvider` and only differ in the types of the arguments their methods take and return.
-
-## Handling of Constraints
-
 A Decision from the PDP can have Constraints attached to the Decision. There are two different kinds of Constraints,
 Obligations and Advices. Obligations have to be handled, otherwise the Permission is Denied. Advices should be handled, 
 but the Decision won't change when the Advices are not handled.
 
 To handle these Constraints, this library offers an abstract class called `ConstraintHandlerProvider`, which can handle 
 Constraints. The classes, which can handle the constraints are created by the developer and have to be registered to be available 
-to the library to check, if given constraints can be handled.
+to the library, to check if given constraints can be handled.
 
 
 ## How to create ConstraintHandlerProvider
@@ -261,11 +262,13 @@ abstract classes are:
 - `FunctionArgumentsConstraintHandlerProvider`
 - `ResultConstraintHandlerProvider`
 
-They all inherit from the baseclass `ConstraintHandlerProvider` and only differ in the types of the arguments their methods
+They all inherit from the base class `ConstraintHandlerProvider` and only differ in the types of the arguments their methods
 take and return.
 
 The Baseclass is defined like this:
 ```python
+from abc import abstractmethod, ABC
+
 class ConstraintHandlerProvider(ABC):
   
     @abstractmethod
@@ -297,20 +300,24 @@ class ConstraintHandlerProvider(ABC):
         """
 ```
 
-When a Decision contains a Constraints the library checks all registered ConstraintHandlerProvider, if their 
+When a Decision contains a Constraint, the library checks all registered Constraint handler provider, if their 
 `is_responsible` method evaluates to true for the given Constraint. 
-The responsible Constraint-handler Provider are gathered and 
+The responsible Constraint handler provider are gathered and 
 sorted by the value their method `priority` returns.
 At the end, the `handle` methods of the sorted list of `ConstraintHandlerProvider`, which are responsible for a given 
 Constraint are executed in the order of the list.
 
-An example for a ConstraintHandlerProvider, which logs the received Decision, when it contains a constraint which 
+An example for a ConstraintHandlerProvider, which logs the received Decision when it contains a constraint which 
 equals to "log decision" would be:
 ```python
+from sapl_base.decision import Decision
+from sapl_base.constraint_handling.constraint_handler_provider import OnDecisionConstraintHandlerProvider
+import logging
+
 class LogNewDecisionConstraintHandler(OnDecisionConstraintHandlerProvider):
 
     def handle(self, decision: Decision) -> None:
-        logging.info(decision.__str__())
+        logging.info(str(decision))
 
     def priority(self) -> int:
         return 0
@@ -323,7 +330,7 @@ class LogNewDecisionConstraintHandler(OnDecisionConstraintHandlerProvider):
 
 The class `ConstraintHandlerService` handles any Constraints and contains a singleton(constraint_handler_service), which 
 is created when the file is loaded. All `ConstraintHandlerProvider` registered at this singleton are taken into account, 
-when a Decision containing Constraints is checked, if the Constraints can be handled.
+when the Constraints of a Decision are checked, if they can be handled.
 
 The ConstraintHandlerService has methods to register single ConstraintHandlerProvider, or lists of ConstraintHandlerProvider 
 for each of the 4 types of ConstraintHandlerProvider.
@@ -334,15 +341,39 @@ the Flask app.
 ```Python
 import sapl_flask
 from sapl_base.constraint_handling.constraint_handler_service import constraint_handler_service
-from flask import Flask
+from sapl_base.decision import Decision
+from sapl_base.decorators import pre_enforce
+from sapl_base.constraint_handling.constraint_handler_provider import OnDecisionConstraintHandlerProvider
+import logging
+from flask import Flask,session
 
 
 app = Flask(__name__)
-def subject_function(values:dict):
-  return {"function_name" : values.get("function").__name__}
 
+class LogNewDecisionConstraintHandler(OnDecisionConstraintHandlerProvider):
+
+    def handle(self, decision: Decision) -> None:
+        logging.info(str(decision))
+
+    def priority(self) -> int:
+        return 0
+
+    def is_responsible(self, constraint) -> bool:
+        return True if constraint == "log decision" else False
+
+def subject_function():
+  try:
+    return session['access_token']
+  except KeyError:
+    return None
+
+@app.route('/')
+@pre_enforce
+def hello_world():
+  return "Hello World!"
+  
 if __name__ == "__main__":
-    sapl_flask.init_sapl(app.config, [subject_function])
+    sapl_flask.init_sapl(app.config, subject_function)
     constraint_handler_service.register_decision_constraint_handler_provider(LogNewDecisionConstraintHandler())
     app.run()
 ```

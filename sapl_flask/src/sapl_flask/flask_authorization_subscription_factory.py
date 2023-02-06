@@ -1,3 +1,5 @@
+from typing import Callable, Any, Dict
+
 from flask import current_app, request
 from werkzeug.exceptions import BadRequest
 
@@ -6,7 +8,10 @@ from sapl_base.authorization_subscription_factory import AuthorizationSubscripti
 
 class FlaskAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
 
-    def create_authorization_subscription(self, values: dict, subject, action, resource, environment, scope,
+    def __init__(self,subject_function: Callable[[], Any]):
+        self.subject_function = subject_function
+
+    def create_authorization_subscription(self, values: Dict, subject, action, resource, environment, scope,
                                           enforcement_type):
         """
         Create an AuthorizationSubscription with the given dictionary and arguments
@@ -23,20 +28,15 @@ class FlaskAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
         authz = self._create_subscription(values, subject, action, resource, environment)
         return authz
 
-    def _default_subject_function(self, values: dict) -> dict:
+    def _default_subject_function(self, values: Dict) -> Any:
         """
-        Default function returns an empty dict.
-        The subject is composed of functions, which need to be provided by the developer of the flask application.
+        Default function returns the value of the provided subject_function
 
-        :param values: Dict which contains
-        the decorated function itself as  'function', the class of the decorated method as 'class' and the args and kwargs
-        zipped in a dict as 'args'.
-
-        :return: empty dict
+        :return: The return value of the provided subject_function
         """
-        return {}
+        return self.subject_function
 
-    def _default_action_function(self, values: dict) -> dict:
+    def _default_action_function(self, values: Dict) -> Dict:
         """
         The default function, which creates the action of an AuthorizationSubscription
 
@@ -65,7 +65,7 @@ class FlaskAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
         action.update({'function': function_para})
         return action
 
-    def _default_resource_function(self, values: dict) -> dict:
+    def _default_resource_function(self, values: Dict) -> Dict:
         """
         The default function, which creates the resource of an AuthorizationSubscription
 
