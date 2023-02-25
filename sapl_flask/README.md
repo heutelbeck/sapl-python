@@ -374,7 +374,7 @@ def hello_world():
   
 if __name__ == "__main__":
     sapl_flask.init_sapl(app.config, subject_function)
-    constraint_handler_service.register_decision_constraint_handler_provider(LogNewDecisionConstraintHandler())
+    constraint_handler_service.register_on_decision_constraint_handler_provider(LogNewDecisionConstraintHandler())
     app.run()
 ```
 

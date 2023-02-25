@@ -24,7 +24,7 @@ class ConstraintHandlerService:
         self.result_handler : List[ResultConstraintHandlerProvider]= []
         self.function_arguments_mapper : List[FunctionArgumentsConstraintHandlerProvider]= []
 
-    def register_decision_constraint_handler_provider(self, providers: Union[List[OnDecisionConstraintHandlerProvider], OnDecisionConstraintHandlerProvider]) -> None:
+    def register_on_decision_constraint_handler_provider(self, providers: Union[List[OnDecisionConstraintHandlerProvider], OnDecisionConstraintHandlerProvider]) -> None:
         try:
             for provider in providers:
                 self.on_decision_handler.append(provider)
