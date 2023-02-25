@@ -104,7 +104,7 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
             user = request.user
             if user.is_anonymous:
                 if request.headers.get("Authorization") is not None:
-                    return self._get_authorization(request)
+                    return {"authorization":self._get_authorization(request)}
                 return 'anonymous'
         except Exception:
             return 'anonymous'   

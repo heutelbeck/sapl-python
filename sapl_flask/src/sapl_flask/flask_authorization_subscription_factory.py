@@ -9,6 +9,7 @@ from sapl_base.authorization_subscription_factory import AuthorizationSubscripti
 class FlaskAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
 
     def __init__(self,subject_function: Callable[[], Any]):
+        super().__init__()
         self.subject_function = subject_function
 
     def create_authorization_subscription(self, values: Dict, subject, action, resource, environment, scope,

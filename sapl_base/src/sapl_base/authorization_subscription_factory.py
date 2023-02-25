@@ -1,6 +1,8 @@
 import contextvars
+import typing
+
 from abc import abstractmethod, ABC
-from typing import Dict
+from typing import Dict,Callable
 
 from .authorization_subscriptions import AuthorizationSubscription, MultiSubscription
 
@@ -8,11 +10,27 @@ client_request = contextvars.ContextVar('request')
 authorization_subscription = contextvars.ContextVar('authorization_subscription')
 
 class AuthorizationSubscriptionFactory(ABC):
+    subject_function: Callable[[Dict],Dict]
+    action_function: Callable[[Dict],Dict]
+    resource_function: Callable[[Dict],Dict]
+
+    def __init__(self):
+        self.subject_function = self._default_subject_function
+        self.action_function = self._default_action_function
+        self.resource_function = self._default_resource_function
+
+    def register_default_subject_function(self,subject_function: Callable[[Dict],Dict]):
+        self.subject_function = subject_function
+
+    def register_default_action_function(self,action_function: Callable[[Dict],Dict]):
+        self.action_function = action_function
+
+    def register_default_resource_function(self,resource_function: Callable[[Dict],Dict]):
+        self.resource_function = resource_function
     """
     Baseclass of an AuthorizationSubscriptionFactory, which can be inherited to create a framework specific
     AuthorizationSubscriptionFactory.
     """
-
     def _create_subscription(self, values: Dict, subject=None, action=None, resource=None,
                              environment=None) -> AuthorizationSubscription:
         """
@@ -29,19 +47,19 @@ class AuthorizationSubscriptionFactory(ABC):
         if subject is not None:
             _subject = self._argument_is_callable(subject, values)
         else:
-            _subject = self._default_subject_function(values)
+            _subject = self.subject_function(values)
         if not _subject:
             _subject = "anonymous"
 
         if action is not None:
             _action = self._argument_is_callable(action, values)
         else:
-            _action = self._default_action_function(values)
+            _action = self.action_function(values)
 
         if resource is not None:
             _resource = self._argument_is_callable(resource, values)
         else:
-            _resource = self._default_resource_function(values)
+            _resource = self.resource_function(values)
 
         if environment is not None:
             _environment = self._argument_is_callable(environment, values)
@@ -216,4 +234,4 @@ class MultiSubscriptionBuilder:
                                  self._remove_empty_list(self.authorization_subscription))
 
 
-auth_factory = None
+auth_factory : AuthorizationSubscriptionFactory
