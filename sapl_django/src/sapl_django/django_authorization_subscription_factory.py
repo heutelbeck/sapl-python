@@ -6,7 +6,7 @@ from django.forms import model_to_dict
 from django.urls import ResolverMatch
 from django.views import View
 
-from sapl_base.authorization_subscription_factory import AuthorizationSubscriptionFactory, client_request, authorization_subscription
+from sapl_base.authorization_subscription_factory import AuthorizationSubscriptionFactory, client_request
 
 
 class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
@@ -162,7 +162,6 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
         values.update({'type': fn_type})
 
         authz = self._create_subscription(values, subject, action, resource, environment)
-        authorization_subscription.set(authz)
         return authz
 
     def _valid_combination(self, fn_type: str, enforcement_type: str) -> None:
@@ -177,6 +176,8 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
         if fn_type == 'Consumer' and enforcement_type in self.STREAMING_ENFORCEMENTS:
             return
         if fn_type in self.POST_ENFORCE_CLASSES and enforcement_type in ('post_enforce', 'pre_enforce'):
+            return
+        if fn_type == 'Template' and enforcement_type == 'pre_enforce':
             return
         raise
 

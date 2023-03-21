@@ -1,7 +1,6 @@
 from sapl_base.constraint_handling.constraint_handler_service import constraint_handler_service
 from sapl_base.decision import Decision
 import sapl_base.policy_decision_points
-#from sapl_base.policy_decision_points import pdp
 from sapl_base.policy_enforcement_points.policy_enforcement_point import PolicyEnforcementPoint
 
 
