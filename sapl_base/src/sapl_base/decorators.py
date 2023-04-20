@@ -1,7 +1,10 @@
 import asyncio
+import inspect
 from functools import wraps
 
-from sapl_base.policy_enforcement_points.streaming_policy_enforcement_point import StreamingPolicyEnforcementPoint
+from sapl_base.policy_enforcement_points.async_generator_policy_enforcement_point import \
+    AsyncGeneratorPolicyEnforcementPoint
+import sapl_base.policy_enforcement_points.policy_enforcement_point as pep
 from sapl_base.policy_enforcement_points.async_policy_enforcement_point import AsyncPolicyEnforcementPoint
 from sapl_base.policy_enforcement_points.sync_policy_enforcement_point import SyncPolicyEnforcementPoint
 from sapl_base.sapl_util import double_wrap
@@ -141,19 +144,33 @@ def enforce_till_denied(fn, subject: str = None, action: str = None, resource: s
     :param scope: Argument which creates a AuthorizationSubscription according to the given scope instead of evaluating the scope based on other parameter
     :return: The return_value of the decorated function with a generator which will enforce each value, which is sent with the stream
     """
-    if asyncio.iscoroutinefunction(fn):
+    if inspect.isclass(fn):
+        fn.original_init = fn.__init__
+        def new_init(self,*args,**kwargs):
+            fn.original_init(self,*args,**kwargs)
+            self.streaming_pep = pep.streaming_pep(fn,*args, **kwargs)
+            self.streaming_pep.enforce_till_denied(subject, action, resource, environment, scope)
+        fn.__init__= new_init
+        return fn
+        # class EnforceTillDenied:
+        #     def __init__(self,*args,**kwargs):
+        #         fn.__init__(self,*args,**kwargs)
+        #         self.streaming_pep = pep.streaming_pep(fn,*args, **kwargs)
+        #         self.streaming_pep.enforce_till_denied(subject, action, resource, environment, scope)
+        #
+        # return EnforceTillDenied
+
+
+    if inspect.isasyncgenfunction(fn):
         @wraps(fn)
         async def async_wrap(*args, **kwargs):
-            enforcement_point = StreamingPolicyEnforcementPoint(fn, *args, **kwargs)
-            return await enforcement_point.enforce_till_denied(subject, action, resource, environment, scope)
+
+            enforcement_point = AsyncGeneratorPolicyEnforcementPoint(fn, *args, **kwargs)
+            async for value in enforcement_point.enforce_till_denied(subject,action,resource,environment,scope):
+                yield value
 
         return async_wrap
-    else:
-        @wraps(fn)
-        def wrap(*args, **kwargs):
-            raise Exception
-
-        return wrap
+    raise Exception
 
 
 @double_wrap
@@ -176,19 +193,26 @@ def enforce_drop_while_denied(fn, subject: str = None, action: str = None, resou
     :param scope: Argument which creates a AuthorizationSubscription according to the given scope instead of evaluating the scope based on other parameter
     :return: The return_value of the decorated function with a generator which will enforce each value, which is sent with the stream
     """
-    if asyncio.iscoroutinefunction(fn):
+    if inspect.isclass(fn):
+        fn.original_init = fn.__init__
+        def new_init(self,*args,**kwargs):
+            fn.original_init(self,*args,**kwargs)
+            self.streaming_pep = pep.streaming_pep(fn,*args, **kwargs)
+            self.streaming_pep.drop_while_denied(subject, action, resource, environment, scope)
+        fn.__init__= new_init
+        return fn
+
+
+    if inspect.isasyncgenfunction(fn):
         @wraps(fn)
         async def async_wrap(*args, **kwargs):
-            enforcement_point = StreamingPolicyEnforcementPoint(fn, *args, **kwargs)
-            return await enforcement_point.drop_while_denied(subject, action, resource, environment, scope)
+
+            enforcement_point = AsyncGeneratorPolicyEnforcementPoint(fn, *args, **kwargs)
+            async for value in enforcement_point.drop_while_denied(subject,action,resource,environment,scope):
+                yield value
 
         return async_wrap
-    else:
-        @wraps(fn)
-        def wrap(*args, **kwargs):
-            raise Exception
-
-        return wrap
+    raise Exception
 
 
 @double_wrap
@@ -213,16 +237,26 @@ def enforce_recoverable_if_denied(fn, subject: str = None, action: str = None, r
     :param scope: Argument which creates a AuthorizationSubscription according to the given scope instead of evaluating the scope based on other parameter
     :return: The return_value of the decorated function with a generator which will enforce each value, which is sent with the stream
     """
-    if asyncio.iscoroutinefunction(fn):
+    if isinstance(fn,type):
+
+
+        fn.original_init = fn.__init__
+        def new_init(self,*args,**kwargs):
+            fn.original_init(self,*args,**kwargs)
+            self.streaming_pep = pep.streaming_pep(fn,self,*args, **kwargs)
+            self.streaming_pep.recoverable_if_denied(subject, action, resource, environment, scope)
+        fn.__init__= new_init
+        return fn
+
+    if inspect.isasyncgenfunction(fn):
         @wraps(fn)
         async def async_wrap(*args, **kwargs):
-            enforcement_point = StreamingPolicyEnforcementPoint(fn, *args, **kwargs)
-            return await enforcement_point.recoverable_if_denied(subject, action, resource, environment, scope)
+            enforcement_point = AsyncGeneratorPolicyEnforcementPoint(fn, *args, **kwargs)
+            async for value in enforcement_point.recoverable_if_denied(subject,action,resource,environment,scope):
+                """TODO"""
+                yield value
 
         return async_wrap
-    else:
-        @wraps(fn)
-        def wrap(*args, **kwargs):
-            raise Exception
+    raise Exception
 
-        return wrap
+
