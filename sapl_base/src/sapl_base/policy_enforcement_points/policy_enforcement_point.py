@@ -1,3 +1,4 @@
+import inspect
 import types
 from typing import Type, Union, Callable, Dict
 
@@ -5,6 +6,7 @@ import sapl_base.authorization_subscription_factory
 from sapl_base.authorization_subscriptions import AuthorizationSubscription
 from sapl_base.constraint_handling.constraint_handler_bundle import ConstraintHandlerBundle
 from sapl_base.exceptions import PermissionDenied
+from sapl_base.sapl_util import get_function_positional_args, get_named_args_dict, get_class_positional_args
 
 
 class PolicyEnforcementPoint:
@@ -19,6 +21,10 @@ class PolicyEnforcementPoint:
         args_dict = get_named_args_dict(fn, *args, **kwargs)
         self._function_args = args
         self._function_kwargs = kwargs
+
+        if inspect.isclass(fn):
+            self.values_dict = {"class": fn, "args": args_dict}
+            return
 
         try:
             class_object = args_dict.get('self')
@@ -63,8 +69,9 @@ class PolicyEnforcementPoint:
         :param enforcement_type: Type of enforcement, with which the function is decorated
         :return: An AuthorizationSubscription
         """
-        return sapl_base.authorization_subscription_factory.auth_factory.create_authorization_subscription(self.values_dict, subject, action, resource, environment,
-                                                              scope, enforcement_type)
+        return sapl_base.authorization_subscription_factory.auth_factory.create_authorization_subscription(
+            self.values_dict, subject, action, resource, environment,
+            scope, enforcement_type)
 
     def _fail_with_bundle(self, exception: Exception) -> None:
         """
@@ -90,42 +97,5 @@ class PolicyEnforcementPoint:
             self._fail_with_bundle(permission_denied_exception())
 
 
-def get_function_positional_args(fn, args):
-    """
-
-    :param fn:
-    :param args:
-    :return:
-    """
-    return args[0:fn.__code__.co_argcount]
-
-
-def get_class_positional_args(fn, args):
-    """
-
-    :param fn:
-    :param args:
-    :return:
-    """
-    return args[1:fn.__code__.co_argcount]
-
-
-def get_named_args_dict(fn, *args, **kwargs) -> Dict:
-    """
-    Create a dictionary from the args of the function and merge it with the kwargs
-
-    :param fn: function of which args a dict shall be created
-    :param args: Arguments provided to the function
-    :param kwargs: keyword arguments provided to the function
-    """
-
-    if not hasattr(fn, "__code__"):
-        args_names = fn.func.__code__.co_varnames[: fn.func.__code__.co_argcount]
-    else:
-        args_names = fn.__code__.co_varnames[: fn.__code__.co_argcount]
-
-    return {**dict(zip(args_names, args)), **kwargs}
-
-
-streaming_pep: Union[PolicyEnforcementPoint,None] = None
+streaming_pep = None
 permission_denied_exception: Type[Exception] = PermissionDenied

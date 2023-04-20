@@ -1,5 +1,4 @@
 import contextvars
-import typing
 
 from abc import abstractmethod, ABC
 from typing import Dict,Callable
@@ -118,7 +117,7 @@ class AuthorizationSubscriptionFactory(ABC):
 
     @abstractmethod
     def create_authorization_subscription(self, values: Dict, subject, action, resource,
-                                          environment, scope, enforcement_type):
+                                          environment, scope, enforcement_type)-> AuthorizationSubscription:
         """
         Create an AuthorizationSubscription with the given dictionary and arguments
 

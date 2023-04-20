@@ -1,4 +1,5 @@
 from functools import wraps
+from typing import Dict
 
 
 class NoHandlerException(Exception):
@@ -27,3 +28,35 @@ def double_wrap(f):
     return new_dec
 
 
+def get_function_positional_args(fn, args):
+    """
+    :param fn:
+    :param args:
+    :return:
+    """
+    return args[0:fn.__code__.co_argcount]
+
+
+def get_class_positional_args(fn, args):
+    """
+    :param fn:
+    :param args:
+    :return:
+    """
+    return args[1:fn.__code__.co_argcount]
+
+
+def get_named_args_dict(fn, *args, **kwargs) -> Dict:
+    """
+    Create a dictionary from the args of the function or class and merge it with the kwargs
+
+    :param fn: function of which args a dict shall be created
+    :param args: Arguments provided to the function
+    :param kwargs: keyword arguments provided to the function
+    """
+    if hasattr(fn, "__code__"):
+        args_names = fn.__code__.co_varnames[: fn.__code__.co_argcount]
+    else:
+        args_names = fn.original_init.__code__.co_varnames[1:]
+
+    return {**dict(zip(args_names, args)), **kwargs}
