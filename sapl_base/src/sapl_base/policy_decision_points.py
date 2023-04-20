@@ -3,7 +3,7 @@ import logging
 import types
 from abc import ABC, abstractmethod
 from base64 import b64encode
-from typing import Coroutine, Dict
+from typing import Coroutine, Dict, AsyncGenerator
 
 import aiohttp
 import backoff
@@ -61,7 +61,7 @@ class PolicyDecisionPoint(ABC):
 
     @abstractmethod
     async def async_decide(self, subscription: AuthorizationSubscription,
-                           pep_decision_stream: types.GeneratorType,
+                           pep_decision_stream: AsyncGenerator,
                            decision_events: str = "decide") -> (Decision, Coroutine):
         """
         Request Decisions based on the given AuthorizationSubscription and decision_event
@@ -111,7 +111,7 @@ class DummyPolicyDecisionPoint(PolicyDecisionPoint):
             "PURPOSE ONLY!"
         )
 
-    async def async_decide(self, subscription: AuthorizationSubscription, pep_decision_stream: types.GeneratorType,
+    async def async_decide(self, subscription: AuthorizationSubscription, pep_decision_stream: AsyncGenerator,
                            decision_events: str = "decide") -> (Decision, Coroutine):
         """
         implementation of decide, which returns a tuple of a Decision with Permit and a Coroutine which will send a
@@ -120,13 +120,13 @@ class DummyPolicyDecisionPoint(PolicyDecisionPoint):
         return Decision.permit_decision(), self._yield_permit(pep_decision_stream)
 
     @staticmethod
-    async def _yield_permit(pep_decision_stream: types.GeneratorType):
+    async def _yield_permit(pep_decision_stream: AsyncGenerator):
         """
         Send a Permit to the given Generator
 
         :param pep_decision_stream:  Generator to which the Decision is sent
         """
-        pep_decision_stream.send(Decision.permit_decision())
+        await pep_decision_stream.asend(Decision.permit_decision())
 
     async def async_decide_once(
             self, subscription: AuthorizationSubscription = None, decision_events: str = None
@@ -221,15 +221,15 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         ) as stream_response:
             if stream_response.status_code != 200:
                 self.logger.debug("Responsecode != 200, was %s . Decision defaults to DENY",
-                                      stream_response.status_code)
+                                  stream_response.status_code)
                 return Decision.deny_decision()
             for event in SSEClient(stream_response).events():
                 decision = Decision(json.loads(event.data))
 
-                self.logger.debug("Decision : %s", json.dumps(decision.__dict__, indent=2, skipkeys=True, default=lambda o: str(o)))
+                self.logger.debug("Decision : %s",json.dumps(decision.__dict__, indent=2, skipkeys=True, default=lambda o: str(o)))
                 return decision
 
-    async def async_decide(self, subscription: AuthorizationSubscription, pep_decision_stream: types.GeneratorType,
+    async def async_decide(self, subscription: AuthorizationSubscription, pep_decision_stream: AsyncGenerator,
                            decision_events: str = "decide") -> (Decision, types.CoroutineType):
         """
         Establish a connection to the RemotePDP and receive new Decisions, which are send to the provided Generator.
@@ -252,8 +252,8 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
                                                pep_decision_stream=pep_decision_stream, decision_events=decision_events)
 
     @backoff.on_exception(backoff.expo, Exception, on_backoff=recreate_stream, max_value=set_expo_max_value)
-    async def _update_decision(self, subscription: AuthorizationSubscription, decision_stream: types.AsyncGeneratorType,
-                               pep_decision_stream: types.GeneratorType, decision_events: str = "decide") -> None:
+    async def _update_decision(self, subscription: AuthorizationSubscription, decision_stream: AsyncGenerator,
+                               pep_decision_stream: AsyncGenerator, decision_events: str = "decide") -> None:
         """
         Returns a Coroutine, which will send new Decisions to the provided Generator.
         When an Exception occurs this method sends a INDETERMINATE Decision to the Generator and trys to reestablish a
@@ -266,15 +266,15 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         """
         if decision_stream is None:
             self.logger.debug("Stream to PDP was cancelled. Retrying to connect to the PDP")
-            await pep_decision_stream.send({"decision": "INDETERMINATE"})
+            await pep_decision_stream.asend({"decision": "INDETERMINATE"})
             decision_stream = self._get_decision_stream(subscription=subscription, decision_events=decision_events)
 
         async for decision in decision_stream:
-            await pep_decision_stream.send(decision)
+            await pep_decision_stream.asend(decision)
 
     @backoff.on_exception(backoff.constant, Exception, max_time=set_const_max_time)
     async def _get_first_decision_and_stream(self, subscription: AuthorizationSubscription, decision_events: str) -> (
-            Decision, types.AsyncGeneratorType):
+            Decision, AsyncGenerator):
         """
         Establish a connection to the RemotePDP and return the first Decision together with the Generator,
         which receives new Decisions from the RemotePDP.
@@ -292,7 +292,7 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         return Decision(decision), decision_stream
 
     async def _get_decision_stream(self, subscription: AuthorizationSubscription,
-                                   decision_events: str = "decide") -> types.AsyncGeneratorType:
+                                   decision_events: str = "decide") -> AsyncGenerator:
         """
         Establish a connection to the RemotePDP and yield new Decisions
 
@@ -321,8 +321,8 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
                             data_begin = str.find(response, '{')
                             decision = json.loads(response[data_begin:])
                             try:
-                                self.logger.debug("Decision : %s",json.dumps(decision, indent=2, skipkeys=True,
-                                                             default=lambda o: str(o)))
+                                self.logger.debug("Decision : %s", json.dumps(decision, indent=2, skipkeys=True,
+                                                                              default=lambda o: str(o)))
                             except Exception:
                                 pass
                             yield decision
