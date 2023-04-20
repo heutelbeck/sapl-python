@@ -1,19 +1,37 @@
+import asyncio
+import types
 from abc import ABC, abstractmethod
-from typing import Dict
+from asyncio import Task
 
-import asgiref.sync
-
-from sapl_base.authorization_subscription_factory import auth_factory
+import sapl_base.policy_decision_points
+from sapl_base.constraint_handling.constraint_handler_service import constraint_handler_service
+from sapl_base.decision import Decision
 from sapl_base.policy_enforcement_points.policy_enforcement_point import PolicyEnforcementPoint
 
 
 class StreamingPolicyEnforcementPoint(PolicyEnforcementPoint, ABC):
-    _current_decision: Dict
 
-    def __init__(self, fn, *args, **kwargs):
+    def __init__(self, fn: types.FunctionType, *args, instance=None,**kwargs):
         super().__init__(fn, *args, **kwargs)
         self._decision_generator = self._update_decision()
-        self._decision_generator.send(None)
+        self._decision_task: Task | None = None
+        self._current_decision: Decision = Decision.deny_decision()
+        if instance is not None:
+            self.values_dict.update({"self":instance})
+
+
+    async def init_decision_generator(self):
+        await anext(self._decision_generator)
+
+    async def _update_decision(self):
+        while True:
+            self._current_decision = yield
+
+    async def create_task_and_bundle(self, subscription):
+        decision, decision_stream = await sapl_base.policy_decision_points.pdp.async_decide(subscription,
+                                                                                            self._decision_generator)
+        self._decision_task = asyncio.create_task(decision_stream)
+        self.constraint_handler_bundle = constraint_handler_service.build_pre_enforce_bundle(decision)
 
     @abstractmethod
     async def enforce_till_denied(self, subject, action, resource, environment, scope):
@@ -27,23 +45,4 @@ class StreamingPolicyEnforcementPoint(PolicyEnforcementPoint, ABC):
     async def recoverable_if_denied(self, subject, action, resource, environment, scope):
         pass
 
-    async def _get_subscription(self, subject, action, resource, environment, scope, enforcement_type):
-        """
 
-        :param subject:
-        :param action:
-        :param resource:
-        :param environment:
-        :param scope:
-        :param enforcement_type:
-        :return:
-        """
-
-        return await asgiref.sync.sync_to_async(auth_factory.create_authorization_subscription)(self.values_dict,
-                                                                                                subject, action,
-                                                                                                resource, environment,
-                                                                                                scope, enforcement_type)
-
-    def _update_decision(self):
-        while True:
-            self._current_decision = yield
