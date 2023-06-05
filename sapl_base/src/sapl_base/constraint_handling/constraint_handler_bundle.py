@@ -18,6 +18,14 @@ class ConstraintHandlerBundle:
     _result_handler: List[Callable[[Any], Any]]
     _function_arguments_mapper: List[Callable[[Dict], Dict]]
 
+    @classmethod
+    def empty_bundle(cls):
+        """
+        Create an empty ConstraintHandlerBundle
+        :return: ConstraintHandlerBundle with empty lists of ConstraintHandlerProvider
+        """
+        return ConstraintHandlerBundle(list(),list(),list())
+
     def __init__(self,
                  on_decision_handler: List[OnDecisionConstraintHandlerProvider],
                  error_handler: List[ErrorConstraintHandlerProvider],
