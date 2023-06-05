@@ -246,7 +246,7 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
                                                                                   decision_events=decision_events)
         except Exception as e:
             self.logger.debug("An Error occured while getting the first Decision. Decision defaults to INDETERMINATE")
-            decision = {"decision": "INDETERMINATE"}
+            decision = Decision({"decision": "INDETERMINATE"})
             decision_stream = None
         return decision, self._update_decision(subscription=subscription, decision_stream=decision_stream,
                                                pep_decision_stream=pep_decision_stream, decision_events=decision_events)
@@ -266,13 +266,13 @@ class RemotePolicyDecisionPoint(PolicyDecisionPoint, ABC):
         """
         if decision_stream is None:
             self.logger.debug("Stream to PDP was cancelled. Retrying to connect to the PDP")
-            await pep_decision_stream.asend({"decision": "INDETERMINATE"})
+            await pep_decision_stream.asend(Decision({"decision": "INDETERMINATE"}))
             decision_stream = self._get_decision_stream(subscription=subscription, decision_events=decision_events)
 
         async for decision in decision_stream:
-            await pep_decision_stream.asend(decision)
+            await pep_decision_stream.asend(Decision(decision))
 
-    @backoff.on_exception(backoff.constant, Exception, max_time=set_const_max_time)
+
     async def _get_first_decision_and_stream(self, subscription: AuthorizationSubscription, decision_events: str) -> (
             Decision, AsyncGenerator):
         """
