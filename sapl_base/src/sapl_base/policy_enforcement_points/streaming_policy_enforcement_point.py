@@ -1,48 +1,142 @@
-import asyncio
 import types
 from abc import ABC, abstractmethod
 from asyncio import Task
+from typing import Union
 
-import sapl_base.policy_decision_points
+from sapl_base.constraint_handling.constraint_handler_bundle import ConstraintHandlerBundle
 from sapl_base.constraint_handling.constraint_handler_service import constraint_handler_service
 from sapl_base.decision import Decision
+from sapl_base.exceptions import PermissionDenied
 from sapl_base.policy_enforcement_points.policy_enforcement_point import PolicyEnforcementPoint
 
 
 class StreamingPolicyEnforcementPoint(PolicyEnforcementPoint, ABC):
+    """
+    The Baseclass for StreamingPolicyEnforcementPoints serves as a foundation for implementing specific
+    StreamingPolicyEnforcementPoints. It defines a set of abstract methods that must be implemented by any derived
+    StreamingPolicyEnforcementPoint.
 
-    def __init__(self, fn: types.FunctionType, *args, instance=None,**kwargs):
+    In addition, this base class provides a generator that can be utilized by a Policy Decision Point (PDP). The generator
+    handles incoming Decisions from the PDP and updates the current Decision whenever a new Decision is received.
+
+    By extending this base class and implementing the required abstract methods, developers can create custom
+    StreamingPolicyEnforcementPoints tailored to their specific needs. The provided generator facilitates seamless
+    integration with a PDP, ensuring efficient handling of Decisions in a streaming environment.
+    """
+    def __init__(self, fn: types.FunctionType, *args, instance=None, type_of_enforcement, **kwargs):
         super().__init__(fn, *args, **kwargs)
         self._decision_generator = self._update_decision()
-        self._decision_task: Task | None = None
+        self._decision_task: Union[Task, None] = None
+        self.type_of_enforcement: Union[str, None] = type_of_enforcement
         self._current_decision: Decision = Decision.deny_decision()
         if instance is not None:
-            self.values_dict.update({"self":instance})
-
+            self.values_dict.update({"self": instance})
 
     async def init_decision_generator(self):
-        await anext(self._decision_generator)
+        await self._decision_generator.asend(None)
+
 
     async def _update_decision(self):
-        while True:
-            self._current_decision = yield
+        """
+        When a connection to a Policy Decision Point (PDP) is established, the StreamingPolicyEnforcementPoint's
+        generator receives new Decisions. Each new Decision triggers the creation of a new ConstraintHandlerBundle. The
+        StreamingPolicyEnforcementPoint then reacts to the new Decision and ConstraintHandlerBundle based on the type of
+        Enforcement.
 
-    async def create_task_and_bundle(self, subscription):
-        decision, decision_stream = await sapl_base.policy_decision_points.pdp.async_decide(subscription,
-                                                                                            self._decision_generator)
-        self._decision_task = asyncio.create_task(decision_stream)
-        self.constraint_handler_bundle = constraint_handler_service.build_pre_enforce_bundle(decision)
+        After processing the new Decision and ConstraintHandlerBundle, the current Decision is updated and set as
+        current Decision.
+        """
+        try:
+            while True:
+                new_decision: Decision = yield
+
+                try:
+                    self.constraint_handler_bundle = constraint_handler_service.build_pre_enforce_bundle(new_decision)
+                except PermissionDenied:
+                    new_decision = Decision.deny_decision()
+                    self.constraint_handler_bundle = ConstraintHandlerBundle.empty_bundle()
+
+                if new_decision.decision != "PERMIT" and self.type_of_enforcement == "enforce_till_denied":
+                    try:
+                        self.constraint_handler_bundle.execute_on_decision_handler(new_decision)
+                    finally:
+                        await self._cancel_stream()
+                        return
+
+                try:
+                    self.constraint_handler_bundle.execute_on_decision_handler(new_decision)
+                except Exception as e:
+                    new_decision = Decision.deny_decision()
+                finally:
+                    if self._current_decision.decision == "PERMIT" and new_decision.decision != "PERMIT" and self.type_of_enforcement == "enforce_recoverable_if_denied":
+                        await self._handle_deny_on_recoverable()
+                    self._current_decision = new_decision
+                    continue
+        except Exception as e:
+            self._decision_task.cancel()
 
     @abstractmethod
-    async def enforce_till_denied(self, subject, action, resource, environment, scope):
+    def enforce_till_denied(self, subject, action, resource, environment, scope):
+        """
+        The implementation of this method is responsible for defining how the StreamingPolicyEnforcementPoint handles the
+        situation where a class or asyncgenerator is decorated with enforce_till_denied. The specifics of this behavior will
+        depend on the particular requirements and functionality of the derived StreamingPolicyEnforcementPoint.
+        :param subject: Custom subject which will be set as the Subject for an AuthorizationSubscription
+        :param action: Custom action which will be set as the Subject for an AuthorizationSubscription
+        :param resource: Custom resource which will be set as the Subject for an AuthorizationSubscription
+        :param environment: Custom environment which will be set as the Subject for an AuthorizationSubscription
+        :param scope:
+        """
         pass
 
     @abstractmethod
     async def drop_while_denied(self, subject, action, resource, environment, scope):
+        """
+        The implementation of this method is responsible for defining how the StreamingPolicyEnforcementPoint handles the
+        situation where a class or asyncgenerator is decorated with drop_while_denied. The specifics of this behavior will
+        depend on the particular requirements and functionality of the derived StreamingPolicyEnforcementPoint.
+
+        :param subject: Custom subject which will be set as the Subject for an AuthorizationSubscription
+        :param action: Custom action which will be set as the Subject for an AuthorizationSubscription
+        :param resource: Custom resource which will be set as the Subject for an AuthorizationSubscription
+        :param environment: Custom environment which will be set as the Subject for an AuthorizationSubscription
+        :param scope:
+        """
         pass
 
     @abstractmethod
-    async def recoverable_if_denied(self, subject, action, resource, environment, scope):
+    async def recoverable_if_denied(self, subject, action, resource, environment, scope,
+                                    handle_recoverable_deny_function):
+        """
+        The implementation of this method is responsible for defining how the StreamingPolicyEnforcementPoint handles the
+        situation where a class or asyncgenerator is decorated with recoverable_if_denied. The specifics of this behavior will
+        depend on the particular requirements and functionality of the derived StreamingPolicyEnforcementPoint.
+
+        :param subject: Custom subject which will be set as the Subject for an AuthorizationSubscription
+        :param action: Custom action which will be set as the Subject for an AuthorizationSubscription
+        :param resource: Custom resource which will be set as the Subject for an AuthorizationSubscription
+        :param environment: Custom environment which will be set as the Subject for an AuthorizationSubscription
+        :param scope:
+        :param handle_recoverable_deny_function: Custom function, which replaces the _handle_deny_on_recoverable method of a StreamingPolicyEnforcementPoint
+        """
         pass
 
+    @abstractmethod
+    async def _cancel_stream(self):
+        """
+        When the StreamingPolicyEnforcementPoint detects that the Stream needs to be cancelled, it invokes this method
+        to handle the cancellation process. The specific implementation of this method will depend on the requirements
+        and functionality of the derived StreamingPolicyEnforcementPoint.
+        """
+        pass
 
+    @abstractmethod
+    async def _handle_deny_on_recoverable(self):
+        """
+        This method is called when the current Decision transitions from "Permit" to a non-permitted state. Its purpose
+        is to notify the client that updates will no longer be received until permission is granted again.
+
+        The specific implementation of this method will depend on the requirements
+        and functionality of the derived StreamingPolicyEnforcementPoint.
+        """
+        pass
