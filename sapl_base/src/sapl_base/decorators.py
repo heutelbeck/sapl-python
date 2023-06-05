@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 from functools import wraps
+from typing import Callable
 
 from sapl_base.policy_enforcement_points.async_generator_policy_enforcement_point import \
     AsyncGeneratorPolicyEnforcementPoint
@@ -145,31 +146,28 @@ def enforce_till_denied(fn, subject: str = None, action: str = None, resource: s
     :return: The return_value of the decorated function with a generator which will enforce each value, which is sent with the stream
     """
     if inspect.isclass(fn):
+        "Replace the original init method of the decorated class with an init method which inits the class and creates " \
+        "a Streaming PEP which enforces the decorated class with till_denied behaviour"
         fn.original_init = fn.__init__
+
         def new_init(self,*args,**kwargs):
             fn.original_init(self,*args,**kwargs)
-            self.streaming_pep = pep.streaming_pep(fn,*args, **kwargs)
+            self.streaming_pep = pep.streaming_pep(fn,*args, instance=self,type_of_enforcement="enforce_till_denied",**kwargs)
             self.streaming_pep.enforce_till_denied(subject, action, resource, environment, scope)
+
         fn.__init__= new_init
         return fn
-        # class EnforceTillDenied:
-        #     def __init__(self,*args,**kwargs):
-        #         fn.__init__(self,*args,**kwargs)
-        #         self.streaming_pep = pep.streaming_pep(fn,*args, **kwargs)
-        #         self.streaming_pep.enforce_till_denied(subject, action, resource, environment, scope)
-        #
-        # return EnforceTillDenied
-
 
     if inspect.isasyncgenfunction(fn):
+
         @wraps(fn)
         async def async_wrap(*args, **kwargs):
-
-            enforcement_point = AsyncGeneratorPolicyEnforcementPoint(fn, *args, **kwargs)
+            enforcement_point = AsyncGeneratorPolicyEnforcementPoint(fn, *args,type_of_enforcement="enforce_till_denied", **kwargs)
             async for value in enforcement_point.enforce_till_denied(subject,action,resource,environment,scope):
                 yield value
 
         return async_wrap
+
     raise Exception
 
 
@@ -193,31 +191,38 @@ def enforce_drop_while_denied(fn, subject: str = None, action: str = None, resou
     :param scope: Argument which creates a AuthorizationSubscription according to the given scope instead of evaluating the scope based on other parameter
     :return: The return_value of the decorated function with a generator which will enforce each value, which is sent with the stream
     """
+
+
     if inspect.isclass(fn):
+        "Replace the original init method of the decorated class with an init method which inits the class and creates " \
+        "a Streaming PEP which enforces the decorated class with drop_while_denied behaviour"
         fn.original_init = fn.__init__
+
         def new_init(self,*args,**kwargs):
             fn.original_init(self,*args,**kwargs)
-            self.streaming_pep = pep.streaming_pep(fn,*args, **kwargs)
+            self.streaming_pep = pep.streaming_pep(fn,*args, instance=self,type_of_enforcement="enforce_drop_while_denied",**kwargs)
             self.streaming_pep.drop_while_denied(subject, action, resource, environment, scope)
+
         fn.__init__= new_init
         return fn
 
 
     if inspect.isasyncgenfunction(fn):
+
         @wraps(fn)
         async def async_wrap(*args, **kwargs):
-
-            enforcement_point = AsyncGeneratorPolicyEnforcementPoint(fn, *args, **kwargs)
+            enforcement_point = AsyncGeneratorPolicyEnforcementPoint(fn, *args,type_of_enforcement="enforce_drop_while_denied", **kwargs)
             async for value in enforcement_point.drop_while_denied(subject,action,resource,environment,scope):
                 yield value
 
         return async_wrap
+
     raise Exception
 
 
 @double_wrap
 def enforce_recoverable_if_denied(fn, subject: str = None, action: str = None, resource: str = None,
-                                  environment: str = None, scope: str = "automatic"):
+                                  environment: str = None, scope: str = "automatic", handle_recoverable_deny_function : Callable[[], None] = None):
     """
     Enforces a stream and drops values, when the current decision is not PERMIT and notify the client, that
     values are dropped, because they are not PERMITTED to receive them.
@@ -237,26 +242,29 @@ def enforce_recoverable_if_denied(fn, subject: str = None, action: str = None, r
     :param scope: Argument which creates a AuthorizationSubscription according to the given scope instead of evaluating the scope based on other parameter
     :return: The return_value of the decorated function with a generator which will enforce each value, which is sent with the stream
     """
-    if isinstance(fn,type):
-
-
+    if inspect.isclass(fn):
+        "Replace the original init method of the decorated class with an init method which inits the class and creates " \
+        "a Streaming PEP which enforces the decorated class with recoverable_if_denied behaviour"
         fn.original_init = fn.__init__
+
         def new_init(self,*args,**kwargs):
             fn.original_init(self,*args,**kwargs)
-            self.streaming_pep = pep.streaming_pep(fn,self,*args, **kwargs)
-            self.streaming_pep.recoverable_if_denied(subject, action, resource, environment, scope)
+            self.streaming_pep = pep.streaming_pep(fn,*args, instance=self,type_of_enforcement="enforce_recoverable_if_denied",**kwargs)
+            self.streaming_pep.recoverable_if_denied(subject, action, resource, environment, scope, handle_recoverable_deny_function)
+
         fn.__init__= new_init
         return fn
 
     if inspect.isasyncgenfunction(fn):
+
         @wraps(fn)
         async def async_wrap(*args, **kwargs):
-            enforcement_point = AsyncGeneratorPolicyEnforcementPoint(fn, *args, **kwargs)
-            async for value in enforcement_point.recoverable_if_denied(subject,action,resource,environment,scope):
-                """TODO"""
+            enforcement_point = AsyncGeneratorPolicyEnforcementPoint(fn, *args, type_of_enforcement="enforce_recoverable_if_denied",**kwargs)
+            async for value in enforcement_point.recoverable_if_denied(subject,action,resource,environment,scope, handle_recoverable_deny_function):
                 yield value
 
         return async_wrap
+
     raise Exception
 
 
