@@ -1,3 +1,4 @@
+import contextvars
 from typing import Dict
 
 from channels.consumer import AsyncConsumer
@@ -7,6 +8,39 @@ from django.urls import ResolverMatch
 from django.views import View
 
 from sapl_base.authorization_subscription_factory import AuthorizationSubscriptionFactory, client_request
+from sapl_base.authorization_subscriptions import AuthorizationSubscription
+
+
+def identify_type(values: Dict) -> str:
+    """
+    Identifies the type of the decorated function
+
+    :param values: dict containing all values needed to create the AuthorizationSubscription
+    :return: The name of the type of the decorated function
+    """
+    if 'self' in values:
+        try:
+            classes_names = values['self']
+            if isinstance(classes_names, View):
+                return 'View'
+            if isinstance(classes_names, QuerySet):
+                return 'Queryset'
+            if isinstance(classes_names, Manager):
+                return 'Manager'
+            if isinstance(classes_names, AsyncConsumer):
+                return 'Consumer'
+        except Exception:
+            pass
+    return 'View'
+
+
+def get_authorization(request):
+    if request.headers.get("Authorization") is not None:
+        authorization = request.headers.get("Authorization")
+        if authorization.find('Bearer ') == 0:
+            return authorization[7:]
+        else:
+            return None
 
 
 class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
@@ -15,7 +49,7 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
     Creates AuthorizationSubscription, when SAPL is used in a Django project.
     """
 
-    STREAMING_ENFORCEMENTS = ('enforce_till_denied', 'enforce_while_denied', 'drop_while_denied')
+    STREAMING_ENFORCEMENTS = ('enforce_till_denied', 'enforce_drop_while_denied','enforce_recoverable_if_denied')
     POST_ENFORCE_CLASSES = ('Manager', 'Queryset')
 
     def _default_action_function(self, values: Dict) -> Dict:
@@ -26,20 +60,28 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
         :return: A dictionary which will be provided as action, when an AuthorizationSubscription is created
         """
         action = {}
-        request = values['request']
-        resolver: ResolverMatch = request.resolver_match
         function_para = {}
 
         if 'self' in values:
             function_para.update({'class': values['self'].__class__.__name__})
-        function_para.update({'function_name': values['function'].__name__})
+        try:
+            function_para.update({'function_name': values['function'].__name__})
+        except Exception:
+            pass
         function_para.update({'type': values['type']})
         request_para = {}
-        request_para.update({'path': request.path})
-        request_para.update({'method': request.method})
-        request_para.update({'view_name': resolver.view_name})
-        request_para.update({'route': resolver.route})
-        request_para.update({'url_name': resolver.url_name})
+        if values.get('request') is not None:
+            request = values['request']
+            resolver: ResolverMatch = request.resolver_match
+            request_para.update({'path': request.path})
+            request_para.update({'method': request.method})
+            request_para.update({'view_name': resolver.view_name})
+            request_para.update({'route': resolver.route})
+            request_para.update({'url_name': resolver.url_name})
+        elif values.get('scope') is not None:
+            request = values['scope']
+
+
 
         action.update({'request': request_para})
         action.update({'function': function_para})
@@ -52,17 +94,23 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
         :return: A dictionary which will be provided as resource, when an AuthorizationSubscription is created
         """
         resource = {}
-        request = values['request']
-        resolver: ResolverMatch = request.resolver_match
-        request_method = request.method
         request_resources = {}
         function_resources = {}
-        if request_method == 'GET':
-            request_resources.update({'GET': request.GET.dict()})
-        if request_method == 'POST':
-            request_resources.update({'POST': request.POST.dict()})
 
-        function_resources.update({'url_kwargs': resolver.kwargs})
+        if values.get('request') is not None:
+            request = values['request']
+            resolver: ResolverMatch = request.resolver_match
+            request_method = request.method
+            if request_method == 'GET':
+                request_resources.update({'GET': request.GET.dict()})
+            if request_method == 'POST':
+                request_resources.update({'POST': request.POST.dict()})
+            function_resources.update({'url_kwargs': resolver.kwargs})
+
+        elif values.get('scope') is not None:
+            request = values['scope']
+
+
         args_copy: dict = values.get('args').copy()
         if 'self' in args_copy:
             args_copy.pop('self')
@@ -98,16 +146,17 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
         :param values: dict containing all values needed to create an AuthorizationSubscription
         :return: A dictionary which will be provided as subject, when an AuthorizationSubscription is created
         """
-        request = values['request']
+
+        request = values.get('request') if values.get('request') is None else values.get('scope')
 
         try:
             user = request.user
             if user.is_anonymous:
                 if request.headers.get("Authorization") is not None:
-                    return {"authorization":self._get_authorization(request)}
+                    return {"authorization": get_authorization(request)}
                 return 'anonymous'
         except Exception:
-            return 'anonymous'   
+            return 'anonymous'
         subj = {}
         subj.update({'user_id': user.id,
                      'username': user.username,
@@ -121,22 +170,13 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
                      'is_authenticated': user.is_authenticated,
                      })
         try:
-            subj.update({'authorization':self._get_authorization(request)})
+            subj.update({'authorization': get_authorization(request)})
         except Exception:
             pass
         return subj
 
-
-    def _get_authorization(self,request):
-        if request.headers.get("Authorization") is not None:
-            authorization = request.headers.get("Authorization")
-            if authorization.find('Bearer ') == 0:
-                return authorization[7:]
-            else:
-                return None
-
     def create_authorization_subscription(self, values: Dict, subject, action, resource,
-                                          environment, scope, enforcement_type):
+                                          environment, scope, enforcement_type)-> AuthorizationSubscription:
         """
         Create an AuthorizationSubscription with the given dictionary and arguments
 
@@ -154,7 +194,7 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
         fn_type: str
         self._add_contextvar_to_values(values)
         if scope == "automatic":
-            fn_type = self._identify_type(values)
+            fn_type = identify_type(values)
         else:
             fn_type = scope
 
@@ -181,32 +221,16 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
             return
         raise
 
-    def _identify_type(self, values: Dict) -> str:
-        """
-        Identifies the type of the decorated function
-
-        :param values: dict containing all values needed to create the AuthorizationSubscription
-        :return: The name of the type of the decorated function
-        """
-        if 'self' in values:
-            try:
-                classes_names = values['self']
-                if isinstance(classes_names, View):
-                    return 'View'
-                if isinstance(classes_names, QuerySet):
-                    return 'Queryset'
-                if isinstance(classes_names, Manager):
-                    return 'Manager'
-                if isinstance(classes_names, AsyncConsumer):
-                    return 'Consumer'
-            except Exception:
-                pass
-        return 'View'
-
     def _add_contextvar_to_values(self, values: Dict) -> None:
         """
         Adds the request made to the dict which is used to create the AuthorizationSubscription
         :param values: A dict object containing all values needed to create an AuthorizationSubscription
         """
-        request = client_request.get('request')
-        values.update({'request': request})
+        if client_request.get('request') != 'request':
+            values.update({'request': client_request.get('request')})
+        if consumer_scope.get('scope') != 'scope':
+            values.update({'scope': consumer_scope.get()})
+
+
+
+consumer_scope = contextvars.ContextVar('scope')
