@@ -73,15 +73,17 @@ class PolicyEnforcementPoint:
             self.values_dict, subject, action, resource, environment,
             scope, enforcement_type)
 
-    def _fail_with_bundle(self, exception: Exception) -> None:
+    def _fail_with_bundle(self, exception: Union[Exception , None] = None) -> None:
         """
         Call all responsible ErrorConstraintHandlerprovider with the given Exception and fail with the Exception of the
         ErrorConstraintHandlerProvider
 
         :param exception:Exception with which the ErrorConstraintHandlerProvider are called
         """
+        exce = permission_denied_exception() if exception is None  else exception
+
         try:
-            self.constraint_handler_bundle.execute_on_error_handler(exception)
+            self.constraint_handler_bundle.execute_on_error_handler(exce)
         except Exception as e:
             if isinstance(e, type(permission_denied_exception())):
                 raise permission_denied_exception()
@@ -93,7 +95,7 @@ class PolicyEnforcementPoint:
         Check if the Decision is DENY and call the method fail_with_bundle with a PermissionDenied Exception if true
         :param decision: Decision
         """
-        if decision.decision == "DENY":
+        if decision.decision != "PERMIT":
             self._fail_with_bundle(permission_denied_exception())
 
 
