@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from asyncio import Task
 from typing import Union
 
+import sapl_base.policy_decision_points
 from sapl_base.constraint_handling.constraint_handler_bundle import ConstraintHandlerBundle
 from sapl_base.constraint_handling.constraint_handler_service import constraint_handler_service
 from sapl_base.decision import Decision
@@ -35,6 +36,20 @@ class StreamingPolicyEnforcementPoint(PolicyEnforcementPoint, ABC):
     async def init_decision_generator(self):
         await self._decision_generator.asend(None)
 
+    async def request_decision(self, subscription):
+        """
+        The provided Authorization Subscription is used to request Decisions from a Policy Decision Point (PDP). The
+        initial Decision is sent to the generator, which evaluates subsequent Decisions. The opened Stream to the PDP is
+        returned and can be executed as an independent task, which can be started at a later time.
+
+        :param subscription: The Authorization Subscription which is send to a PDP and for which Decisions are requested
+        :return: A Generator which updates the current Decision of the PEP when new Decisions are received from the PDP
+        """
+        await self.init_decision_generator()
+        decision, decision_stream = await sapl_base.policy_decision_points.pdp.async_decide(subscription,
+                                                                                                self._decision_generator)
+        await self._decision_generator.asend(decision)
+        return decision_stream
 
     async def _update_decision(self):
         """
@@ -50,18 +65,24 @@ class StreamingPolicyEnforcementPoint(PolicyEnforcementPoint, ABC):
             while True:
                 new_decision: Decision = yield
 
+                "When the creation of a Bundle for the new Decision fails, the Decision is defaulted to DENY with an empty Bundle"
                 try:
                     self.constraint_handler_bundle = constraint_handler_service.build_pre_enforce_bundle(new_decision)
                 except PermissionDenied:
                     new_decision = Decision.deny_decision()
                     self.constraint_handler_bundle = ConstraintHandlerBundle.empty_bundle()
 
+                "If for the decorator enforce_till_denied no permission is granted, the stream will cancelled"
                 if new_decision.decision != "PERMIT" and self.type_of_enforcement == "enforce_till_denied":
                     try:
                         self.constraint_handler_bundle.execute_on_decision_handler(new_decision)
+
                     finally:
-                        await self._cancel_stream()
-                        return
+                        try:
+                            await self._cancel_stream()
+                        except Exception:
+                            pass
+                        self._fail_with_bundle()
 
                 try:
                     self.constraint_handler_bundle.execute_on_decision_handler(new_decision)
@@ -73,7 +94,14 @@ class StreamingPolicyEnforcementPoint(PolicyEnforcementPoint, ABC):
                     self._current_decision = new_decision
                     continue
         except Exception as e:
-            self._decision_task.cancel()
+            try:
+                self._decision_task.cancel()
+            except Exception:
+                pass
+
+            raise e
+
+
 
     @abstractmethod
     def enforce_till_denied(self, subject, action, resource, environment, scope):

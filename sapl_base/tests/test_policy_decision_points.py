@@ -1,9 +1,7 @@
-from unittest.mock import patch
-
 import pytest
 
 from sapl_base.decision import Decision
-from sapl_base.policy_decision_points import PolicyDecisionPoint, DummyPolicyDecisionPoint, RemotePolicyDecisionPoint
+from sapl_base.policy_decision_points import PolicyDecisionPoint, DummyPolicyDecisionPoint
 
 
 class TestDummyPdp:
@@ -40,9 +38,3 @@ class TestDummyPdp:
 def test_instantiate_pdp_raises():
     with pytest.raises(TypeError):
         PolicyDecisionPoint()
-
-
-
-
-
-
