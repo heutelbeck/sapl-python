@@ -138,7 +138,7 @@ class AsyncGeneratorPolicyEnforcementPoint(StreamingPolicyEnforcementPoint):
         decision_stream = await self.request_decision(subscription)
 
         if self._current_decision != "PERMIT":
-            await self._handle_deny_on_recoverable
+            await self._handle_deny_on_recoverable()
 
         async for result in self.run_generator(decision_stream):
             yield result

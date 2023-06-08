@@ -17,6 +17,7 @@ class DjangoStreamingPolicyEnforcementPoint(StreamingPolicyEnforcementPoint):
         self.instance = self.values_dict.get("self")
         if self.instance is None or not isinstance(self.instance, AsyncWebsocketConsumer):
             raise Exception
+        self.stream_task = asyncio.current_task()
 
     async def _cancel_stream(self):
         """
@@ -172,15 +173,14 @@ class DjangoStreamingPolicyEnforcementPoint(StreamingPolicyEnforcementPoint):
                                                   scope, self.type_of_enforcement)
 
             decision_stream = await self.request_decision(subscription)
-            if self._current_decision != "PERMIT":
-                await self._handle_deny_on_recoverable
+            await self.instance.original_connect()
+            if self._current_decision.decision != "PERMIT":
+                await self._handle_deny_on_recoverable()
 
             self._decision_task = asyncio.create_task(decision_stream)
-            await self.instance.original_connect()
+
 
         self.instance.original_connect = self.instance.connect
         self.instance.connect = connect
 
         self.replace_methods()
-
-

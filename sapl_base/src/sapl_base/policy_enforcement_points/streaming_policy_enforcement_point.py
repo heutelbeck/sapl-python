@@ -32,6 +32,7 @@ class StreamingPolicyEnforcementPoint(PolicyEnforcementPoint, ABC):
         self._current_decision: Decision = Decision.deny_decision()
         if instance is not None:
             self.values_dict.update({"self": instance})
+        self.stream_task : Union[Task , None] = None
 
     async def init_decision_generator(self):
         await self._decision_generator.asend(None)
@@ -64,7 +65,10 @@ class StreamingPolicyEnforcementPoint(PolicyEnforcementPoint, ABC):
         try:
             while True:
                 new_decision: Decision = yield
-
+                "Check if the Stream was canceled without notification"
+                if self.stream_task is not None:
+                    if self.stream_task.cancelled():
+                        raise Exception
                 "When the creation of a Bundle for the new Decision fails, the Decision is defaulted to DENY with an empty Bundle"
                 try:
                     self.constraint_handler_bundle = constraint_handler_service.build_pre_enforce_bundle(new_decision)
