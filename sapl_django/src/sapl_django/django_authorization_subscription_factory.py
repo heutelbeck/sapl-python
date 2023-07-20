@@ -80,7 +80,8 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
             request_para.update({'url_name': resolver.url_name})
         elif values.get('scope') is not None:
             request = values['scope']
-
+            request_para.update({'path': request["path"]})
+            request_para.update({'type': request["type"]})
 
 
         action.update({'request': request_para})
@@ -109,6 +110,9 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
 
         elif values.get('scope') is not None:
             request = values['scope']
+            function_resources.update({'url_kwargs': request["url_route"]["kwargs"]})
+            function_resources.update({'cookies': request["cookies"]})
+            function_resources.update({'asgi': request["asgi"]})
 
 
         args_copy: dict = values.get('args').copy()
@@ -147,7 +151,7 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
         :return: A dictionary which will be provided as subject, when an AuthorizationSubscription is created
         """
 
-        request = values.get('request') if values.get('request') is None else values.get('scope')
+        request = values.get('request') if values.get('request') is not None else values.get('scope')
 
         try:
             user = request.user

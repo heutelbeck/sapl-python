@@ -1,6 +1,6 @@
 # SAPL Integration library for Django
 
-This library provides decorators to enforce functions with SAPL functionality, allowing you to implement attribute-based access control (ABAC) in a Django application.
+This library provides decorators to enforce methods, functions, asyncGenerator and AsyncWebsocketConsumer with SAPL functionality, allowing you to implement attribute streaming based access control (ABAC) in a Django application.
 
 If you're not familiar with ABAC, it's recommended that you first read the SAPL [documentation](https://sapl.io/documentation) to gain a better understanding of the underlying concepts.
 
@@ -23,7 +23,6 @@ The demo project can be found on GitHub [here](https://github.com/heutelbeck/sap
 ## how to install
 
 The SAPL Django integration library is available on PyPI and can be installed using `pip`.
-
 To install SAPL_Django run `pip install sapl_django`. 
 
 ## initialize the library
@@ -95,16 +94,16 @@ POLICY_DECISION_POINT = {
 
 # How to use it
 
-To secure a Django project with SAPL, developers can decorate the functions, methods, and classes that they want to 
+To secure a Django project with SAPL, developers can decorate the functions, methods, asyncGenerator and AsyncWebsocketConsumer that they want to 
 enforce with SAPL decorators. The SAPL Django integration library is designed to be compatible with both ASGI and WSGI 
 servers, and can recognize both synchronous and asynchronous functions automatically.
 
-The library provides decorators for functions, methods, consumers, and templates, which are explained in their 
+The library provides decorators for functions, methods, AsyncWebsocketConsumer and templates, which are explained in their 
 respective chapters in the documentation. The decorators can be customized with arguments for the Subject, Action, 
 Resource, and Environment parameters. If no arguments are provided, the library uses default implementations to 
 determine these values and create an AuthorizationSubscription, which is sent as a JSON to the PDP to request a decision.
 
-An AuthorizationSubscription as JSON with default implementation will look like this:
+An AuthorizationSubscription as JSON with default implementation for a method or function will look like this:
 ```json
 {
   "subject": {
@@ -179,31 +178,61 @@ def pre_enforced_function(*args,**kwargs):
     return return_value
 ```
 
-The AuthorizationSubscription which would be sent to the PDP to request a Decision would be:
+The AuthorizationSubscription which could be sent to the PDP to request a Decision could be:
 
-# TODO: EXAMPLE
+```json
+{
+  "subject":{
+    "user_id":4,"username":"alina","first_name":"Alina","last_name":"Aurich","is_active":true,"is_superuser":false,
+    "permissions":["medical.add_patient","medical.change_patient","medical.view_patient"],
+    "groups":["Head Nurse","Nurse"],"last_login":"2023-06-12 10:15:51.149613+00:00","is_authenticated":true
+  },
+  "action":{
+    "request":{
+      "path":"/patients/5/update_patient_data/","method":"GET","view_name":"medical:update_patient",
+      "route":"patients/<int:pk>/update_patient_data/","url_name":"update_patient"
+    },
+    "function":{
+      "class":"PatientManager","function_name":"find_patient_by_pk","type":"Manager"
+    }
+  },
+  "resource":{
+    "return_value":{
+      "id":5,"name":"hello","icd11_code":"5","diagnosis_text":"data",
+      "attending_doctor":"doctor","room_number":20,"is_related_to_staff":false
+    },"function":{
+      "url_kwargs":{
+        "pk":5
+      },"kwargs":{
+        "patient_pk":5
+      }
+    }
+  }
+}
 
+```
 Instead of using the default implementation to determine Subject,Action,Resources and Environment it is possible to provide Arguments for these parameter.
 An explanation on how to provide Arguments for decorators is explained in the chapter [Providing arguments to a decorator](##providing_arguments_to_a_decorator)
 
-## Decorators for Consumer
+## Decorators for AsyncGenerator and AsyncWebsockets
 
-Django provides a class Consumer, from which can be inherited.
-The inheriting class uses methods of the baseclass, which handle the sending and receiving from data. To secure the receiving and sending of data 
-from a Consumer, the class can be decorated with one of 3 Decorators.
+Django provides a class AsyncWebsocketConsumer, which can be enforced with SAPL.
+There are 3 possible decorators which can be used to enforce AsyncGenerator and AsyncWebsocketConsumer:
 
 - `enforce_till_denied`
 - `enforce_drop_while_denied`
 - `enforce_recoverable_if_denied`
 
-These Decorators add methods to the class and will check for Permission, whenever data is received or sent and 
-possibly stop the server from sending, or processing data.
+When an AsyncWebsocketConsumer is decorated, these decorators will check for Permission, whenever data should be sent and 
+can prevent the sending of data.
 Using Obligations and Advices it is also possible to restrict the usage of certain methods within the class.
-
-Decorated classes can close a Connection, when 
-The Decorator also add methods to send an error message on a Recoverable_if_denied, or to close the Connection on a pre_enforce decorator
-
+The Decorator also add methods to send an error message on a Recoverable_if_denied, or it can close the Connection on a pre_enforce decorator
 Decorating doesn't prohibit the usage of sapl decorators for methods in the class.
+
+When an AsyncGenerator is decorated, the decorator will enforce each yield of the AsyncGenerator.
+The AsyncGenerator can be closed when the Permission is denied, or it can just drop a value, which should be yielded.
+Additionally, any value can be handled with Constrainthandlers before yielding it.
+
 
 ## Decorators for templates
 

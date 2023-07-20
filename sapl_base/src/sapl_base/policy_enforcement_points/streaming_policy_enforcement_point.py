@@ -67,7 +67,7 @@ class StreamingPolicyEnforcementPoint(PolicyEnforcementPoint, ABC):
                 new_decision: Decision = yield
                 "Check if the Stream was canceled without notification"
                 if self.stream_task is not None:
-                    if self.stream_task.cancelled():
+                    if self.stream_task.done():
                         raise Exception
                 "When the creation of a Bundle for the new Decision fails, the Decision is defaulted to DENY with an empty Bundle"
                 try:

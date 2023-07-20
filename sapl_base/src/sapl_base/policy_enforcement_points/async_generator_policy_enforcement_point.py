@@ -32,7 +32,7 @@ class AsyncGeneratorPolicyEnforcementPoint(StreamingPolicyEnforcementPoint):
         :param decision_stream: A Generator which yields new Decisions from a Connection to a PDP and sends them to the
         PEP to evaluate them and update the current Decision
         """
-        self.generator = self._enforced_function(self._function_args, self._function_kwargs)
+        self.generator = self._enforced_function(*self._function_args, **self._function_kwargs)
         self._decision_task = asyncio.create_task(decision_stream)
 
     async def run_generator(self, decision_stream):
@@ -51,7 +51,7 @@ class AsyncGeneratorPolicyEnforcementPoint(StreamingPolicyEnforcementPoint):
 
         try:
             async for value in self.generator:
-                if self._current_decision != "PERMIT":
+                if self._current_decision.decision != "PERMIT":
                     continue
                 result = self.constraint_handler_bundle.execute_result_handler(value)
 
