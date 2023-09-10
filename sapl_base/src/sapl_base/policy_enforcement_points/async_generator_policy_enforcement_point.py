@@ -5,7 +5,7 @@ import asgiref.sync
 
 import sapl_base.policy_enforcement_points.policy_enforcement_point as pep
 from sapl_base.policy_enforcement_points.streaming_policy_enforcement_point import StreamingPolicyEnforcementPoint
-
+from sapl_base.authorization_subscription_factory import consumer_scope
 
 class AsyncGeneratorPolicyEnforcementPoint(StreamingPolicyEnforcementPoint):
 
@@ -74,6 +74,10 @@ class AsyncGeneratorPolicyEnforcementPoint(StreamingPolicyEnforcementPoint):
         :param environment: environment of an authorization_subscription or a function to create the environment
         :param scope: Argument which creates a AuthorizationSubscription according to the given scope instead of evaluating the scope based on other parameter
         """
+        try:
+            consumer_scope.set(self.values_dict["self"].scope)
+        except Exception:
+            pass
         subscription = await asgiref.sync.sync_to_async(self._get_subscription)(subject, action, resource, environment,
                                                                                 scope, self.type_of_enforcement)
         decision_stream = await self.request_decision(subscription)
@@ -107,6 +111,10 @@ class AsyncGeneratorPolicyEnforcementPoint(StreamingPolicyEnforcementPoint):
         :param environment: environment of an authorization_subscription or a function to create the environment
         :param scope: Argument which creates a AuthorizationSubscription according to the given scope instead of evaluating the scope based on other parameter
         """
+        try:
+            consumer_scope.set(self.values_dict["self"].scope)
+        except Exception:
+            pass
         subscription = await asgiref.sync.sync_to_async(self._get_subscription)(subject, action, resource, environment,
                                                                                 scope, self.type_of_enforcement)
         decision_stream = await self.request_decision(subscription)
@@ -132,7 +140,10 @@ class AsyncGeneratorPolicyEnforcementPoint(StreamingPolicyEnforcementPoint):
         """
         if handle_recoverable_deny_function is not None:
             self._handle_deny_on_recoverable = handle_recoverable_deny_function
-
+        try:
+            consumer_scope.set(self.values_dict["self"].scope)
+        except Exception:
+            pass
         subscription = await asgiref.sync.sync_to_async(self._get_subscription)(subject, action, resource, environment,
                                                                                 scope, self.type_of_enforcement)
         decision_stream = await self.request_decision(subscription)

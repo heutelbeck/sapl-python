@@ -6,6 +6,7 @@ from typing import Dict,Callable
 from .authorization_subscriptions import AuthorizationSubscription, MultiSubscription
 
 client_request = contextvars.ContextVar('request')
+consumer_scope = contextvars.ContextVar('scope')
 
 class AuthorizationSubscriptionFactory(ABC):
     subject_function: Callable[[Dict],Dict]
