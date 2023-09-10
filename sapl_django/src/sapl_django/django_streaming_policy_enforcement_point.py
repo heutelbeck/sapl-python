@@ -1,10 +1,10 @@
 import asyncio
 import json
-
+import asgiref.sync
 from channels.generic.websocket import AsyncWebsocketConsumer
 
 from sapl_base.policy_enforcement_points.streaming_policy_enforcement_point import StreamingPolicyEnforcementPoint
-from sapl_django.django_authorization_subscription_factory import consumer_scope
+from sapl_base.authorization_subscription_factory import consumer_scope
 
 
 class DjangoStreamingPolicyEnforcementPoint(StreamingPolicyEnforcementPoint):
@@ -108,7 +108,7 @@ class DjangoStreamingPolicyEnforcementPoint(StreamingPolicyEnforcementPoint):
 
         async def connect():
             consumer_scope.set(self.instance.scope)
-            subscription = self._get_subscription(subject, action, resource,
+            subscription = await asgiref.sync.sync_to_async(self._get_subscription)(subject, action, resource,
                                                   environment,
                                                   scope, self.type_of_enforcement)
             await self.start_stream_and_connection(subscription)
@@ -137,7 +137,7 @@ class DjangoStreamingPolicyEnforcementPoint(StreamingPolicyEnforcementPoint):
 
         async def connect():
             consumer_scope.set(self.instance.scope)
-            subscription = self._get_subscription(subject, action, resource,
+            subscription = await asgiref.sync.sync_to_async(self._get_subscription)(subject, action, resource,
                                                   environment,
                                                   scope, self.type_of_enforcement)
             await self.start_stream_and_connection(subscription)
@@ -168,7 +168,7 @@ class DjangoStreamingPolicyEnforcementPoint(StreamingPolicyEnforcementPoint):
 
         async def connect():
             consumer_scope.set(self.instance.scope)
-            subscription = self._get_subscription(subject, action, resource,
+            subscription = await asgiref.sync.sync_to_async(self._get_subscription)(subject, action, resource,
                                                   environment,
                                                   scope, self.type_of_enforcement)
 

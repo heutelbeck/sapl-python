@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "SAPL-Django"
-version = "0.3.5"
+version = "0.3.6"
 description = "initial upload to register the name for future development"
 readme = "README.md"
 authors = [{ name = "Dominic Heutelbeck", email = "dominic@heutelbeck.com"}]

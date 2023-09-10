@@ -7,7 +7,7 @@ from django.forms import model_to_dict
 from django.urls import ResolverMatch
 from django.views import View
 
-from sapl_base.authorization_subscription_factory import AuthorizationSubscriptionFactory, client_request
+from sapl_base.authorization_subscription_factory import AuthorizationSubscriptionFactory, client_request, consumer_scope
 from sapl_base.authorization_subscriptions import AuthorizationSubscription
 
 
@@ -150,11 +150,13 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
         :param values: dict containing all values needed to create an AuthorizationSubscription
         :return: A dictionary which will be provided as subject, when an AuthorizationSubscription is created
         """
-
-        request = values.get('request') if values.get('request') is not None else values.get('scope')
-
-        try:
+        request = values.get('request')
+        if request is None:
+            request = values.get('scope')
+            user = request["user"]
+        else:
             user = request.user
+        try:
             if user.is_anonymous:
                 if request.headers.get("Authorization") is not None:
                     return {"authorization": get_authorization(request)}
@@ -234,7 +236,3 @@ class DjangoAuthorizationSubscriptionFactory(AuthorizationSubscriptionFactory):
             values.update({'request': client_request.get('request')})
         if consumer_scope.get('scope') != 'scope':
             values.update({'scope': consumer_scope.get()})
-
-
-
-consumer_scope = contextvars.ContextVar('scope')
