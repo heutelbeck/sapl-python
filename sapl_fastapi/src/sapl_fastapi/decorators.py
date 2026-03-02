@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import functools
 import inspect
 import json
@@ -321,7 +322,10 @@ def enforce_till_denied(
             )
 
             async def data_source():
-                return func(*args, **kwargs)
+                result = func(*args, **kwargs)
+                if asyncio.iscoroutine(result):
+                    result = await result
+                return result
 
             async def sse_generator():
                 async for item in _enforce_till_denied(
@@ -367,7 +371,10 @@ def enforce_drop_while_denied(
             )
 
             async def data_source():
-                return func(*args, **kwargs)
+                result = func(*args, **kwargs)
+                if asyncio.iscoroutine(result):
+                    result = await result
+                return result
 
             async def sse_generator():
                 async for item in _enforce_drop_while_denied(
@@ -414,7 +421,10 @@ def enforce_recoverable_if_denied(
             )
 
             async def data_source():
-                return func(*args, **kwargs)
+                result = func(*args, **kwargs)
+                if asyncio.iscoroutine(result):
+                    result = await result
+                return result
 
             async def sse_generator():
                 async for item in _enforce_recoverable_if_denied(

@@ -343,7 +343,10 @@ def enforce_till_denied(
             )
 
             async def data_source():
-                return func(*args, **kwargs)
+                result = func(*args, **kwargs)
+                if asyncio.iscoroutine(result):
+                    result = await result
+                return result
 
             def sync_generator():
                 loop = asyncio.new_event_loop()
@@ -412,7 +415,10 @@ def enforce_drop_while_denied(
             )
 
             async def data_source():
-                return func(*args, **kwargs)
+                result = func(*args, **kwargs)
+                if asyncio.iscoroutine(result):
+                    result = await result
+                return result
 
             def sync_generator():
                 loop = asyncio.new_event_loop()
@@ -485,7 +491,10 @@ def enforce_recoverable_if_denied(
             )
 
             async def data_source():
-                return func(*args, **kwargs)
+                result = func(*args, **kwargs)
+                if asyncio.iscoroutine(result):
+                    result = await result
+                return result
 
             def sync_generator():
                 loop = asyncio.new_event_loop()

@@ -22,6 +22,23 @@ WARN_ON_STREAM_DENY_FAILED = "onStreamDeny callback raised an exception"
 WARN_ON_STREAM_RECOVER_FAILED = "onStreamRecover callback raised an exception"
 
 
+DataSourceFactory = Callable[[], AsyncIterator[Any]]
+
+
+async def _open_data_source(factory: DataSourceFactory) -> AsyncIterator[Any]:
+    """Open a data source, awaiting if the factory returns a coroutine.
+
+    Framework decorators wrap view functions in ``async def data_source()``
+    closures. Calling such a closure returns a coroutine that must be awaited
+    to obtain the underlying async iterator. Plain factories (e.g. lambdas
+    in tests) return async iterators directly.
+    """
+    result = factory()
+    if asyncio.iscoroutine(result):
+        result = await result
+    return result
+
+
 class _StreamState(Enum):
     INITIAL = auto()
     PERMITTED = auto()
@@ -69,7 +86,7 @@ async def enforce_till_denied(
     pdp_client: PdpClient,
     constraint_service: ConstraintEnforcementService,
     subscription: AuthorizationSubscription,
-    data_source: Callable[[], AsyncIterator[Any]],
+    data_source: DataSourceFactory,
     on_stream_deny: Callable[[AuthorizationDecision], Any] | None = None,
 ) -> AsyncIterator[Any]:
     """EnforceTillDenied: stream until first non-PERMIT, then terminate.
@@ -122,7 +139,7 @@ async def enforce_till_denied(
                 _safe_call_deny(on_stream_deny, current_decision)
             return
 
-        source_iterator = data_source().__aiter__()
+        source_iterator = (await _open_data_source(data_source)).__aiter__()
 
         async for item in source_iterator:
             if decision_event.is_set():
@@ -164,7 +181,7 @@ async def enforce_drop_while_denied(
     pdp_client: PdpClient,
     constraint_service: ConstraintEnforcementService,
     subscription: AuthorizationSubscription,
-    data_source: Callable[[], AsyncIterator[Any]],
+    data_source: DataSourceFactory,
 ) -> AsyncIterator[Any]:
     """EnforceDropWhileDenied: silently drop data during deny, resume on permit.
 
@@ -212,7 +229,7 @@ async def enforce_drop_while_denied(
             if state != _StreamState.PERMITTED:
                 return
 
-        source_iterator = data_source().__aiter__()
+        source_iterator = (await _open_data_source(data_source)).__aiter__()
 
         async for item in source_iterator:
             if decision_event.is_set():
@@ -247,7 +264,7 @@ async def enforce_recoverable_if_denied(
     pdp_client: PdpClient,
     constraint_service: ConstraintEnforcementService,
     subscription: AuthorizationSubscription,
-    data_source: Callable[[], AsyncIterator[Any]],
+    data_source: DataSourceFactory,
     on_stream_deny: Callable[[AuthorizationDecision], Any] | None = None,
     on_stream_recover: Callable[[AuthorizationDecision], Any] | None = None,
 ) -> AsyncIterator[Any]:
@@ -320,7 +337,7 @@ async def enforce_recoverable_if_denied(
                     yield result
             return
 
-        source_iterator = data_source().__aiter__()
+        source_iterator = (await _open_data_source(data_source)).__aiter__()
 
         async for item in source_iterator:
             if decision_event.is_set():
