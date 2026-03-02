@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 import structlog
@@ -22,7 +21,6 @@ except ImportError:
 if _HAS_CHANNELS:
     from sapl_base.constraint_bundle import AccessDeniedError
     from sapl_base.types import AuthorizationSubscription, Decision
-
     from sapl_django.config import get_constraint_service, get_pdp_client
 
     class SaplWebsocketConsumer(AsyncJsonWebsocketConsumer):  # type: ignore[misc]

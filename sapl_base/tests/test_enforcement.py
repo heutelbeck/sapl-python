@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from sapl_base.constraint_bundle import AccessDeniedError, ConstraintHandlerBundle
 from sapl_base.constraint_engine import ConstraintEnforcementService
-from sapl_base.constraint_types import MethodInvocationContext
+
+if TYPE_CHECKING:
+    from sapl_base.constraint_types import MethodInvocationContext
 from sapl_base.enforcement import (
     ERROR_ACCESS_DENIED,
     WARN_BEST_EFFORT_FAILED,
@@ -112,7 +114,7 @@ def protected_function() -> AsyncMock:
 class TestPreEnforce:
     """PreEnforce: authorize before method execution."""
 
-    async def test_whenPermitThenMethodExecutes(
+    async def test_when_permit_then_method_executes(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -134,7 +136,7 @@ class TestPreEnforce:
         assert result == "result"
         protected_function.assert_awaited_once()
 
-    async def test_whenDenyThenAccessDenied(
+    async def test_when_deny_then_access_denied(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -156,7 +158,7 @@ class TestPreEnforce:
 
         protected_function.assert_not_awaited()
 
-    async def test_whenIndeterminateThenAccessDenied(
+    async def test_when_indeterminate_then_access_denied(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -180,7 +182,7 @@ class TestPreEnforce:
 
         protected_function.assert_not_awaited()
 
-    async def test_whenNotApplicableThenAccessDenied(
+    async def test_when_not_applicable_then_access_denied(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -204,7 +206,7 @@ class TestPreEnforce:
 
         protected_function.assert_not_awaited()
 
-    async def test_whenUnhandledObligationThenAccessDenied(
+    async def test_when_unhandled_obligation_then_access_denied(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -229,7 +231,7 @@ class TestPreEnforce:
 
         protected_function.assert_not_awaited()
 
-    async def test_whenOnDecisionHandlerFailsThenAccessDenied(
+    async def test_when_on_decision_handler_fails_then_access_denied(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -255,7 +257,7 @@ class TestPreEnforce:
 
         protected_function.assert_not_awaited()
 
-    async def test_whenMethodInvocationHandlersModifyArgsThenModifiedArgsUsed(
+    async def test_when_method_invocation_handlers_modify_args_then_modified_args_used(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -291,7 +293,7 @@ class TestPreEnforce:
         assert received_args == ["modified_arg"]
         assert received_kwargs == [{"key": "modified_value"}]
 
-    async def test_whenProtectedMethodThrowsThenErrorHandlersInvokedAndReRaised(
+    async def test_when_protected_method_throws_then_error_handlers_invoked_and_re_raised(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -325,7 +327,7 @@ class TestPreEnforce:
         assert exc_info.value.__cause__ is original_error
         assert error_handler_called == [original_error]
 
-    async def test_whenReturnValueHandlersTransformResultThenTransformedReturned(
+    async def test_when_return_value_handlers_transform_result_then_transformed_returned(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -347,7 +349,7 @@ class TestPreEnforce:
 
         assert result == "RESULT"
 
-    async def test_whenDecisionHasResourceThenResourceReplacesReturnValue(
+    async def test_when_decision_has_resource_then_resource_replaces_return_value(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -371,7 +373,7 @@ class TestPreEnforce:
 
         assert result == {"replacement": True}
 
-    async def test_whenOnDenyCallbackThenCallbackResultReturned(
+    async def test_when_on_deny_callback_then_callback_result_returned(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -397,7 +399,7 @@ class TestPreEnforce:
         assert result == "denied_response"
         on_deny.assert_called_once_with(deny_decision)
 
-    async def test_whenOnDenyCallbackFailsThenAccessDeniedRaised(
+    async def test_when_on_deny_callback_fails_then_access_denied_raised(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -420,7 +422,7 @@ class TestPreEnforce:
                 on_deny=on_deny,
             )
 
-    async def test_whenMethodInvocationHandlerFailsThenAccessDenied(
+    async def test_when_method_invocation_handler_fails_then_access_denied(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -448,7 +450,7 @@ class TestPreEnforce:
 
         protected_function.assert_not_awaited()
 
-    async def test_whenOnNextHandlerFailsThenAccessDenied(
+    async def test_when_on_next_handler_fails_then_access_denied(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -476,7 +478,7 @@ class TestPreEnforce:
 class TestPostEnforce:
     """PostEnforce: authorize after method execution."""
 
-    async def test_whenPermitThenMethodRunsFirstThenAuthorized(
+    async def test_when_permit_then_method_runs_first_then_authorized(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -498,7 +500,7 @@ class TestPostEnforce:
         assert result == "result"
         protected_function.assert_awaited_once()
 
-    async def test_whenDenyThenMethodRunsButResultDenied(
+    async def test_when_deny_then_method_runs_but_result_denied(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -521,7 +523,7 @@ class TestPostEnforce:
         # Method STILL executes in PostEnforce before authorization
         protected_function.assert_awaited_once()
 
-    async def test_whenMethodThrowsThenExceptionPropagatesDirectly(
+    async def test_when_method_throws_then_exception_propagates_directly(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -545,7 +547,7 @@ class TestPostEnforce:
         # PDP should never be consulted when method throws (F17)
         pdp_client.decide_once.assert_not_awaited()
 
-    async def test_whenSubscriptionBuilderReceivesReturnValue(
+    async def test_when_subscription_builder_receives_return_value(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -574,7 +576,7 @@ class TestPostEnforce:
 
         assert received_values == ["result"]
 
-    async def test_whenPostEnforceThenNoMethodInvocationHandlers(
+    async def test_when_post_enforce_then_no_method_invocation_handlers(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -597,7 +599,7 @@ class TestPostEnforce:
         constraint_service.post_enforce_bundle_for.assert_called_once()
         constraint_service.pre_enforce_bundle_for.assert_not_called()
 
-    async def test_whenDecisionHasResourceThenResourceReplacesReturnValue(
+    async def test_when_decision_has_resource_then_resource_replaces_return_value(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -621,7 +623,7 @@ class TestPostEnforce:
 
         assert result == {"replacement": True}
 
-    async def test_whenOnDenyCallbackThenCallbackResultReturned(
+    async def test_when_on_deny_callback_then_callback_result_returned(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -647,7 +649,7 @@ class TestPostEnforce:
         assert result == "denied_response"
         on_deny.assert_called_once_with(deny_decision)
 
-    async def test_whenUnhandledObligationThenAccessDenied(
+    async def test_when_unhandled_obligation_then_access_denied(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -670,7 +672,7 @@ class TestPostEnforce:
                 function_name="test_fn",
             )
 
-    async def test_whenOnDecisionHandlerFailsThenAccessDenied(
+    async def test_when_on_decision_handler_fails_then_access_denied(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -694,7 +696,7 @@ class TestPostEnforce:
                 function_name="test_fn",
             )
 
-    async def test_whenOnNextHandlerFailsThenAccessDenied(
+    async def test_when_on_next_handler_fails_then_access_denied(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -720,7 +722,7 @@ class TestPostEnforce:
 class TestDenyHandling:
     """Deny path: best-effort handlers, on_deny callback, error messages."""
 
-    async def test_whenDenyThenBestEffortHandlersExecute(
+    async def test_when_deny_then_best_effort_handlers_execute(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -746,7 +748,7 @@ class TestDenyHandling:
 
         assert best_effort_called == [True]
 
-    async def test_whenBestEffortHandlerFailsThenDenyStillRaised(
+    async def test_when_best_effort_handler_fails_then_deny_still_raised(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -768,7 +770,7 @@ class TestDenyHandling:
                 function_name="test_fn",
             )
 
-    async def test_whenAccessDeniedThenGenericMessage(
+    async def test_when_access_denied_then_generic_message(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -791,7 +793,7 @@ class TestDenyHandling:
         # REQ-ERROR-1: generic message, no policy details leaked
         assert str(exc_info.value) == ERROR_ACCESS_DENIED
 
-    async def test_whenOnDenyCallbackFailsThenWarnLogged(
+    async def test_when_on_deny_callback_fails_then_warn_logged(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,
@@ -817,7 +819,7 @@ class TestDenyHandling:
 
             mock_log.warning.assert_any_call(WARN_ON_DENY_CALLBACK_FAILED)
 
-    async def test_whenBestEffortHandlerFailsThenWarnLogged(
+    async def test_when_best_effort_handler_fails_then_warn_logged(
         self,
         pdp_client: AsyncMock,
         constraint_service: MagicMock,

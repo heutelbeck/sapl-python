@@ -7,9 +7,7 @@ import pytest
 from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, JsonResponse
 
-from sapl_base.constraint_bundle import AccessDeniedError
-from sapl_base.types import AuthorizationDecision, Decision
-
+from sapl_base.types import AuthorizationDecision
 from sapl_django.decorators import (
     _extract_class_name,
     _extract_request,
@@ -114,9 +112,9 @@ class TestPreEnforce:
         request = _make_request()
 
         with patch("sapl_django.decorators.get_pdp_client", return_value=_mock_pdp_deny()), \
-             patch("sapl_django.decorators.get_constraint_service", return_value=_mock_constraint_service()):
-            with pytest.raises(PermissionDenied):
-                await my_view(request)
+             patch("sapl_django.decorators.get_constraint_service", return_value=_mock_constraint_service()), \
+             pytest.raises(PermissionDenied):
+            await my_view(request)
 
     @pytest.mark.asyncio
     async def test_on_deny_callback_returns_custom_response(self):
@@ -173,9 +171,9 @@ class TestPostEnforce:
         request = _make_request()
 
         with patch("sapl_django.decorators.get_pdp_client", return_value=_mock_pdp_deny()), \
-             patch("sapl_django.decorators.get_constraint_service", return_value=_mock_constraint_service()):
-            with pytest.raises(PermissionDenied):
-                await my_view(request)
+             patch("sapl_django.decorators.get_constraint_service", return_value=_mock_constraint_service()), \
+             pytest.raises(PermissionDenied):
+            await my_view(request)
 
     @pytest.mark.asyncio
     async def test_view_executes_before_authorization(self):
@@ -201,9 +199,9 @@ class TestPostEnforce:
         request = _make_request()
 
         with patch("sapl_django.decorators.get_pdp_client", return_value=mock_pdp), \
-             patch("sapl_django.decorators.get_constraint_service", return_value=_mock_constraint_service()):
-            with pytest.raises(PermissionDenied):
-                await my_view(request)
+             patch("sapl_django.decorators.get_constraint_service", return_value=_mock_constraint_service()), \
+             pytest.raises(PermissionDenied):
+            await my_view(request)
 
         assert call_order == ["view", "pdp"]
 

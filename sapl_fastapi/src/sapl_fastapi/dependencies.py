@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sapl_base.constraint_engine import ConstraintEnforcementService
 from sapl_base.content_filter import ContentFilteringProvider, ContentFilterPredicateProvider
 from sapl_base.pdp_client import PdpClient
 
-from sapl_fastapi.config import SaplConfig
+if TYPE_CHECKING:
+    from sapl_fastapi.config import SaplConfig
 
 # Module-level singleton state
 _pdp_client: PdpClient | None = None

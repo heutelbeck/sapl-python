@@ -17,21 +17,21 @@ def app() -> Flask:
 
 
 class TestInitApp:
-    def test_initAppStoresExtensionOnApp(self, app: Flask) -> None:
+    def test_init_app_stores_extension_on_app(self, app: Flask) -> None:
         sapl = SaplFlask()
         sapl.init_app(app)
 
         assert "sapl" in app.extensions
         assert app.extensions["sapl"] is sapl
 
-    def test_constructorWithAppInitializesImmediately(self, app: Flask) -> None:
+    def test_constructor_with_app_initializes_immediately(self, app: Flask) -> None:
         sapl = SaplFlask(app)
 
         assert "sapl" in app.extensions
         assert sapl._pdp_client is not None
         assert sapl._constraint_service is not None
 
-    def test_initAppReadsBearerTokenFromConfig(self) -> None:
+    def test_init_app_reads_bearer_token_from_config(self) -> None:
         app = Flask(__name__)
         app.config["SAPL_BASE_URL"] = "http://localhost:8443"
         app.config["SAPL_TOKEN"] = "test-token"
@@ -41,7 +41,7 @@ class TestInitApp:
 
         assert sapl._pdp_client is not None
 
-    def test_initAppReadsBasicAuthFromConfig(self) -> None:
+    def test_init_app_reads_basic_auth_from_config(self) -> None:
         app = Flask(__name__)
         app.config["SAPL_BASE_URL"] = "http://localhost:8443"
         app.config["SAPL_USERNAME"] = "admin"
@@ -54,23 +54,23 @@ class TestInitApp:
 
 
 class TestProperties:
-    def test_pdpClientAvailableAfterInit(self, app: Flask) -> None:
+    def test_pdp_client_available_after_init(self, app: Flask) -> None:
         sapl = SaplFlask(app)
 
         assert sapl.pdp_client is not None
 
-    def test_constraintServiceAvailableAfterInit(self, app: Flask) -> None:
+    def test_constraint_service_available_after_init(self, app: Flask) -> None:
         sapl = SaplFlask(app)
 
         assert sapl.constraint_service is not None
 
-    def test_pdpClientRaisesWhenNotInitialized(self) -> None:
+    def test_pdp_client_raises_when_not_initialized(self) -> None:
         sapl = SaplFlask()
 
         with pytest.raises(RuntimeError, match="SAPL not initialized"):
             _ = sapl.pdp_client
 
-    def test_constraintServiceRaisesWhenNotInitialized(self) -> None:
+    def test_constraint_service_raises_when_not_initialized(self) -> None:
         sapl = SaplFlask()
 
         with pytest.raises(RuntimeError, match="SAPL not initialized"):
@@ -78,7 +78,7 @@ class TestProperties:
 
 
 class TestRegisterConstraintHandler:
-    def test_registerMappingHandler(self, app: Flask) -> None:
+    def test_register_mapping_handler(self, app: Flask) -> None:
         sapl = SaplFlask(app)
         mock_provider = MagicMock()
 
@@ -86,7 +86,7 @@ class TestRegisterConstraintHandler:
 
         assert mock_provider in sapl.constraint_service._mapping_providers
 
-    def test_registerConsumerHandler(self, app: Flask) -> None:
+    def test_register_consumer_handler(self, app: Flask) -> None:
         sapl = SaplFlask(app)
         mock_provider = MagicMock()
 
@@ -94,7 +94,7 @@ class TestRegisterConstraintHandler:
 
         assert mock_provider in sapl.constraint_service._consumer_providers
 
-    def test_unknownHandlerTypeRaisesValueError(self, app: Flask) -> None:
+    def test_unknown_handler_type_raises_value_error(self, app: Flask) -> None:
         sapl = SaplFlask(app)
 
         with pytest.raises(ValueError, match="Unknown handler type"):
@@ -102,7 +102,7 @@ class TestRegisterConstraintHandler:
 
 
 class TestGetSaplExtension:
-    def test_returnsExtensionFromCurrentApp(self, app: Flask) -> None:
+    def test_returns_extension_from_current_app(self, app: Flask) -> None:
         sapl = SaplFlask(app)
 
         with app.app_context():
@@ -110,21 +110,20 @@ class TestGetSaplExtension:
 
         assert result is sapl
 
-    def test_raisesWhenNotRegistered(self, app: Flask) -> None:
-        with app.app_context():
-            with pytest.raises(RuntimeError, match="SAPL extension not initialized"):
-                get_sapl_extension()
+    def test_raises_when_not_registered(self, app: Flask) -> None:
+        with app.app_context(), pytest.raises(RuntimeError, match="SAPL extension not initialized"):
+            get_sapl_extension()
 
 
 class TestClose:
-    def test_closeSetsPdpClientToNone(self, app: Flask) -> None:
+    def test_close_sets_pdp_client_to_none(self, app: Flask) -> None:
         sapl = SaplFlask(app)
 
         sapl.close()
 
         assert sapl._pdp_client is None
 
-    def test_closeIsIdempotent(self, app: Flask) -> None:
+    def test_close_is_idempotent(self, app: Flask) -> None:
         sapl = SaplFlask(app)
 
         sapl.close()

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 from sapl_base.constraint_bundle import (
     AccessDeniedError,
@@ -764,7 +766,7 @@ class TestObligationNoShortCircuit:
     is raised only after all handlers have been attempted.
     """
 
-    def test_failingObligationRunnableDoesNotPreventSecondFromRunning(self) -> None:
+    def test_failing_obligation_runnable_does_not_prevent_second_from_running(self) -> None:
         action_log: list[str] = []
         service = ConstraintEnforcementService()
         service.register_runnable(
@@ -782,7 +784,7 @@ class TestObligationNoShortCircuit:
             bundle.handle_on_decision_constraints()
         assert "runnable:second" in action_log
 
-    def test_failingObligationConsumerDoesNotPreventSecondFromRunning(self) -> None:
+    def test_failing_obligation_consumer_does_not_prevent_second_from_running(self) -> None:
         action_log: list[str] = []
         service = ConstraintEnforcementService()
         service.register_consumer(_FailingConsumerProvider("fail"))
@@ -796,7 +798,7 @@ class TestObligationNoShortCircuit:
             bundle.handle_all_on_next_constraints("val")
         assert "consumer:second:val" in action_log
 
-    def test_failingObligationMappingDoesNotPreventSecondFromRunning(self) -> None:
+    def test_failing_obligation_mapping_does_not_prevent_second_from_running(self) -> None:
         action_log: list[str] = []
         service = ConstraintEnforcementService()
         service.register_mapping(_FailingMappingProvider("fail", 10))
@@ -811,7 +813,7 @@ class TestObligationNoShortCircuit:
         assert len(action_log) == 1
         assert action_log[0].startswith("mapping:")
 
-    def test_failingObligationFilterDoesNotPreventSecondFromRunning(self) -> None:
+    def test_failing_obligation_filter_does_not_prevent_second_from_running(self) -> None:
         action_log: list[str] = []
         service = ConstraintEnforcementService()
         service.register_filter_predicate(_FailingFilterPredicateProvider("fail"))
@@ -825,7 +827,7 @@ class TestObligationNoShortCircuit:
             bundle.handle_all_on_next_constraints("val")
         assert "consumer:second:val" in action_log
 
-    def test_failingObligationErrorHandlerDoesNotPreventSecondFromRunning(self) -> None:
+    def test_failing_obligation_error_handler_does_not_prevent_second_from_running(self) -> None:
         action_log: list[str] = []
         service = ConstraintEnforcementService()
         service.register_error_handler(_FailingErrorHandlerProvider("fail"))
@@ -839,7 +841,7 @@ class TestObligationNoShortCircuit:
             bundle.handle_all_on_error_constraints(ValueError("test"))
         assert len(action_log) == 1
 
-    def test_failingObligationErrorMappingDoesNotPreventSecondFromRunning(self) -> None:
+    def test_failing_obligation_error_mapping_does_not_prevent_second_from_running(self) -> None:
         service = ConstraintEnforcementService()
         service.register_error_mapping(_FailingErrorMappingProvider("fail", 10))
         service.register_error_mapping(
@@ -853,7 +855,7 @@ class TestObligationNoShortCircuit:
         with pytest.raises(AccessDeniedError):
             bundle.handle_all_on_error_constraints(ValueError("original"))
 
-    def test_failingObligationMethodInvocationDoesNotPreventSecondFromRunning(self) -> None:
+    def test_failing_obligation_method_invocation_does_not_prevent_second_from_running(self) -> None:
         action_log: list[str] = []
         service = ConstraintEnforcementService()
         service.register_method_invocation(_FailingMethodInvocationProvider("fail"))
@@ -870,7 +872,7 @@ class TestObligationNoShortCircuit:
             bundle.handle_method_invocation_handlers(context)
         assert "method_invocation:fn" in action_log
 
-    def test_adviceStillRunsAfterObligationFailure(self) -> None:
+    def test_advice_still_runs_after_obligation_failure(self) -> None:
         action_log: list[str] = []
         service = ConstraintEnforcementService()
         service.register_runnable(
@@ -889,7 +891,7 @@ class TestObligationNoShortCircuit:
             bundle.handle_on_decision_constraints()
         assert "runnable:advice_ran" in action_log
 
-    def test_allFailuresCollectedBeforeDeny(self) -> None:
+    def test_all_failures_collected_before_deny(self) -> None:
         action_log: list[str] = []
         service = ConstraintEnforcementService()
         service.register_runnable(

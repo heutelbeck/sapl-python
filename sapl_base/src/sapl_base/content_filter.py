@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-import re
 import copy
-from typing import Any, Callable
+import re
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 import structlog
 
@@ -241,9 +244,7 @@ def _is_safe_regex(pattern: str) -> bool:
         return False
     if len(pattern) > _MAX_REGEX_LENGTH:
         return False
-    if _REDOS_PATTERNS.search(pattern):
-        return False
-    return True
+    return not _REDOS_PATTERNS.search(pattern)
 
 
 def _resolve_value(element: Any, path: str) -> Any:

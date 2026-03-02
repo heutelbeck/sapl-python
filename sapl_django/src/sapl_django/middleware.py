@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from contextvars import ContextVar
-from typing import Any, Callable
+from typing import TYPE_CHECKING
 
-from django.http import HttpRequest, HttpResponse
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from django.http import HttpRequest, HttpResponse
 
 _current_request: ContextVar[HttpRequest | None] = ContextVar("_current_request", default=None)
 

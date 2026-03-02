@@ -7,7 +7,6 @@ import structlog
 from django import template
 
 from sapl_base.types import AuthorizationSubscription, Decision
-
 from sapl_django.config import get_pdp_client
 
 log = structlog.get_logger()
@@ -63,7 +62,6 @@ def sapl_enforce(context: dict[str, Any], action: Any, resource: Any, **kwargs: 
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            future = asyncio.ensure_future(_decide(subscription))
             # In async context (ASGI), we cannot block. Create a new thread.
             import concurrent.futures
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:

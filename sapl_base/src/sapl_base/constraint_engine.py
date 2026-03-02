@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 from sapl_base.constraint_bundle import (
-    AccessDeniedError,
     ConstraintHandlerBundle,
     StreamingConstraintHandlerBundle,
     UnhandledObligationError,
@@ -23,7 +24,7 @@ from sapl_base.constraint_types import (
     RunnableConstraintHandlerProvider,
     Signal,
 )
-from sapl_base.types import AuthorizationDecision, RESOURCE_ABSENT
+from sapl_base.types import RESOURCE_ABSENT, AuthorizationDecision
 
 log = structlog.get_logger()
 

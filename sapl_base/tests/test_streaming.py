@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
-from typing import Any, AsyncIterator
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import TYPE_CHECKING, Any
+from unittest.mock import MagicMock, patch
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Callable
 
 import pytest
 
@@ -11,15 +13,12 @@ from sapl_base.constraint_bundle import AccessDeniedError, StreamingConstraintHa
 from sapl_base.constraint_engine import ConstraintEnforcementService
 from sapl_base.pdp_client import PdpClient
 from sapl_base.streaming import (
-    WARN_ON_NEXT_HANDLER_FAILED,
     WARN_ON_STREAM_DENY_FAILED,
-    WARN_ON_STREAM_RECOVER_FAILED,
-    _StreamState,
     enforce_drop_while_denied,
     enforce_recoverable_if_denied,
     enforce_till_denied,
 )
-from sapl_base.types import AuthorizationDecision, AuthorizationSubscription, Decision, RESOURCE_ABSENT
+from sapl_base.types import AuthorizationDecision, AuthorizationSubscription, Decision
 
 
 def _make_subscription() -> AuthorizationSubscription:
@@ -166,7 +165,7 @@ async def _collect(async_iter: AsyncIterator[Any]) -> list[Any]:
 class TestEnforceTillDenied:
     """EnforceTillDenied: stream until first non-PERMIT, then terminate."""
 
-    async def test_deferredSourceSubscriptionUntilFirstPermit(self) -> None:
+    async def test_deferred_source_subscription_until_first_permit(self) -> None:
         """Source factory is not called until a PERMIT arrives (REQ-STREAM-DEFER-1)."""
         source_called = False
 
@@ -185,7 +184,7 @@ class TestEnforceTillDenied:
         assert source_called is True
         assert result == ["item"]
 
-    async def test_initialDenyNoDataYielded(self) -> None:
+    async def test_initial_deny_no_data_yielded(self) -> None:
         """If the first decision is DENY, the generator ends without yielding data."""
         source_called = False
 
@@ -204,7 +203,7 @@ class TestEnforceTillDenied:
         assert result == []
         assert source_called is False
 
-    async def test_permitThenDenyStopsStream(self) -> None:
+    async def test_permit_then_deny_stops_stream(self) -> None:
         """Data yielded during PERMIT, stream terminates on DENY transition."""
         decision_event = asyncio.Event()
         deny_decision = _make_deny()
@@ -238,7 +237,7 @@ class TestEnforceTillDenied:
         assert len(result) >= 1
         assert all(item.startswith("item-") for item in result)
 
-    async def test_permitFlowDataYielded(self) -> None:
+    async def test_permit_flow_data_yielded(self) -> None:
         """Items are yielded when state is PERMITTED."""
         pdp_client = _make_pdp_client([_make_permit()])
         service = _make_constraint_service()
@@ -254,7 +253,7 @@ class TestEnforceTillDenied:
 
         assert result == ["a", "b", "c"]
 
-    async def test_constraintHandlersApplied(self) -> None:
+    async def test_constraint_handlers_applied(self) -> None:
         """Items are transformed by the bundle on_next pipeline."""
         bundle = _make_bundle(on_next_mappings=lambda v: v.upper())
         pdp_client = _make_pdp_client([_make_permit()])
@@ -271,7 +270,7 @@ class TestEnforceTillDenied:
 
         assert result == ["HELLO", "WORLD"]
 
-    async def test_onStreamDenyCallbackCalled(self) -> None:
+    async def test_on_stream_deny_callback_called(self) -> None:
         """on_stream_deny callback is invoked on initial deny."""
         deny_decision = _make_deny()
         pdp_client = _make_pdp_client([deny_decision])
@@ -290,7 +289,7 @@ class TestEnforceTillDenied:
 
         assert deny_log == [deny_decision]
 
-    async def test_onStreamDenyCallbackFailureLoggedAndStreamStillTerminates(self) -> None:
+    async def test_on_stream_deny_callback_failure_logged_and_stream_still_terminates(self) -> None:
         """F20: on_stream_deny failure is logged, stream still terminates."""
         pdp_client = _make_pdp_client([_make_deny()])
         service = _make_constraint_service()
@@ -312,7 +311,7 @@ class TestEnforceTillDenied:
         assert result == []
         mock_log.warning.assert_called_with(WARN_ON_STREAM_DENY_FAILED)
 
-    async def test_onNextHandlerFailureTerminatesStream(self) -> None:
+    async def test_on_next_handler_failure_terminates_stream(self) -> None:
         """F18: on_next obligation failure terminates the stream."""
         bundle = _make_failing_on_next_bundle()
         pdp_client = _make_pdp_client([_make_permit()])
@@ -330,7 +329,7 @@ class TestEnforceTillDenied:
 
         assert result == []
 
-    async def test_initialIndeterminateTreatedAsDeny(self) -> None:
+    async def test_initial_indeterminate_treated_as_deny(self) -> None:
         """INDETERMINATE is treated the same as DENY."""
         pdp_client = _make_pdp_client([_make_indeterminate()])
         service = _make_constraint_service()
@@ -346,7 +345,7 @@ class TestEnforceTillDenied:
 
         assert result == []
 
-    async def test_obligationResolutionFailureTreatedAsDeny(self) -> None:
+    async def test_obligation_resolution_failure_treated_as_deny(self) -> None:
         """If constraint resolution raises AccessDeniedError, treated as deny."""
         pdp_client = _make_pdp_client([_make_permit()])
         service = _make_constraint_service(raise_on_resolve=True)
@@ -366,7 +365,7 @@ class TestEnforceTillDenied:
 class TestEnforceDropWhileDenied:
     """EnforceDropWhileDenied: silently drop data during deny, resume on permit."""
 
-    async def test_deferredSourceSubscriptionUntilFirstPermit(self) -> None:
+    async def test_deferred_source_subscription_until_first_permit(self) -> None:
         """Source factory is not called until a PERMIT arrives."""
         source_called = False
 
@@ -385,7 +384,7 @@ class TestEnforceDropWhileDenied:
         assert source_called is True
         assert result == ["item"]
 
-    async def test_permitFlowDataYielded(self) -> None:
+    async def test_permit_flow_data_yielded(self) -> None:
         """Items are yielded when state is PERMITTED."""
         pdp_client = _make_pdp_client([_make_permit()])
         service = _make_constraint_service()
@@ -401,7 +400,7 @@ class TestEnforceDropWhileDenied:
 
         assert result == ["a", "b", "c"]
 
-    async def test_constraintHandlersApplied(self) -> None:
+    async def test_constraint_handlers_applied(self) -> None:
         """Items are transformed by the bundle on_next pipeline."""
         bundle = _make_bundle(on_next_mappings=lambda v: v * 2)
         pdp_client = _make_pdp_client([_make_permit()])
@@ -418,9 +417,8 @@ class TestEnforceDropWhileDenied:
 
         assert result == [2, 4, 6]
 
-    async def test_permitDenyPermitCycleDropsDuringDeny(self) -> None:
+    async def test_permit_deny_permit_cycle_drops_during_deny(self) -> None:
         """Data is dropped during DENY phase and resumes on re-PERMIT."""
-        phase = {"current": 0}
         advance_event = asyncio.Event()
 
         async def decision_stream(_sub: AuthorizationSubscription) -> AsyncIterator[AuthorizationDecision]:
@@ -447,9 +445,7 @@ class TestEnforceDropWhileDenied:
         async def data_factory() -> AsyncIterator[Any]:
             for i in range(6):
                 yield f"item-{i}"
-                if i == 1:
-                    advance_event.set()
-                elif i == 3:
+                if i == 1 or i == 3:
                     advance_event.set()
                 await asyncio.sleep(0)
 
@@ -461,7 +457,7 @@ class TestEnforceDropWhileDenied:
         assert "item-0" in items_yielded
         assert "item-1" in items_yielded
 
-    async def test_handlerReResolutionOnRePermit(self) -> None:
+    async def test_handler_re_resolution_on_re_permit(self) -> None:
         """A new bundle is created on re-PERMIT (hot-swap)."""
         bundle1 = _make_bundle(on_next_mappings=lambda v: f"{v}-v1")
         bundle2 = _make_bundle(on_next_mappings=lambda v: f"{v}-v2")
@@ -503,9 +499,7 @@ class TestEnforceDropWhileDenied:
             for i in range(6):
                 yield f"item-{i}"
                 item_count += 1
-                if item_count == 2:
-                    advance_event.set()
-                elif item_count == 4:
+                if item_count == 2 or item_count == 4:
                     advance_event.set()
                 await asyncio.sleep(0)
 
@@ -516,7 +510,7 @@ class TestEnforceDropWhileDenied:
 
         assert service.streaming_bundle_for.call_count == 2
 
-    async def test_onNextFailureDropsSingleElement(self) -> None:
+    async def test_on_next_failure_drops_single_element(self) -> None:
         """F18: on_next obligation failure drops one element, stream continues."""
         call_count = {"n": 0}
 
@@ -542,7 +536,7 @@ class TestEnforceDropWhileDenied:
 
         assert result == ["a", "c"]
 
-    async def test_continuousDenyAllItemsDropped(self) -> None:
+    async def test_continuous_deny_all_items_dropped(self) -> None:
         """When never permitted, all items are dropped and stream ends with source."""
         advance_event = asyncio.Event()
 
@@ -578,7 +572,7 @@ class TestEnforceDropWhileDenied:
 class TestEnforceRecoverableIfDenied:
     """EnforceRecoverableIfDenied: suspend on deny with signals, resume on re-permit."""
 
-    async def test_deferredSourceSubscriptionUntilFirstPermit(self) -> None:
+    async def test_deferred_source_subscription_until_first_permit(self) -> None:
         """Source factory is not called until a PERMIT arrives."""
         source_called = False
 
@@ -599,7 +593,7 @@ class TestEnforceRecoverableIfDenied:
         assert source_called is True
         assert result == ["item"]
 
-    async def test_permitFlowDataYielded(self) -> None:
+    async def test_permit_flow_data_yielded(self) -> None:
         """Items are yielded when state is PERMITTED."""
         pdp_client = _make_pdp_client([_make_permit()])
         service = _make_constraint_service()
@@ -615,7 +609,7 @@ class TestEnforceRecoverableIfDenied:
 
         assert result == ["a", "b", "c"]
 
-    async def test_constraintHandlersApplied(self) -> None:
+    async def test_constraint_handlers_applied(self) -> None:
         """Items are transformed by the bundle on_next pipeline."""
         bundle = _make_bundle(on_next_mappings=lambda v: v.upper())
         pdp_client = _make_pdp_client([_make_permit()])
@@ -632,7 +626,7 @@ class TestEnforceRecoverableIfDenied:
 
         assert result == ["HELLO"]
 
-    async def test_onStreamDenyCallbackOnPermitToDenyTransition(self) -> None:
+    async def test_on_stream_deny_callback_on_permit_to_deny_transition(self) -> None:
         """on_stream_deny is called on PERMIT->DENY transition."""
         advance_event = asyncio.Event()
         deny_decision = _make_deny()
@@ -673,7 +667,7 @@ class TestEnforceRecoverableIfDenied:
         assert len(deny_log) >= 1
         assert deny_log[0] is deny_decision
 
-    async def test_onStreamRecoverCallbackOnDenyToPermitTransition(self) -> None:
+    async def test_on_stream_recover_callback_on_deny_to_permit_transition(self) -> None:
         """on_stream_recover is called on DENY->PERMIT transition."""
         advance_event = asyncio.Event()
         advance_event_2 = asyncio.Event()
@@ -723,7 +717,7 @@ class TestEnforceRecoverableIfDenied:
 
         assert len(recover_log) >= 1
 
-    async def test_signalCallbackFailureLoggedStateTransitionStillHappens(self) -> None:
+    async def test_signal_callback_failure_logged_state_transition_still_happens(self) -> None:
         """F20: signal callback failure is logged, state transition still happens."""
         pdp_client = _make_pdp_client([_make_deny()])
         service = _make_constraint_service()
@@ -745,7 +739,7 @@ class TestEnforceRecoverableIfDenied:
         assert result == []
         mock_log.warning.assert_called_with(WARN_ON_STREAM_DENY_FAILED)
 
-    async def test_onNextFailureDropsElementNoStateChange(self) -> None:
+    async def test_on_next_failure_drops_element_no_state_change(self) -> None:
         """F18: on_next obligation failure drops element, no state transition."""
         call_count = {"n": 0}
 
@@ -771,7 +765,7 @@ class TestEnforceRecoverableIfDenied:
 
         assert result == ["a", "c"]
 
-    async def test_initialDenyCallsOnStreamDeny(self) -> None:
+    async def test_initial_deny_calls_on_stream_deny(self) -> None:
         """Initial DENY calls on_stream_deny and generator ends."""
         deny_decision = _make_deny()
         deny_log: list[AuthorizationDecision] = []
@@ -793,7 +787,7 @@ class TestEnforceRecoverableIfDenied:
         assert len(deny_log) == 1
         assert deny_log[0] is deny_decision
 
-    async def test_denySignalYieldedWhenCallbackReturnsValue(self) -> None:
+    async def test_deny_signal_yielded_when_callback_returns_value(self) -> None:
         """When on_stream_deny returns a value, it is yielded to the consumer."""
         pdp_client = _make_pdp_client([_make_deny()])
         service = _make_constraint_service()
@@ -810,7 +804,7 @@ class TestEnforceRecoverableIfDenied:
 
         assert "DENIED_SIGNAL" in result
 
-    async def test_recoverSignalYieldedWhenCallbackReturnsValue(self) -> None:
+    async def test_recover_signal_yielded_when_callback_returns_value(self) -> None:
         """When on_stream_recover returns a value, it is yielded to the consumer."""
         advance_event = asyncio.Event()
         advance_event_2 = asyncio.Event()
@@ -863,7 +857,7 @@ class TestEnforceRecoverableIfDenied:
 class TestTeardown:
     """Teardown: ON_CANCEL handlers execute when generator closes."""
 
-    async def test_onCancelExecutedOnNormalCompletion(self) -> None:
+    async def test_on_cancel_executed_on_normal_completion(self) -> None:
         """ON_CANCEL handlers are called when the stream completes normally."""
         cancel_log: list[str] = []
         bundle = _make_bundle(on_cancel_handlers=lambda: cancel_log.append("cancelled"))
@@ -881,7 +875,7 @@ class TestTeardown:
 
         assert cancel_log == ["cancelled"]
 
-    async def test_onCancelExecutedOnDenyTermination(self) -> None:
+    async def test_on_cancel_executed_on_deny_termination(self) -> None:
         """ON_CANCEL handlers are called when stream terminates due to deny."""
         cancel_log: list[str] = []
         bundle = _make_bundle(on_cancel_handlers=lambda: cancel_log.append("cancelled"))
@@ -907,7 +901,7 @@ class TestTeardown:
 
         assert cancel_log == ["cancelled"]
 
-    async def test_onCancelExecutedForDropWhileDenied(self) -> None:
+    async def test_on_cancel_executed_for_drop_while_denied(self) -> None:
         """ON_CANCEL handlers are called for DropWhileDenied on normal completion."""
         cancel_log: list[str] = []
         bundle = _make_bundle(on_cancel_handlers=lambda: cancel_log.append("cancelled"))
@@ -925,7 +919,7 @@ class TestTeardown:
 
         assert cancel_log == ["cancelled"]
 
-    async def test_onCancelExecutedForRecoverableIfDenied(self) -> None:
+    async def test_on_cancel_executed_for_recoverable_if_denied(self) -> None:
         """ON_CANCEL handlers are called for RecoverableIfDenied on normal completion."""
         cancel_log: list[str] = []
         bundle = _make_bundle(on_cancel_handlers=lambda: cancel_log.append("cancelled"))
@@ -943,7 +937,7 @@ class TestTeardown:
 
         assert cancel_log == ["cancelled"]
 
-    async def test_onCancelFailureDoesNotPropagate(self) -> None:
+    async def test_on_cancel_failure_does_not_propagate(self) -> None:
         """ON_CANCEL handler failure is suppressed and does not propagate."""
         def failing_cancel() -> None:
             raise RuntimeError("cancel failed")
@@ -963,7 +957,7 @@ class TestTeardown:
 
         assert result == ["a"]
 
-    async def test_decisionTaskCancelledOnTeardown(self) -> None:
+    async def test_decision_task_cancelled_on_teardown(self) -> None:
         """The PDP decision background task is cancelled during teardown."""
         stalled = asyncio.Event()
 

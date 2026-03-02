@@ -8,12 +8,11 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 
-from sapl_base.constraint_bundle import AccessDeniedError, ConstraintHandlerBundle
+import sapl_fastapi.dependencies as deps
+from sapl_base.constraint_bundle import ConstraintHandlerBundle
 from sapl_base.constraint_engine import ConstraintEnforcementService
 from sapl_base.pdp_client import PdpClient
 from sapl_base.types import AuthorizationDecision, Decision
-
-import sapl_fastapi.dependencies as deps
 from sapl_fastapi.decorators import (
     _extract_class_name,
     _extract_request,

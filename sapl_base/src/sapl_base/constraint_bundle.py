@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
-from sapl_base.constraint_types import MethodInvocationContext
 from sapl_base.types import RESOURCE_ABSENT
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from sapl_base.constraint_types import MethodInvocationContext
 
 log = structlog.get_logger()
 

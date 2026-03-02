@@ -6,11 +6,10 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 from django.test import override_settings
 
-from sapl_base.constraint_engine import ConstraintEnforcementService
-from sapl_base.content_filter import ContentFilterPredicateProvider, ContentFilteringProvider
-from sapl_base.pdp_client import PdpClient
-
 import sapl_django.config as config_module
+from sapl_base.constraint_engine import ConstraintEnforcementService
+from sapl_base.content_filter import ContentFilteringProvider, ContentFilterPredicateProvider
+from sapl_base.pdp_client import PdpClient
 from sapl_django.config import (
     cleanup_sapl,
     get_constraint_service,

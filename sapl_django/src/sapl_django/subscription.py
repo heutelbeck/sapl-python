@@ -3,12 +3,14 @@ from __future__ import annotations
 import base64
 import json
 import logging
-from typing import Any, Callable
-
-from django.http import HttpRequest
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from sapl_base.constraint_types import SubscriptionContext
 from sapl_base.types import AuthorizationSubscription
+
+if TYPE_CHECKING:
+    from django.http import HttpRequest
 
 SubscriptionField = Any | Callable[[SubscriptionContext], Any]
 

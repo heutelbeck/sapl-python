@@ -6,15 +6,14 @@ from typing import Any
 import pytest
 
 from sapl_base.content_filter import (
-    ContentFilterPredicateProvider,
     ContentFilteringProvider,
+    ContentFilterPredicateProvider,
     _blacken_value,
     _evaluate_condition,
     _identity,
     _is_safe_regex,
     _parse_path,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

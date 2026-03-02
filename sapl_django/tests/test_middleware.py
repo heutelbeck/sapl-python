@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
-
 import pytest
 from django.http import HttpRequest, HttpResponse
 
-from sapl_django.middleware import SaplRequestMiddleware, _current_request, get_current_request
+from sapl_django.middleware import SaplRequestMiddleware, get_current_request
 
 
 class TestGetCurrentRequest:

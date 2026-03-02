@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
-
-from flask import Flask
+from typing import TYPE_CHECKING, Any
 
 from sapl_base.constraint_engine import ConstraintEnforcementService
 from sapl_base.content_filter import ContentFilteringProvider, ContentFilterPredicateProvider
 from sapl_base.pdp_client import PdpClient, PdpConfig
+
+if TYPE_CHECKING:
+    from flask import Flask
 
 ERROR_NOT_INITIALIZED = "SAPL not initialized. Call init_app() first."
 ERROR_UNKNOWN_HANDLER_TYPE = "Unknown handler type: %s"
@@ -112,7 +113,7 @@ class SaplFlask:
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                loop.create_task(self._pdp_client.close())
+                self._close_task = loop.create_task(self._pdp_client.close())
             else:
                 loop.run_until_complete(self._pdp_client.close())
         except RuntimeError:

@@ -4,21 +4,29 @@ import asyncio
 import functools
 import inspect
 import json
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from flask import Response, abort
 
 from sapl_base.constraint_bundle import AccessDeniedError
-from sapl_base.enforcement import post_enforce as _post_enforce, pre_enforce as _pre_enforce
+from sapl_base.enforcement import post_enforce as _post_enforce
+from sapl_base.enforcement import pre_enforce as _pre_enforce
 from sapl_base.streaming import (
     enforce_drop_while_denied as _enforce_drop_while_denied,
+)
+from sapl_base.streaming import (
     enforce_recoverable_if_denied as _enforce_recoverable_if_denied,
+)
+from sapl_base.streaming import (
     enforce_till_denied as _enforce_till_denied,
 )
-from sapl_base.types import AuthorizationDecision, AuthorizationSubscription
-
 from sapl_flask.extension import get_sapl_extension
 from sapl_flask.subscription import SubscriptionBuilder, SubscriptionField
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from sapl_base.types import AuthorizationDecision, AuthorizationSubscription
 
 
 def _extract_class_name(func: Callable) -> str:

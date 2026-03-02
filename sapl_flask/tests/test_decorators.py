@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from flask import Flask
 
-from sapl_base.constraint_bundle import AccessDeniedError
-from sapl_base.types import AuthorizationDecision, Decision
-
-from sapl_flask.decorators import _extract_class_name, _resolve_args, pre_enforce, post_enforce
+from sapl_base.types import AuthorizationDecision
+from sapl_flask.decorators import _extract_class_name, _resolve_args, post_enforce, pre_enforce
 from sapl_flask.extension import SaplFlask
 
 
@@ -27,7 +25,7 @@ def _mock_decide_once(decision: AuthorizationDecision) -> AsyncMock:
 
 
 class TestPreEnforcePermit:
-    def test_permitReturns200(self, app: Flask) -> None:
+    def test_permit_returns200(self, app: Flask) -> None:
         @app.route("/data")
         @pre_enforce(action="read", resource="data")
         def get_data():
@@ -37,13 +35,12 @@ class TestPreEnforcePermit:
             app.extensions["sapl"].pdp_client,
             "decide_once",
             _mock_decide_once(AuthorizationDecision.permit()),
-        ):
-            with app.test_client() as client:
-                response = client.get("/data")
+        ), app.test_client() as client:
+            response = client.get("/data")
 
         assert response.status_code == 200
 
-    def test_permitReturnsViewResult(self, app: Flask) -> None:
+    def test_permit_returns_view_result(self, app: Flask) -> None:
         @app.route("/data")
         @pre_enforce(action="read", resource="data")
         def get_data():
@@ -53,15 +50,14 @@ class TestPreEnforcePermit:
             app.extensions["sapl"].pdp_client,
             "decide_once",
             _mock_decide_once(AuthorizationDecision.permit()),
-        ):
-            with app.test_client() as client:
-                response = client.get("/data")
+        ), app.test_client() as client:
+            response = client.get("/data")
 
         assert response.data == b"hello"
 
 
 class TestPreEnforceDeny:
-    def test_denyReturns403(self, app: Flask) -> None:
+    def test_deny_returns403(self, app: Flask) -> None:
         @app.route("/secret")
         @pre_enforce(action="read", resource="secret")
         def get_secret():
@@ -71,13 +67,12 @@ class TestPreEnforceDeny:
             app.extensions["sapl"].pdp_client,
             "decide_once",
             _mock_decide_once(AuthorizationDecision.deny()),
-        ):
-            with app.test_client() as client:
-                response = client.get("/secret")
+        ), app.test_client() as client:
+            response = client.get("/secret")
 
         assert response.status_code == 403
 
-    def test_indeterminateReturns403(self, app: Flask) -> None:
+    def test_indeterminate_returns403(self, app: Flask) -> None:
         @app.route("/unknown")
         @pre_enforce(action="read", resource="unknown")
         def get_unknown():
@@ -87,13 +82,12 @@ class TestPreEnforceDeny:
             app.extensions["sapl"].pdp_client,
             "decide_once",
             _mock_decide_once(AuthorizationDecision.indeterminate()),
-        ):
-            with app.test_client() as client:
-                response = client.get("/unknown")
+        ), app.test_client() as client:
+            response = client.get("/unknown")
 
         assert response.status_code == 403
 
-    def test_viewBodyNotExecutedOnDeny(self, app: Flask) -> None:
+    def test_view_body_not_executed_on_deny(self, app: Flask) -> None:
         executed = []
 
         @app.route("/side-effect")
@@ -106,15 +100,14 @@ class TestPreEnforceDeny:
             app.extensions["sapl"].pdp_client,
             "decide_once",
             _mock_decide_once(AuthorizationDecision.deny()),
-        ):
-            with app.test_client() as client:
-                client.get("/side-effect")
+        ), app.test_client() as client:
+            client.get("/side-effect")
 
         assert executed == []
 
 
 class TestPreEnforceOnDeny:
-    def test_onDenyCallbackReturnsCustomResponse(self, app: Flask) -> None:
+    def test_on_deny_callback_returns_custom_response(self, app: Flask) -> None:
         def custom_deny(decision: AuthorizationDecision) -> str:
             return "custom deny"
 
@@ -127,16 +120,15 @@ class TestPreEnforceOnDeny:
             app.extensions["sapl"].pdp_client,
             "decide_once",
             _mock_decide_once(AuthorizationDecision.deny()),
-        ):
-            with app.test_client() as client:
-                response = client.get("/custom")
+        ), app.test_client() as client:
+            response = client.get("/custom")
 
         assert response.status_code == 200
         assert response.data == b"custom deny"
 
 
 class TestPostEnforcePermit:
-    def test_permitReturns200WithResult(self, app: Flask) -> None:
+    def test_permit_returns_200_with_result(self, app: Flask) -> None:
         @app.route("/post-data")
         @post_enforce(action="read", resource="post-data")
         def get_post_data():
@@ -146,16 +138,15 @@ class TestPostEnforcePermit:
             app.extensions["sapl"].pdp_client,
             "decide_once",
             _mock_decide_once(AuthorizationDecision.permit()),
-        ):
-            with app.test_client() as client:
-                response = client.get("/post-data")
+        ), app.test_client() as client:
+            response = client.get("/post-data")
 
         assert response.status_code == 200
         assert response.data == b"post result"
 
 
 class TestPostEnforceDeny:
-    def test_denyReturns403AfterExecution(self, app: Flask) -> None:
+    def test_deny_returns_403_after_execution(self, app: Flask) -> None:
         executed = []
 
         @app.route("/post-secret")
@@ -168,16 +159,15 @@ class TestPostEnforceDeny:
             app.extensions["sapl"].pdp_client,
             "decide_once",
             _mock_decide_once(AuthorizationDecision.deny()),
-        ):
-            with app.test_client() as client:
-                response = client.get("/post-secret")
+        ), app.test_client() as client:
+            response = client.get("/post-secret")
 
         assert response.status_code == 403
         assert executed == [True]
 
 
 class TestPostEnforceOnDeny:
-    def test_onDenyCallbackReturnsCustomResponse(self, app: Flask) -> None:
+    def test_on_deny_callback_returns_custom_response(self, app: Flask) -> None:
         def custom_deny(decision: AuthorizationDecision) -> str:
             return "post custom deny"
 
@@ -190,23 +180,22 @@ class TestPostEnforceOnDeny:
             app.extensions["sapl"].pdp_client,
             "decide_once",
             _mock_decide_once(AuthorizationDecision.deny()),
-        ):
-            with app.test_client() as client:
-                response = client.get("/post-custom")
+        ), app.test_client() as client:
+            response = client.get("/post-custom")
 
         assert response.status_code == 200
         assert response.data == b"post custom deny"
 
 
 class TestDecoratorPreservesMetadata:
-    def test_preEnforcePreservesFunctionName(self, app: Flask) -> None:
+    def test_pre_enforce_preserves_function_name(self, app: Flask) -> None:
         @pre_enforce(action="read")
         def my_view():
             return "ok"
 
         assert my_view.__name__ == "my_view"
 
-    def test_postEnforcePreservesFunctionName(self, app: Flask) -> None:
+    def test_post_enforce_preserves_function_name(self, app: Flask) -> None:
         @post_enforce(action="read")
         def my_other_view():
             return "ok"
@@ -235,41 +224,41 @@ class _TestOuter:
 class TestExtractClassName:
     """Verify _extract_class_name detects class names from qualified names."""
 
-    def test_plainFunctionReturnsEmptyString(self) -> None:
+    def test_plain_function_returns_empty_string(self) -> None:
         assert _extract_class_name(_module_level_function) == ""
 
-    def test_methodReturnsClassName(self) -> None:
+    def test_method_returns_class_name(self) -> None:
         assert _extract_class_name(_TestPatientService.get_patient) == "_TestPatientService"
 
-    def test_nestedClassReturnsInnerClassName(self) -> None:
+    def test_nested_class_returns_inner_class_name(self) -> None:
         assert _extract_class_name(_TestOuter.Inner.method) == "Inner"
 
 
 class TestResolveArgs:
     """Verify _resolve_args maps positional and keyword arguments to names."""
 
-    def test_resolvesPositionalArgs(self) -> None:
+    def test_resolves_positional_args(self) -> None:
         def my_view(patient_id, amount):
             pass
 
         result = _resolve_args(my_view, ("P-001", 100.0), {})
         assert result == {"patient_id": "P-001", "amount": 100.0}
 
-    def test_resolvesKwargs(self) -> None:
+    def test_resolves_kwargs(self) -> None:
         def my_view(patient_id, amount=50.0):
             pass
 
         result = _resolve_args(my_view, ("P-001",), {"amount": 200.0})
         assert result == {"patient_id": "P-001", "amount": 200.0}
 
-    def test_appliesDefaults(self) -> None:
+    def test_applies_defaults(self) -> None:
         def my_view(name, limit=10):
             pass
 
         result = _resolve_args(my_view, ("test",), {})
         assert result == {"name": "test", "limit": 10}
 
-    def test_excludesSelf(self) -> None:
+    def test_excludes_self(self) -> None:
         class MyService:
             def get_data(self, patient_id):
                 pass
@@ -278,7 +267,7 @@ class TestResolveArgs:
         assert "self" not in result
         assert result == {"patient_id": "P-001"}
 
-    def test_fallsBackToKwargsOnBindFailure(self) -> None:
+    def test_falls_back_to_kwargs_on_bind_failure(self) -> None:
         def my_view(a, b, c):
             pass
 

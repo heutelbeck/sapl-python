@@ -5,7 +5,6 @@ import dataclasses
 import pytest
 
 from sapl_base.pdp_client import PdpConfig
-
 from sapl_fastapi.config import SaplConfig
 
 

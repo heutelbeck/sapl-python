@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+from collections.abc import AsyncIterator, Callable
 from enum import Enum, auto
-from typing import Any, AsyncIterator, Callable
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
 from sapl_base.constraint_bundle import AccessDeniedError, StreamingConstraintHandlerBundle
-from sapl_base.constraint_engine import ConstraintEnforcementService
-from sapl_base.pdp_client import PdpClient
 from sapl_base.types import AuthorizationDecision, AuthorizationSubscription, Decision
+
+if TYPE_CHECKING:
+    from sapl_base.constraint_engine import ConstraintEnforcementService
+    from sapl_base.pdp_client import PdpClient
 
 log = structlog.get_logger()
 
@@ -165,16 +169,12 @@ async def enforce_till_denied(
 
     finally:
         if bundle:
-            try:
+            with contextlib.suppress(Exception):
                 bundle.handle_on_cancel_constraints()
-            except Exception:
-                pass
         if decision_task and not decision_task.done():
             decision_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError, Exception):
                 await decision_task
-            except (asyncio.CancelledError, Exception):
-                pass
 
 
 async def enforce_drop_while_denied(
@@ -248,16 +248,12 @@ async def enforce_drop_while_denied(
 
     finally:
         if bundle:
-            try:
+            with contextlib.suppress(Exception):
                 bundle.handle_on_cancel_constraints()
-            except Exception:
-                pass
         if decision_task and not decision_task.done():
             decision_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError, Exception):
                 await decision_task
-            except (asyncio.CancelledError, Exception):
-                pass
 
 
 async def enforce_recoverable_if_denied(
@@ -367,13 +363,9 @@ async def enforce_recoverable_if_denied(
 
     finally:
         if bundle:
-            try:
+            with contextlib.suppress(Exception):
                 bundle.handle_on_cancel_constraints()
-            except Exception:
-                pass
         if decision_task and not decision_task.done():
             decision_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError, Exception):
                 await decision_task
-            except (asyncio.CancelledError, Exception):
-                pass

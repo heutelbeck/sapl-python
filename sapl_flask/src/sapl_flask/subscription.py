@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from sapl_base.constraint_types import SubscriptionContext
 from sapl_base.types import AuthorizationSubscription

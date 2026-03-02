@@ -4,24 +4,31 @@ import asyncio
 import functools
 import inspect
 import json
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, JsonResponse, StreamingHttpResponse
 
 from sapl_base.constraint_bundle import AccessDeniedError
-from sapl_base.enforcement import post_enforce as _post_enforce, pre_enforce as _pre_enforce
+from sapl_base.enforcement import post_enforce as _post_enforce
+from sapl_base.enforcement import pre_enforce as _pre_enforce
 from sapl_base.streaming import (
     enforce_drop_while_denied as _enforce_drop_while_denied,
+)
+from sapl_base.streaming import (
     enforce_recoverable_if_denied as _enforce_recoverable_if_denied,
+)
+from sapl_base.streaming import (
     enforce_till_denied as _enforce_till_denied,
 )
-from sapl_base.types import AuthorizationDecision, AuthorizationSubscription
-
 from sapl_django.config import get_constraint_service, get_pdp_client
 from sapl_django.subscription import SubscriptionBuilder, SubscriptionField
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from sapl_base.types import AuthorizationDecision, AuthorizationSubscription
 
 log = structlog.get_logger()
 
@@ -145,7 +152,7 @@ def pre_enforce(
                 )
                 return _wrap_response(result)
             except AccessDeniedError:
-                raise PermissionDenied
+                raise PermissionDenied from None
         return wrapper
     return decorator
 
@@ -209,7 +216,7 @@ def post_enforce(
                 )
                 return _wrap_response(result)
             except AccessDeniedError:
-                raise PermissionDenied
+                raise PermissionDenied from None
         return wrapper
     return decorator
 

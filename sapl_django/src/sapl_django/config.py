@@ -6,7 +6,7 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
 from sapl_base.constraint_engine import ConstraintEnforcementService
-from sapl_base.content_filter import ContentFilterPredicateProvider, ContentFilteringProvider
+from sapl_base.content_filter import ContentFilteringProvider, ContentFilterPredicateProvider
 from sapl_base.pdp_client import PdpClient, PdpConfig
 
 ERROR_MISSING_CONFIG = "SAPL_CONFIG not found in Django settings"

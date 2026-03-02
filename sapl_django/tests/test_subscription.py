@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 
-import pytest
 from django.http import HttpRequest
 
 from sapl_django.subscription import SubscriptionBuilder

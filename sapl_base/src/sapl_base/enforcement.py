@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
-from sapl_base.constraint_bundle import AccessDeniedError, ConstraintHandlerBundle
-from sapl_base.constraint_engine import ConstraintEnforcementService
+from sapl_base.constraint_bundle import AccessDeniedError
 from sapl_base.constraint_types import MethodInvocationContext
-from sapl_base.pdp_client import PdpClient
 from sapl_base.types import AuthorizationDecision, AuthorizationSubscription, Decision
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from sapl_base.constraint_engine import ConstraintEnforcementService
+    from sapl_base.pdp_client import PdpClient
 
 log = structlog.get_logger()
 
