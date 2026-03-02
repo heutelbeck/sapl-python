@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.12', '3.13']
-        package: [sapl_base, sapl_fastapi, sapl_django, sapl_flask]
+        package: [sapl_base, sapl_fastapi, sapl_django, sapl_flask, sapl_tornado]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
