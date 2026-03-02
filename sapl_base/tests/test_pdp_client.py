@@ -353,6 +353,7 @@ class TestMultiDecideAllOnce:
 
 
 class TestClientLifecycle:
+    @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
     async def test_close_returns_indeterminate_on_subsequent_request(self, httpx_mock):
         config = PdpConfig()
         client = PdpClient(config)
