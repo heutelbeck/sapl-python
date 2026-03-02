@@ -84,7 +84,7 @@ def _mock_sapl(monkeypatch):
 
 def _make_app(_mock_sapl) -> tornado.web.Application:
     """Create a Tornado application with test handlers using mock SAPL."""
-    mock_pdp, mock_service = _mock_sapl
+    _mock_pdp, _mock_service = _mock_sapl
 
     class PermitDataHandler(tornado.web.RequestHandler):
         @pre_enforce()

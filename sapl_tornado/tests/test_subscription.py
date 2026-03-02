@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import MagicMock
 
-from tornado.httputil import HTTPServerRequest, HTTPConnection
+from tornado.httputil import HTTPConnection, HTTPServerRequest
 
 from sapl_tornado.subscription import SubscriptionBuilder
 
