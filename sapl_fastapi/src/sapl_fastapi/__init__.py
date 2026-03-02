@@ -1,12 +1,5 @@
-from __future__ import annotations
-
-from sapl_django.config import (
-    cleanup_sapl,
-    get_constraint_service,
-    get_pdp_client,
-    register_constraint_handler,
-)
-from sapl_django.decorators import (
+from sapl_fastapi.config import SaplConfig
+from sapl_fastapi.decorators import (
     enforce_drop_while_denied,
     enforce_recoverable_if_denied,
     enforce_till_denied,
@@ -15,13 +8,20 @@ from sapl_django.decorators import (
     service_post_enforce,
     service_pre_enforce,
 )
-from sapl_django.middleware import SaplRequestMiddleware
-from sapl_django.subscription import SubscriptionBuilder
+from sapl_fastapi.dependencies import (
+    cleanup_sapl,
+    configure_sapl,
+    get_constraint_service,
+    get_pdp_client,
+    register_constraint_handler,
+)
+from sapl_fastapi.subscription import SubscriptionBuilder
 
 __all__ = [
-    "SaplRequestMiddleware",
+    "SaplConfig",
     "SubscriptionBuilder",
     "cleanup_sapl",
+    "configure_sapl",
     "enforce_drop_while_denied",
     "enforce_recoverable_if_denied",
     "enforce_till_denied",
