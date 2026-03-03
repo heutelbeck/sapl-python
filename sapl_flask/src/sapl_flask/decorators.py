@@ -6,9 +6,8 @@ import inspect
 import json
 from typing import TYPE_CHECKING, Any
 
-from flask import Response, abort
+from flask import Response
 
-from sapl_base.constraint_bundle import AccessDeniedError
 from sapl_base.enforcement import post_enforce as _post_enforce
 from sapl_base.enforcement import pre_enforce as _pre_enforce
 from sapl_base.streaming import (
@@ -110,21 +109,18 @@ def pre_enforce(
             async def async_func(*a: Any, **kw: Any) -> Any:
                 return func(*a, **kw)
 
-            try:
-                return asyncio.run(_pre_enforce(
-                    pdp_client=sapl.pdp_client,
-                    constraint_service=sapl.constraint_service,
-                    subscription=subscription,
-                    protected_function=async_func,
-                    args=list(args),
-                    kwargs=kwargs,
-                    function_name=func.__name__,
-                    on_deny=on_deny,
-                    class_name=class_name,
-                    request=resolved.get("request"),
-                ))
-            except AccessDeniedError:
-                abort(403)
+            return asyncio.run(_pre_enforce(
+                pdp_client=sapl.pdp_client,
+                constraint_service=sapl.constraint_service,
+                subscription=subscription,
+                protected_function=async_func,
+                args=list(args),
+                kwargs=kwargs,
+                function_name=func.__name__,
+                on_deny=on_deny,
+                class_name=class_name,
+                request=resolved.get("request"),
+            ))
         return wrapper
     return decorator
 
@@ -179,119 +175,6 @@ def post_enforce(
             async def async_func(*a: Any, **kw: Any) -> Any:
                 return func(*a, **kw)
 
-            try:
-                return asyncio.run(_post_enforce(
-                    pdp_client=sapl.pdp_client,
-                    constraint_service=sapl.constraint_service,
-                    subscription_builder=subscription_builder,
-                    protected_function=async_func,
-                    args=list(args),
-                    kwargs=kwargs,
-                    function_name=func.__name__,
-                    on_deny=on_deny,
-                    class_name=class_name,
-                    request=resolved.get("request"),
-                ))
-            except AccessDeniedError:
-                abort(403)
-        return wrapper
-    return decorator
-
-
-def service_pre_enforce(
-    *,
-    subject: SubscriptionField = None,
-    action: SubscriptionField = None,
-    resource: SubscriptionField = None,
-    environment: SubscriptionField = None,
-    secrets: SubscriptionField = None,
-) -> Callable:
-    """Decorator: authorize BEFORE service method execution.
-
-    Like ``pre_enforce`` but for service-layer methods:
-    - Does not catch ``AccessDeniedError`` (caller handles it)
-    - Does not abort with 403
-
-    Usage::
-
-        @service_pre_enforce(action="service:listPatients", resource="patients")
-        def list_patients() -> list[dict]:
-            return [dict(p) for p in PATIENTS]
-    """
-    def decorator(func: Callable) -> Callable:
-        class_name = _extract_class_name(func)
-
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            sapl = get_sapl_extension()
-            resolved = _resolve_args(func, args, kwargs)
-            subscription = SubscriptionBuilder.build(
-                subject=subject,
-                action=action,
-                resource=resource,
-                environment=environment,
-                secrets=secrets,
-                function_name=func.__name__,
-                class_name=class_name,
-                resolved_args=resolved,
-            )
-
-            async def async_func(*a: Any, **kw: Any) -> Any:
-                return func(*a, **kw)
-
-            return asyncio.run(_pre_enforce(
-                pdp_client=sapl.pdp_client,
-                constraint_service=sapl.constraint_service,
-                subscription=subscription,
-                protected_function=async_func,
-                args=list(args),
-                kwargs=kwargs,
-                function_name=func.__name__,
-                class_name=class_name,
-                request=resolved.get("request"),
-            ))
-        return wrapper
-    return decorator
-
-
-def service_post_enforce(
-    *,
-    subject: SubscriptionField = None,
-    action: SubscriptionField = None,
-    resource: SubscriptionField = None,
-    environment: SubscriptionField = None,
-    secrets: SubscriptionField = None,
-) -> Callable:
-    """Decorator: authorize AFTER service method execution.
-
-    Like ``post_enforce`` but for service-layer methods:
-    - Does not catch ``AccessDeniedError`` (caller handles it)
-    - Does not abort with 403
-    """
-    def decorator(func: Callable) -> Callable:
-        class_name = _extract_class_name(func)
-
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            sapl = get_sapl_extension()
-            resolved = _resolve_args(func, args, kwargs)
-
-            def subscription_builder(return_value: Any) -> AuthorizationSubscription:
-                return SubscriptionBuilder.build(
-                    subject=subject,
-                    action=action,
-                    resource=resource,
-                    environment=environment,
-                    secrets=secrets,
-                    function_name=func.__name__,
-                    class_name=class_name,
-                    resolved_args=resolved,
-                    return_value=return_value,
-                )
-
-            async def async_func(*a: Any, **kw: Any) -> Any:
-                return func(*a, **kw)
-
             return asyncio.run(_post_enforce(
                 pdp_client=sapl.pdp_client,
                 constraint_service=sapl.constraint_service,
@@ -300,6 +183,7 @@ def service_post_enforce(
                 args=list(args),
                 kwargs=kwargs,
                 function_name=func.__name__,
+                on_deny=on_deny,
                 class_name=class_name,
                 request=resolved.get("request"),
             ))

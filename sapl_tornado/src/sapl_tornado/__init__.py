@@ -5,8 +5,6 @@ from sapl_tornado.decorators import (
     enforce_till_denied,
     post_enforce,
     pre_enforce,
-    service_post_enforce,
-    service_pre_enforce,
 )
 from sapl_tornado.dependencies import (
     cleanup_sapl,
@@ -30,6 +28,4 @@ __all__ = [
     "post_enforce",
     "pre_enforce",
     "register_constraint_handler",
-    "service_post_enforce",
-    "service_pre_enforce",
 ]

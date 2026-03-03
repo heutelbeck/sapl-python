@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any
 import structlog
 from tornado.web import RequestHandler
 
-from sapl_base.constraint_bundle import AccessDeniedError
 from sapl_base.enforcement import post_enforce as _post_enforce
 from sapl_base.enforcement import pre_enforce as _pre_enforce
 from sapl_base.streaming import (
@@ -159,25 +158,18 @@ def pre_enforce(
                 current_user=current_user,
             )
 
-            try:
-                result = await _pre_enforce(
-                    pdp_client=get_pdp_client(),
-                    constraint_service=get_constraint_service(),
-                    subscription=subscription,
-                    protected_function=func,
-                    args=list(args),
-                    kwargs=kwargs,
-                    function_name=func.__name__,
-                    on_deny=on_deny,
-                    class_name=class_name,
-                    request=request,
-                )
-                if handler is not None and result is not None:
-                    _write_response(handler, result)
-                return result
-            except AccessDeniedError:
-                from tornado.web import HTTPError
-                raise HTTPError(403, reason="Access denied") from None
+            return await _pre_enforce(
+                pdp_client=get_pdp_client(),
+                constraint_service=get_constraint_service(),
+                subscription=subscription,
+                protected_function=func,
+                args=list(args),
+                kwargs=kwargs,
+                function_name=func.__name__,
+                on_deny=on_deny,
+                class_name=class_name,
+                request=request,
+            )
         return wrapper
     return decorator
 
@@ -218,121 +210,6 @@ def post_enforce(
                     current_user=current_user,
                 )
 
-            try:
-                result = await _post_enforce(
-                    pdp_client=get_pdp_client(),
-                    constraint_service=get_constraint_service(),
-                    subscription_builder=subscription_builder,
-                    protected_function=func,
-                    args=list(args),
-                    kwargs=kwargs,
-                    function_name=func.__name__,
-                    on_deny=on_deny,
-                    class_name=class_name,
-                    request=request,
-                )
-                if handler is not None and result is not None:
-                    _write_response(handler, result)
-                return result
-            except AccessDeniedError:
-                from tornado.web import HTTPError
-                raise HTTPError(403, reason="Access denied") from None
-        return wrapper
-    return decorator
-
-
-def service_pre_enforce(
-    *,
-    subject: SubscriptionField = None,
-    action: SubscriptionField = None,
-    resource: SubscriptionField = None,
-    environment: SubscriptionField = None,
-    secrets: SubscriptionField = None,
-) -> Callable:
-    """Decorator: authorize BEFORE service method execution.
-
-    Like ``pre_enforce`` but for service-layer methods:
-    - Does not catch ``AccessDeniedError`` (caller handles it)
-    - Does not write response to handler
-    """
-    def decorator(func: Callable) -> Callable:
-        class_name = _extract_class_name(func)
-
-        @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            request, handler = _extract_request_and_handler(args, kwargs)
-            path_kwargs = _get_path_kwargs(handler)
-            current_user = _get_current_user(handler)
-            resolved = _resolve_args(func, args, kwargs)
-            subscription = SubscriptionBuilder.build(
-                request,
-                subject=subject,
-                action=action,
-                resource=resource,
-                environment=environment,
-                secrets=secrets,
-                function_name=func.__name__,
-                class_name=class_name,
-                resolved_args=resolved,
-                path_kwargs=path_kwargs,
-                current_user=current_user,
-            )
-
-            return await _pre_enforce(
-                pdp_client=get_pdp_client(),
-                constraint_service=get_constraint_service(),
-                subscription=subscription,
-                protected_function=func,
-                args=list(args),
-                kwargs=kwargs,
-                function_name=func.__name__,
-                class_name=class_name,
-                request=request,
-            )
-        return wrapper
-    return decorator
-
-
-def service_post_enforce(
-    *,
-    subject: SubscriptionField = None,
-    action: SubscriptionField = None,
-    resource: SubscriptionField = None,
-    environment: SubscriptionField = None,
-    secrets: SubscriptionField = None,
-) -> Callable:
-    """Decorator: authorize AFTER service method execution.
-
-    Like ``post_enforce`` but for service-layer methods:
-    - Does not catch ``AccessDeniedError`` (caller handles it)
-    - Does not write response to handler
-    """
-    def decorator(func: Callable) -> Callable:
-        class_name = _extract_class_name(func)
-
-        @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            request, handler = _extract_request_and_handler(args, kwargs)
-            path_kwargs = _get_path_kwargs(handler)
-            current_user = _get_current_user(handler)
-            resolved = _resolve_args(func, args, kwargs)
-
-            def subscription_builder(return_value: Any) -> AuthorizationSubscription:
-                return SubscriptionBuilder.build(
-                    request,
-                    subject=subject,
-                    action=action,
-                    resource=resource,
-                    environment=environment,
-                    secrets=secrets,
-                    function_name=func.__name__,
-                    class_name=class_name,
-                    resolved_args=resolved,
-                    return_value=return_value,
-                    path_kwargs=path_kwargs,
-                    current_user=current_user,
-                )
-
             return await _post_enforce(
                 pdp_client=get_pdp_client(),
                 constraint_service=get_constraint_service(),
@@ -341,6 +218,7 @@ def service_post_enforce(
                 args=list(args),
                 kwargs=kwargs,
                 function_name=func.__name__,
+                on_deny=on_deny,
                 class_name=class_name,
                 request=request,
             )
@@ -539,17 +417,6 @@ def enforce_recoverable_if_denied(
                 handler.finish()
         return wrapper
     return decorator
-
-
-def _write_response(handler: RequestHandler, result: Any) -> None:
-    """Write a result to the Tornado response."""
-    if isinstance(result, (dict, list)):
-        handler.set_header("Content-Type", "application/json; charset=UTF-8")
-        handler.write(json.dumps(result))
-    elif isinstance(result, str):
-        handler.write(result)
-    elif result is not None:
-        handler.write(json.dumps(result))
 
 
 def _format_sse(data: Any) -> str:

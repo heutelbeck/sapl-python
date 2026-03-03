@@ -12,8 +12,6 @@ from sapl_django.decorators import (
     enforce_till_denied,
     post_enforce,
     pre_enforce,
-    service_post_enforce,
-    service_pre_enforce,
 )
 from sapl_django.middleware import SaplRequestMiddleware
 from sapl_django.subscription import SubscriptionBuilder
@@ -30,6 +28,4 @@ __all__ = [
     "post_enforce",
     "pre_enforce",
     "register_constraint_handler",
-    "service_post_enforce",
-    "service_pre_enforce",
 ]

@@ -7,10 +7,8 @@ import json
 from typing import TYPE_CHECKING, Any
 
 import structlog
-from django.core.exceptions import PermissionDenied
-from django.http import HttpRequest, JsonResponse, StreamingHttpResponse
+from django.http import HttpRequest, StreamingHttpResponse
 
-from sapl_base.constraint_bundle import AccessDeniedError
 from sapl_base.enforcement import post_enforce as _post_enforce
 from sapl_base.enforcement import pre_enforce as _pre_enforce
 from sapl_base.streaming import (
@@ -83,15 +81,6 @@ def _extract_request(args: tuple, kwargs: dict) -> HttpRequest | None:
     return None
 
 
-def _wrap_response(result: Any) -> Any:
-    """Auto-wrap dict/list results as JsonResponse for Django views."""
-    if isinstance(result, dict):
-        return JsonResponse(result)
-    if isinstance(result, list):
-        return JsonResponse(result, safe=False)
-    return result
-
-
 def pre_enforce(
     *,
     subject: SubscriptionField = None,
@@ -137,22 +126,18 @@ def pre_enforce(
                 resolved_args=resolved,
             )
 
-            try:
-                result = await _pre_enforce(
-                    pdp_client=get_pdp_client(),
-                    constraint_service=get_constraint_service(),
-                    subscription=subscription,
-                    protected_function=func,
-                    args=list(args),
-                    kwargs=kwargs,
-                    function_name=func.__name__,
-                    on_deny=on_deny,
-                    class_name=class_name,
-                    request=request,
-                )
-                return _wrap_response(result)
-            except AccessDeniedError:
-                raise PermissionDenied from None
+            return await _pre_enforce(
+                pdp_client=get_pdp_client(),
+                constraint_service=get_constraint_service(),
+                subscription=subscription,
+                protected_function=func,
+                args=list(args),
+                kwargs=kwargs,
+                function_name=func.__name__,
+                on_deny=on_deny,
+                class_name=class_name,
+                request=request,
+            )
         return wrapper
     return decorator
 
@@ -201,116 +186,6 @@ def post_enforce(
                     return_value=return_value,
                 )
 
-            try:
-                result = await _post_enforce(
-                    pdp_client=get_pdp_client(),
-                    constraint_service=get_constraint_service(),
-                    subscription_builder=subscription_builder,
-                    protected_function=func,
-                    args=list(args),
-                    kwargs=kwargs,
-                    function_name=func.__name__,
-                    on_deny=on_deny,
-                    class_name=class_name,
-                    request=request,
-                )
-                return _wrap_response(result)
-            except AccessDeniedError:
-                raise PermissionDenied from None
-        return wrapper
-    return decorator
-
-
-def service_pre_enforce(
-    *,
-    subject: SubscriptionField = None,
-    action: SubscriptionField = None,
-    resource: SubscriptionField = None,
-    environment: SubscriptionField = None,
-    secrets: SubscriptionField = None,
-) -> Callable:
-    """Decorator: authorize BEFORE service method execution.
-
-    Like ``pre_enforce`` but for service-layer methods:
-    - Does not catch ``AccessDeniedError`` (caller handles it)
-    - Does not wrap the result as ``JsonResponse``
-
-    Usage::
-
-        @service_pre_enforce(action="service:listPatients", resource="patients")
-        async def list_patients() -> list[dict]:
-            return [dict(p) for p in PATIENTS]
-    """
-    def decorator(func: Callable) -> Callable:
-        class_name = _extract_class_name(func)
-
-        @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            request = _extract_request(args, kwargs)
-            resolved = _resolve_args(func, args, kwargs)
-            subscription = SubscriptionBuilder.build(
-                request,
-                subject=subject,
-                action=action,
-                resource=resource,
-                environment=environment,
-                secrets=secrets,
-                function_name=func.__name__,
-                class_name=class_name,
-                resolved_args=resolved,
-            )
-
-            return await _pre_enforce(
-                pdp_client=get_pdp_client(),
-                constraint_service=get_constraint_service(),
-                subscription=subscription,
-                protected_function=func,
-                args=list(args),
-                kwargs=kwargs,
-                function_name=func.__name__,
-                class_name=class_name,
-                request=request,
-            )
-        return wrapper
-    return decorator
-
-
-def service_post_enforce(
-    *,
-    subject: SubscriptionField = None,
-    action: SubscriptionField = None,
-    resource: SubscriptionField = None,
-    environment: SubscriptionField = None,
-    secrets: SubscriptionField = None,
-) -> Callable:
-    """Decorator: authorize AFTER service method execution.
-
-    Like ``post_enforce`` but for service-layer methods:
-    - Does not catch ``AccessDeniedError`` (caller handles it)
-    - Does not wrap the result as ``JsonResponse``
-    """
-    def decorator(func: Callable) -> Callable:
-        class_name = _extract_class_name(func)
-
-        @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            request = _extract_request(args, kwargs)
-            resolved = _resolve_args(func, args, kwargs)
-
-            def subscription_builder(return_value: Any) -> AuthorizationSubscription:
-                return SubscriptionBuilder.build(
-                    request,
-                    subject=subject,
-                    action=action,
-                    resource=resource,
-                    environment=environment,
-                    secrets=secrets,
-                    function_name=func.__name__,
-                    class_name=class_name,
-                    resolved_args=resolved,
-                    return_value=return_value,
-                )
-
             return await _post_enforce(
                 pdp_client=get_pdp_client(),
                 constraint_service=get_constraint_service(),
@@ -319,6 +194,7 @@ def service_post_enforce(
                 args=list(args),
                 kwargs=kwargs,
                 function_name=func.__name__,
+                on_deny=on_deny,
                 class_name=class_name,
                 request=request,
             )
