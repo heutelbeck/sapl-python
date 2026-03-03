@@ -5,11 +5,12 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 
 import sapl_fastapi.dependencies as deps
-from sapl_base.constraint_bundle import ConstraintHandlerBundle
+from sapl_base.constraint_bundle import AccessDeniedError, ConstraintHandlerBundle
 from sapl_base.constraint_engine import ConstraintEnforcementService
 from sapl_base.pdp_client import PdpClient
 from sapl_base.types import AuthorizationDecision, Decision
@@ -56,6 +57,17 @@ def _identity_error(e: Exception) -> Exception:
 
 def _noop_method_invocation(_ctx: Any) -> None:
     pass
+
+
+def _app_with_deny_handler() -> FastAPI:
+    """Create a FastAPI app with AccessDeniedError -> 403 mapping."""
+    app = FastAPI()
+
+    @app.exception_handler(AccessDeniedError)
+    async def _handle_access_denied(_request: Request, _exc: AccessDeniedError):
+        return JSONResponse(status_code=403, content={"detail": "Access denied"})
+
+    return app
 
 
 def _make_passthrough_bundle() -> ConstraintHandlerBundle:
@@ -134,7 +146,7 @@ class TestPreEnforceDenyFlow:
         mock_pdp.decide_once.return_value = _make_deny_decision()
         mock_service.best_effort_bundle_for.return_value = _make_passthrough_bundle()
 
-        app = FastAPI()
+        app = _app_with_deny_handler()
 
         @app.get("/secret")
         @pre_enforce()
@@ -150,7 +162,7 @@ class TestPreEnforceDenyFlow:
         mock_pdp.decide_once.return_value = AuthorizationDecision.indeterminate()
         mock_service.best_effort_bundle_for.return_value = _make_passthrough_bundle()
 
-        app = FastAPI()
+        app = _app_with_deny_handler()
 
         @app.get("/data")
         @pre_enforce()
@@ -262,7 +274,7 @@ class TestPostEnforceDenyFlow:
         mock_pdp.decide_once.return_value = _make_deny_decision()
         mock_service.best_effort_bundle_for.return_value = _make_passthrough_bundle()
 
-        app = FastAPI()
+        app = _app_with_deny_handler()
 
         @app.get("/data")
         @post_enforce()
