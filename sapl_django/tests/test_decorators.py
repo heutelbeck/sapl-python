@@ -4,9 +4,8 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from django.http import HttpRequest, JsonResponse
-
 from django.core.exceptions import PermissionDenied
+from django.http import HttpRequest, JsonResponse
 
 from sapl_base.types import AuthorizationDecision
 from sapl_django.decorators import (

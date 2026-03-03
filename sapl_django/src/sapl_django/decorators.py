@@ -7,9 +7,8 @@ import json
 from typing import TYPE_CHECKING, Any
 
 import structlog
-from django.http import HttpRequest, StreamingHttpResponse
-
 from django.core.exceptions import PermissionDenied
+from django.http import HttpRequest, StreamingHttpResponse
 
 from sapl_base.constraint_bundle import AccessDeniedError
 from sapl_base.enforcement import post_enforce as _post_enforce
@@ -143,7 +142,7 @@ def pre_enforce(
                     request=request,
                 )
             except AccessDeniedError:
-                raise PermissionDenied()
+                raise PermissionDenied() from None
         return wrapper
     return decorator
 
@@ -206,7 +205,7 @@ def post_enforce(
                     request=request,
                 )
             except AccessDeniedError:
-                raise PermissionDenied()
+                raise PermissionDenied() from None
         return wrapper
     return decorator
 

@@ -7,9 +7,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 import structlog
-from tornado.web import RequestHandler
-
-from tornado.web import HTTPError
+from tornado.web import HTTPError, RequestHandler
 
 from sapl_base.constraint_bundle import AccessDeniedError
 from sapl_base.enforcement import post_enforce as _post_enforce
@@ -175,7 +173,7 @@ def pre_enforce(
                     request=request,
                 )
             except AccessDeniedError:
-                raise HTTPError(403)
+                raise HTTPError(403) from None
             if handler is not None and result is not None:
                 _write_response(handler, result)
             return result
@@ -233,7 +231,7 @@ def post_enforce(
                     request=request,
                 )
             except AccessDeniedError:
-                raise HTTPError(403)
+                raise HTTPError(403) from None
             if handler is not None and result is not None:
                 _write_response(handler, result)
             return result

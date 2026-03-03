@@ -7,10 +7,9 @@ import json
 from typing import TYPE_CHECKING, Any
 
 import structlog
+from fastapi import HTTPException
 from starlette.requests import Request
 from starlette.responses import StreamingResponse
-
-from fastapi import HTTPException
 
 from sapl_base.constraint_bundle import AccessDeniedError
 from sapl_base.enforcement import post_enforce as _post_enforce
@@ -135,7 +134,7 @@ def pre_enforce(
                     request=request,
                 )
             except AccessDeniedError:
-                raise HTTPException(status_code=403)
+                raise HTTPException(status_code=403) from None
         return wrapper
     return decorator
 
@@ -186,7 +185,7 @@ def post_enforce(
                     request=request,
                 )
             except AccessDeniedError:
-                raise HTTPException(status_code=403)
+                raise HTTPException(status_code=403) from None
         return wrapper
     return decorator
 
