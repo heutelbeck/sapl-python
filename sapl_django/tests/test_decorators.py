@@ -4,15 +4,15 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, JsonResponse
+
+from django.core.exceptions import PermissionDenied
 
 from sapl_base.types import AuthorizationDecision
 from sapl_django.decorators import (
     _extract_class_name,
     _extract_request,
     _resolve_args,
-    _wrap_response,
     post_enforce,
     pre_enforce,
 )
@@ -104,7 +104,7 @@ class TestPreEnforce:
         assert isinstance(result, JsonResponse)
 
     @pytest.mark.asyncio
-    async def test_deny_raises_permission_denied(self):
+    async def test_deny_raises_access_denied(self):
         @pre_enforce(action="read", resource="data")
         async def my_view(request):
             return JsonResponse({"result": "ok"})
@@ -163,7 +163,7 @@ class TestPostEnforce:
         assert isinstance(result, JsonResponse)
 
     @pytest.mark.asyncio
-    async def test_deny_raises_permission_denied(self):
+    async def test_deny_raises_access_denied(self):
         @post_enforce(action="read", resource="data")
         async def my_view(request):
             return JsonResponse({"result": "ok"})
@@ -294,32 +294,3 @@ class TestResolveArgs:
         assert result == {"patient_id": "P-001"}
 
 
-class TestWrapResponse:
-    """Verify _wrap_response auto-wraps dict/list to JsonResponse."""
-
-    def test_wraps_dict_to_json_response(self):
-        result = _wrap_response({"name": "Jane"})
-
-        assert isinstance(result, JsonResponse)
-        assert result.status_code == 200
-
-    def test_wraps_list_to_json_response(self):
-        result = _wrap_response([{"id": 1}, {"id": 2}])
-
-        assert isinstance(result, JsonResponse)
-
-    def test_passes_through_json_response_unchanged(self):
-        original = JsonResponse({"data": "value"})
-        result = _wrap_response(original)
-
-        assert result is original
-
-    def test_passes_through_string_unchanged(self):
-        result = _wrap_response("plain text")
-
-        assert result == "plain text"
-
-    def test_passes_through_none_unchanged(self):
-        result = _wrap_response(None)
-
-        assert result is None

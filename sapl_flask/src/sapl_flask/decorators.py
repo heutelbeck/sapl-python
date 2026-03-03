@@ -6,8 +6,9 @@ import inspect
 import json
 from typing import TYPE_CHECKING, Any
 
-from flask import Response
+from flask import Response, abort
 
+from sapl_base.constraint_bundle import AccessDeniedError
 from sapl_base.enforcement import post_enforce as _post_enforce
 from sapl_base.enforcement import pre_enforce as _pre_enforce
 from sapl_base.streaming import (
@@ -109,18 +110,21 @@ def pre_enforce(
             async def async_func(*a: Any, **kw: Any) -> Any:
                 return func(*a, **kw)
 
-            return asyncio.run(_pre_enforce(
-                pdp_client=sapl.pdp_client,
-                constraint_service=sapl.constraint_service,
-                subscription=subscription,
-                protected_function=async_func,
-                args=list(args),
-                kwargs=kwargs,
-                function_name=func.__name__,
-                on_deny=on_deny,
-                class_name=class_name,
-                request=resolved.get("request"),
-            ))
+            try:
+                return asyncio.run(_pre_enforce(
+                    pdp_client=sapl.pdp_client,
+                    constraint_service=sapl.constraint_service,
+                    subscription=subscription,
+                    protected_function=async_func,
+                    args=list(args),
+                    kwargs=kwargs,
+                    function_name=func.__name__,
+                    on_deny=on_deny,
+                    class_name=class_name,
+                    request=resolved.get("request"),
+                ))
+            except AccessDeniedError:
+                abort(403)
         return wrapper
     return decorator
 
@@ -175,18 +179,21 @@ def post_enforce(
             async def async_func(*a: Any, **kw: Any) -> Any:
                 return func(*a, **kw)
 
-            return asyncio.run(_post_enforce(
-                pdp_client=sapl.pdp_client,
-                constraint_service=sapl.constraint_service,
-                subscription_builder=subscription_builder,
-                protected_function=async_func,
-                args=list(args),
-                kwargs=kwargs,
-                function_name=func.__name__,
-                on_deny=on_deny,
-                class_name=class_name,
-                request=resolved.get("request"),
-            ))
+            try:
+                return asyncio.run(_post_enforce(
+                    pdp_client=sapl.pdp_client,
+                    constraint_service=sapl.constraint_service,
+                    subscription_builder=subscription_builder,
+                    protected_function=async_func,
+                    args=list(args),
+                    kwargs=kwargs,
+                    function_name=func.__name__,
+                    on_deny=on_deny,
+                    class_name=class_name,
+                    request=resolved.get("request"),
+                ))
+            except AccessDeniedError:
+                abort(403)
         return wrapper
     return decorator
 

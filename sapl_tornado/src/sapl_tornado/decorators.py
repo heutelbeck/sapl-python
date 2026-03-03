@@ -9,6 +9,9 @@ from typing import TYPE_CHECKING, Any
 import structlog
 from tornado.web import RequestHandler
 
+from tornado.web import HTTPError
+
+from sapl_base.constraint_bundle import AccessDeniedError
 from sapl_base.enforcement import post_enforce as _post_enforce
 from sapl_base.enforcement import pre_enforce as _pre_enforce
 from sapl_base.streaming import (
@@ -158,18 +161,24 @@ def pre_enforce(
                 current_user=current_user,
             )
 
-            return await _pre_enforce(
-                pdp_client=get_pdp_client(),
-                constraint_service=get_constraint_service(),
-                subscription=subscription,
-                protected_function=func,
-                args=list(args),
-                kwargs=kwargs,
-                function_name=func.__name__,
-                on_deny=on_deny,
-                class_name=class_name,
-                request=request,
-            )
+            try:
+                result = await _pre_enforce(
+                    pdp_client=get_pdp_client(),
+                    constraint_service=get_constraint_service(),
+                    subscription=subscription,
+                    protected_function=func,
+                    args=list(args),
+                    kwargs=kwargs,
+                    function_name=func.__name__,
+                    on_deny=on_deny,
+                    class_name=class_name,
+                    request=request,
+                )
+            except AccessDeniedError:
+                raise HTTPError(403)
+            if handler is not None and result is not None:
+                _write_response(handler, result)
+            return result
         return wrapper
     return decorator
 
@@ -210,18 +219,24 @@ def post_enforce(
                     current_user=current_user,
                 )
 
-            return await _post_enforce(
-                pdp_client=get_pdp_client(),
-                constraint_service=get_constraint_service(),
-                subscription_builder=subscription_builder,
-                protected_function=func,
-                args=list(args),
-                kwargs=kwargs,
-                function_name=func.__name__,
-                on_deny=on_deny,
-                class_name=class_name,
-                request=request,
-            )
+            try:
+                result = await _post_enforce(
+                    pdp_client=get_pdp_client(),
+                    constraint_service=get_constraint_service(),
+                    subscription_builder=subscription_builder,
+                    protected_function=func,
+                    args=list(args),
+                    kwargs=kwargs,
+                    function_name=func.__name__,
+                    on_deny=on_deny,
+                    class_name=class_name,
+                    request=request,
+                )
+            except AccessDeniedError:
+                raise HTTPError(403)
+            if handler is not None and result is not None:
+                _write_response(handler, result)
+            return result
         return wrapper
     return decorator
 
@@ -417,6 +432,15 @@ def enforce_recoverable_if_denied(
                 handler.finish()
         return wrapper
     return decorator
+
+
+def _write_response(handler: RequestHandler, result: Any) -> None:
+    """Write the enforcement result to the Tornado handler response."""
+    if isinstance(result, (dict, list)):
+        handler.set_header("Content-Type", "application/json")
+        handler.write(json.dumps(result))
+    else:
+        handler.write(str(result))
 
 
 def _format_sse(data: Any) -> str:

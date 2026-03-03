@@ -10,6 +10,9 @@ import structlog
 from starlette.requests import Request
 from starlette.responses import StreamingResponse
 
+from fastapi import HTTPException
+
+from sapl_base.constraint_bundle import AccessDeniedError
 from sapl_base.enforcement import post_enforce as _post_enforce
 from sapl_base.enforcement import pre_enforce as _pre_enforce
 from sapl_base.streaming import (
@@ -118,18 +121,21 @@ def pre_enforce(
                 resolved_args=resolved,
             )
 
-            return await _pre_enforce(
-                pdp_client=get_pdp_client(),
-                constraint_service=get_constraint_service(),
-                subscription=subscription,
-                protected_function=func,
-                args=list(args),
-                kwargs=kwargs,
-                function_name=func.__name__,
-                on_deny=on_deny,
-                class_name=class_name,
-                request=request,
-            )
+            try:
+                return await _pre_enforce(
+                    pdp_client=get_pdp_client(),
+                    constraint_service=get_constraint_service(),
+                    subscription=subscription,
+                    protected_function=func,
+                    args=list(args),
+                    kwargs=kwargs,
+                    function_name=func.__name__,
+                    on_deny=on_deny,
+                    class_name=class_name,
+                    request=request,
+                )
+            except AccessDeniedError:
+                raise HTTPException(status_code=403)
         return wrapper
     return decorator
 
@@ -166,18 +172,21 @@ def post_enforce(
                     return_value=return_value,
                 )
 
-            return await _post_enforce(
-                pdp_client=get_pdp_client(),
-                constraint_service=get_constraint_service(),
-                subscription_builder=subscription_builder,
-                protected_function=func,
-                args=list(args),
-                kwargs=kwargs,
-                function_name=func.__name__,
-                on_deny=on_deny,
-                class_name=class_name,
-                request=request,
-            )
+            try:
+                return await _post_enforce(
+                    pdp_client=get_pdp_client(),
+                    constraint_service=get_constraint_service(),
+                    subscription_builder=subscription_builder,
+                    protected_function=func,
+                    args=list(args),
+                    kwargs=kwargs,
+                    function_name=func.__name__,
+                    on_deny=on_deny,
+                    class_name=class_name,
+                    request=request,
+                )
+            except AccessDeniedError:
+                raise HTTPException(status_code=403)
         return wrapper
     return decorator
 
