@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 from django.core.exceptions import PermissionDenied
-from django.http import HttpRequest, StreamingHttpResponse
+from django.http import HttpRequest, JsonResponse, StreamingHttpResponse
 
 from sapl_base.constraint_bundle import AccessDeniedError
 from sapl_base.enforcement import post_enforce as _post_enforce
@@ -83,6 +83,22 @@ def _extract_request(args: tuple, kwargs: dict) -> HttpRequest | None:
     return None
 
 
+def _wrap_response(result: Any, request: HttpRequest | None) -> Any:
+    """Auto-wrap dict/list results as JsonResponse for Django views.
+
+    Only wraps when called from a view context (HttpRequest present).
+    Service-layer methods (no HttpRequest) return raw values so the
+    calling view can handle response formatting itself.
+    """
+    if request is None:
+        return result
+    if isinstance(result, dict):
+        return JsonResponse(result)
+    if isinstance(result, list):
+        return JsonResponse(result, safe=False)
+    return result
+
+
 def pre_enforce(
     *,
     subject: SubscriptionField = None,
@@ -129,7 +145,7 @@ def pre_enforce(
             )
 
             try:
-                return await _pre_enforce(
+                result = await _pre_enforce(
                     pdp_client=get_pdp_client(),
                     constraint_service=get_constraint_service(),
                     subscription=subscription,
@@ -141,6 +157,7 @@ def pre_enforce(
                     class_name=class_name,
                     request=request,
                 )
+                return _wrap_response(result, request)
             except AccessDeniedError:
                 raise PermissionDenied() from None
         return wrapper
@@ -192,7 +209,7 @@ def post_enforce(
                 )
 
             try:
-                return await _post_enforce(
+                result = await _post_enforce(
                     pdp_client=get_pdp_client(),
                     constraint_service=get_constraint_service(),
                     subscription_builder=subscription_builder,
@@ -204,6 +221,7 @@ def post_enforce(
                     class_name=class_name,
                     request=request,
                 )
+                return _wrap_response(result, request)
             except AccessDeniedError:
                 raise PermissionDenied() from None
         return wrapper
