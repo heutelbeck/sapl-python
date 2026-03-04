@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sapl-base"
-version = "4.0.0rc2"
+version = "4.0.0"
 description = "SAPL Policy Enforcement Point (PEP) core library for Python"
 readme = "README.md"
 license = {text = "Apache-2.0"}

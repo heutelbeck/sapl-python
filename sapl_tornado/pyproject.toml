@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sapl-tornado"
-version = "4.0.0rc2"
+version = "4.0.0"
 description = "SAPL Policy Enforcement Point (PEP) integration for Tornado"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -23,7 +23,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "sapl-base>=4.0.0rc2",
+    "sapl-base>=4.0.0",
     "tornado>=6.4",
 ]
 
