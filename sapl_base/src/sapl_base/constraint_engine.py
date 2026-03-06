@@ -410,6 +410,25 @@ class ConstraintEnforcementService:
         """
         self._runnable_providers.append(provider)
 
+    def get_runnable_handlers(
+        self, constraint: Any, signal: Signal,
+    ) -> list[Callable[[], None]]:
+        """Return all runnable handlers matching a constraint and signal.
+
+        Args:
+            constraint: The constraint to match against registered providers.
+            signal: The lifecycle signal to filter by (e.g., ON_DECISION).
+
+        Returns:
+            List of handler callables. Empty list means no provider handles
+            this constraint for the given signal.
+        """
+        return [
+            provider.get_handler(constraint)
+            for provider in self._runnable_providers
+            if provider.get_signal() == signal and provider.is_responsible(constraint)
+        ]
+
     def register_consumer(self, provider: ConsumerConstraintHandlerProvider) -> None:
         """Register a consumer constraint handler provider.
 
@@ -418,6 +437,24 @@ class ConstraintEnforcementService:
         """
         self._consumer_providers.append(provider)
 
+    def get_consumer_handlers(
+        self, constraint: Any,
+    ) -> list[Callable[[Any], None]]:
+        """Return all consumer handlers matching a constraint.
+
+        Args:
+            constraint: The constraint to match against registered providers.
+
+        Returns:
+            List of handler callables. Empty list means no provider handles
+            this constraint.
+        """
+        return [
+            provider.get_handler(constraint)
+            for provider in self._consumer_providers
+            if provider.is_responsible(constraint)
+        ]
+
     def register_mapping(self, provider: MappingConstraintHandlerProvider) -> None:
         """Register a mapping constraint handler provider.
 
@@ -425,6 +462,24 @@ class ConstraintEnforcementService:
             provider: A provider implementing the MappingConstraintHandlerProvider protocol.
         """
         self._mapping_providers.append(provider)
+
+    def get_mapping_handlers(
+        self, constraint: Any,
+    ) -> list[Callable[[Any], Any]]:
+        """Return all mapping handlers matching a constraint.
+
+        Args:
+            constraint: The constraint to match against registered providers.
+
+        Returns:
+            List of handler callables. Empty list means no provider handles
+            this constraint.
+        """
+        return [
+            provider.get_handler(constraint)
+            for provider in self._mapping_providers
+            if provider.is_responsible(constraint)
+        ]
 
     def register_filter_predicate(
         self,
@@ -438,6 +493,24 @@ class ConstraintEnforcementService:
         """
         self._filter_predicate_providers.append(provider)
 
+    def get_filter_predicate_handlers(
+        self, constraint: Any,
+    ) -> list[Callable[[Any], bool]]:
+        """Return all filter predicate handlers matching a constraint.
+
+        Args:
+            constraint: The constraint to match against registered providers.
+
+        Returns:
+            List of handler callables. Empty list means no provider handles
+            this constraint.
+        """
+        return [
+            provider.get_handler(constraint)
+            for provider in self._filter_predicate_providers
+            if provider.is_responsible(constraint)
+        ]
+
     def register_error_handler(self, provider: ErrorHandlerProvider) -> None:
         """Register an error handler provider.
 
@@ -445,6 +518,24 @@ class ConstraintEnforcementService:
             provider: A provider implementing the ErrorHandlerProvider protocol.
         """
         self._error_handler_providers.append(provider)
+
+    def get_error_handlers(
+        self, constraint: Any,
+    ) -> list[Callable[[Exception], None]]:
+        """Return all error handlers matching a constraint.
+
+        Args:
+            constraint: The constraint to match against registered providers.
+
+        Returns:
+            List of handler callables. Empty list means no provider handles
+            this constraint.
+        """
+        return [
+            provider.get_handler(constraint)
+            for provider in self._error_handler_providers
+            if provider.is_responsible(constraint)
+        ]
 
     def register_error_mapping(
         self,
@@ -458,6 +549,24 @@ class ConstraintEnforcementService:
         """
         self._error_mapping_providers.append(provider)
 
+    def get_error_mapping_handlers(
+        self, constraint: Any,
+    ) -> list[Callable[[Exception], Exception]]:
+        """Return all error mapping handlers matching a constraint.
+
+        Args:
+            constraint: The constraint to match against registered providers.
+
+        Returns:
+            List of handler callables. Empty list means no provider handles
+            this constraint.
+        """
+        return [
+            provider.get_handler(constraint)
+            for provider in self._error_mapping_providers
+            if provider.is_responsible(constraint)
+        ]
+
     def register_method_invocation(
         self,
         provider: MethodInvocationConstraintHandlerProvider,
@@ -469,6 +578,24 @@ class ConstraintEnforcementService:
                 protocol.
         """
         self._method_invocation_providers.append(provider)
+
+    def get_method_invocation_handlers(
+        self, constraint: Any,
+    ) -> list[Callable[[MethodInvocationContext], None]]:
+        """Return all method invocation handlers matching a constraint.
+
+        Args:
+            constraint: The constraint to match against registered providers.
+
+        Returns:
+            List of handler callables. Empty list means no provider handles
+            this constraint.
+        """
+        return [
+            provider.get_handler(constraint)
+            for provider in self._method_invocation_providers
+            if provider.is_responsible(constraint)
+        ]
 
     def pre_enforce_bundle_for(self, decision: AuthorizationDecision) -> ConstraintHandlerBundle:
         """Build a bundle for pre-enforcement.

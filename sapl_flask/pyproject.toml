@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sapl-flask"
-version = "4.0.0"
+version = "4.0.1"
 description = "SAPL Policy Enforcement Point (PEP) integration for Flask"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -25,7 +25,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "sapl-base>=4.0.0",
+    "sapl-base>=4.0.1",
     "flask>=3.0",
 ]
 
