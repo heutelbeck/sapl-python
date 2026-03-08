@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        package: [sapl_base, sapl_django, sapl_fastapi, sapl_flask, sapl_tornado]
+        package: [sapl_base, sapl_django, sapl_fastapi, sapl_flask, sapl_tornado, sapl_fastmcp]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -33,7 +33,7 @@ jobs:
     strategy:
       max-parallel: 1
       matrix:
-        package: [sapl_base, sapl_django, sapl_fastapi, sapl_flask, sapl_tornado]
+        package: [sapl_base, sapl_django, sapl_fastapi, sapl_flask, sapl_tornado, sapl_fastmcp]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
