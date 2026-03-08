@@ -25,7 +25,7 @@ classifiers = [
 ]
 dependencies = [
     "sapl-base>=4.0.1",
-    "fastmcp>=2.0",
+    "fastmcp>=3.1.0",
 ]
 
 [project.optional-dependencies]
