@@ -36,8 +36,6 @@ ERROR_AUTH_BASIC_INCOMPLETE = "Basic auth requires both username and password"
 ERROR_INSECURE_HTTP = "HTTP URL rejected: set allow_insecure_connections=True to permit insecure connections"
 ERROR_DECIDE_ONCE_FAILED = "decide_once request failed, returning INDETERMINATE"
 ERROR_DECIDE_ONCE_HTTP_ERROR = "decide_once received HTTP error, returning INDETERMINATE"
-ERROR_MULTI_DECIDE_ONCE_FAILED = "multi_decide_once request failed, returning empty"
-ERROR_MULTI_DECIDE_ONCE_HTTP_ERROR = "multi_decide_once received HTTP error, returning empty"
 ERROR_MULTI_DECIDE_ALL_ONCE_FAILED = "multi_decide_all_once request failed, returning empty"
 ERROR_MULTI_DECIDE_ALL_ONCE_HTTP_ERROR = "multi_decide_all_once received HTTP error, returning empty"
 ERROR_STREAM_CONNECT_FAILED = "Streaming connection failed"
@@ -48,7 +46,6 @@ WARN_STREAM_RECONNECTING = "Reconnecting streaming subscription after failure"
 
 _API_DECIDE_ONCE = "/api/pdp/decide-once"
 _API_DECIDE = "/api/pdp/decide"
-_API_MULTI_DECIDE_ONCE = "/api/pdp/multi-decide-once"
 _API_MULTI_DECIDE = "/api/pdp/multi-decide"
 _API_MULTI_DECIDE_ALL_ONCE = "/api/pdp/multi-decide-all-once"
 _API_MULTI_DECIDE_ALL = "/api/pdp/multi-decide-all"
@@ -61,8 +58,9 @@ _RECONNECTING_SENTINEL = object()
 class PdpConfig:
     """Configuration for connecting to a SAPL PDP server.
 
-    REQ-TRANSPORT-1/2: Default is HTTPS. HTTP requires explicit opt-in.
-    REQ-AUTH-1/2/3/4: Bearer token or basic auth, never both.
+    Default scheme is HTTPS; HTTP requires explicit opt-in via
+    `allow_insecure_connections`. Auth is bearer token or basic auth,
+    never both.
     """
 
     base_url: str = "https://localhost:8443"
@@ -112,7 +110,7 @@ class PdpClient:
     async def decide_once(self, subscription: AuthorizationSubscription) -> AuthorizationDecision:
         """Send a one-shot authorization request.
 
-        REQ-RR-1/2/3: POST to /api/pdp/decide-once. On any error, return INDETERMINATE.
+        POSTs to /api/pdp/decide-once. On any error returns INDETERMINATE.
         """
         try:
             response = await self._get_client().post(
@@ -152,8 +150,8 @@ class PdpClient:
     async def decide(self, subscription: AuthorizationSubscription) -> AsyncIterator[AuthorizationDecision]:
         """Open a streaming authorization subscription.
 
-        REQ-STREAM-1/2/3/4/5: POST to /api/pdp/decide with SSE. Reconnects
-        with exponential backoff and jitter. Applies distinctUntilChanged.
+        POSTs to /api/pdp/decide with SSE. Reconnects with exponential
+        backoff and jitter. Suppresses consecutive duplicate decisions.
         """
         raw_stream = self._streaming_with_retry(
             _API_DECIDE,
@@ -163,18 +161,6 @@ class PdpClient:
         deduped_stream = deduplicate(_parse_decision_stream(raw_stream))
         async for decision in deduped_stream:
             yield decision
-
-    async def multi_decide_once(
-        self,
-        subscription: MultiAuthorizationSubscription,
-    ) -> MultiAuthorizationDecision:
-        """Send a one-shot multi-decision request to /api/pdp/multi-decide-once."""
-        return await self._multi_request_once(
-            _API_MULTI_DECIDE_ONCE,
-            subscription,
-            ERROR_MULTI_DECIDE_ONCE_FAILED,
-            ERROR_MULTI_DECIDE_ONCE_HTTP_ERROR,
-        )
 
     async def multi_decide_all_once(
         self,
@@ -277,12 +263,12 @@ class PdpClient:
         request_body: dict[str, Any],
         loggable_body: dict[str, Any],
     ) -> AsyncIterator[str]:
-        """Connect to an SSE endpoint with exponential backoff retry.
+        """Connect to an SSE endpoint with exponential-backoff retry.
 
-        REQ-STREAM-3: Exponential backoff with jitter. Yields _RECONNECTING_SENTINEL
-        before each reconnection so consumers can emit INDETERMINATE.
-        REQ-STREAM-4: Auth errors (401/403) are logged every time but still retry.
-        REQ-STREAM-5: Buffer overflow triggers reconnection (yields sentinel).
+        Yields `_RECONNECTING_SENTINEL` before each reconnection so
+        consumers can emit INDETERMINATE across the gap. Auth errors
+        (401/403) are logged every time but still retry. Buffer
+        overflow triggers reconnection (yields sentinel).
         """
         config = self._config
         attempt = 0

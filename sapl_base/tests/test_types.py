@@ -31,7 +31,10 @@ class TestDecision:
         assert Decision.PERMIT == "PERMIT"
 
     def test_all_members_present(self):
-        assert len(Decision) == 4
+        assert len(Decision) == 5
+
+    def test_suspend_value(self):
+        assert Decision.SUSPEND.value == "SUSPEND"
 
 
 class TestAuthorizationSubscription:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final, Literal
 
 import structlog
 
@@ -20,21 +20,13 @@ class SseBufferOverflowError(Exception):
 async def parse_sse_stream(byte_stream: AsyncIterator[bytes]) -> AsyncIterator[str]:
     """Parse SSE wire format from a raw byte stream.
 
-    REQ-SSE-1: Incremental UTF-8 decoding -- handles partial multi-byte
-    sequences across chunk boundaries.
-
-    REQ-SSE-2: Line parsing -- recognizes CR, LF, and CRLF as line endings.
-
-    REQ-SSE-3: Extract ``data:`` field values. Multiple consecutive data
-    lines are joined with newline characters. An empty line dispatches the
-    accumulated event data.
-
-    REQ-SSE-4: Parse failures (invalid UTF-8) are logged and the offending
-    chunk is skipped; the stream continues.
-
-    REQ-SSE-5: Buffer limit of 1 MB. If a single line exceeds this, the
-    stream is aborted with ``SseBufferOverflowError``.
-
+    Incremental UTF-8 decoding handles partial multi-byte sequences
+    across chunk boundaries. CR, LF, and CRLF are all recognised as
+    line endings. ``data:`` field values are extracted; multiple
+    consecutive data lines are joined with newlines; an empty line
+    dispatches the accumulated event. Invalid-UTF-8 chunks are
+    skipped with a warning; the stream continues. A single line
+    longer than 1 MB aborts the stream with `SseBufferOverflowError`.
     Comment lines (starting with ``:``) are silently ignored.
     """
     logger = structlog.get_logger(__name__)
@@ -58,7 +50,7 @@ async def parse_sse_stream(byte_stream: AsyncIterator[bytes]) -> AsyncIterator[s
                 break
 
             line_buffer = remainder
-            event_line = _process_sse_line(line, data_lines, has_data)
+            event_line = _process_sse_line(line, data_lines)
 
             if event_line is _DISPATCH:
                 if has_data:
@@ -111,19 +103,10 @@ class _IncrementalUtf8Decoder:
             raise
 
 
-class _SseLineResult:
-    """Marker for SSE line processing results."""
-
-    def __init__(self, name: str) -> None:
-        self._name = name
-
-    def __repr__(self) -> str:
-        return f"<{self._name}>"
-
-
-_DISPATCH = _SseLineResult("DISPATCH")
-_DATA = _SseLineResult("DATA")
-_SKIP = _SseLineResult("SKIP")
+_SseLineResult = Literal["DISPATCH", "DATA", "SKIP"]
+_DISPATCH: Final[_SseLineResult] = "DISPATCH"
+_DATA: Final[_SseLineResult] = "DATA"
+_SKIP: Final[_SseLineResult] = "SKIP"
 
 
 def _split_first_line(text: str) -> tuple[str, str, str]:
@@ -142,11 +125,7 @@ def _split_first_line(text: str) -> tuple[str, str, str]:
     return text, "", ""
 
 
-def _process_sse_line(
-    line: str,
-    data_lines: list[str],
-    has_data: bool,
-) -> _SseLineResult:
+def _process_sse_line(line: str, data_lines: list[str]) -> _SseLineResult:
     """Process a single SSE line.
 
     Returns _DISPATCH for an empty line (event boundary), _DATA when a data

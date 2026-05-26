@@ -12,6 +12,7 @@ class Decision(StrEnum):
     DENY = "DENY"
     INDETERMINATE = "INDETERMINATE"
     NOT_APPLICABLE = "NOT_APPLICABLE"
+    SUSPEND = "SUSPEND"
 
 
 class _ResourceAbsentSentinel:

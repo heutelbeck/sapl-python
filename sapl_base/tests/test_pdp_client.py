@@ -258,61 +258,6 @@ class TestDecideOnce:
             await client.close()
 
 
-class TestMultiDecideOnce:
-    @pytest.fixture()
-    def multi_subscription(self):
-        return MultiAuthorizationSubscription(
-            subscriptions={
-                "sub1": AuthorizationSubscription(subject="alice", action="read"),
-                "sub2": AuthorizationSubscription(subject="bob", action="write"),
-            }
-        )
-
-    async def test_successful_multi_decision(self, httpx_mock, multi_subscription):
-        httpx_mock.add_response(
-            url="https://localhost:8443/api/pdp/multi-decide-once",
-            json={
-                "sub1": {"decision": "PERMIT"},
-                "sub2": {"decision": "DENY"},
-            },
-        )
-        config = PdpConfig()
-        client = PdpClient(config)
-        try:
-            result = await client.multi_decide_once(multi_subscription)
-            assert result.decisions["sub1"].decision == Decision.PERMIT
-            assert result.decisions["sub2"].decision == Decision.DENY
-        finally:
-            await client.close()
-
-    async def test_http_error_returns_empty_multi_decision(self, httpx_mock, multi_subscription):
-        httpx_mock.add_response(
-            url="https://localhost:8443/api/pdp/multi-decide-once",
-            status_code=500,
-            text="Error",
-        )
-        config = PdpConfig()
-        client = PdpClient(config)
-        try:
-            result = await client.multi_decide_once(multi_subscription)
-            assert result.decisions == {}
-        finally:
-            await client.close()
-
-    async def test_network_error_returns_empty_multi_decision(self, httpx_mock, multi_subscription):
-        httpx_mock.add_exception(
-            httpx.ConnectError("Connection refused"),
-            url="https://localhost:8443/api/pdp/multi-decide-once",
-        )
-        config = PdpConfig()
-        client = PdpClient(config)
-        try:
-            result = await client.multi_decide_once(multi_subscription)
-            assert result.decisions == {}
-        finally:
-            await client.close()
-
-
 class TestMultiDecideAllOnce:
     @pytest.fixture()
     def multi_subscription(self):

@@ -13,11 +13,10 @@ logger = structlog.get_logger(__name__)
 
 
 def deep_equal(a: Any, b: Any, max_depth: int = 20) -> bool:
-    """Deep equality comparison with depth limit.
+    """Deep equality comparison with a depth limit.
 
-    REQ-DEDUP-2: Prevents stack overflow on deeply nested or circular
-    structures by treating values as unequal when the depth limit is
-    exceeded.
+    Values are treated as unequal when the limit is exceeded; this
+    prevents stack overflow on deeply nested or circular structures.
     """
     return _deep_equal_recursive(a, b, max_depth, current_depth=0)
 
@@ -25,8 +24,8 @@ def deep_equal(a: Any, b: Any, max_depth: int = 20) -> bool:
 async def deduplicate[T](stream: AsyncIterator[T]) -> AsyncIterator[T]:
     """Suppress consecutive duplicate items from an async stream.
 
-    REQ-DEDUP-1: Only emits an item when it differs from the immediately
-    preceding item, using deep structural equality.
+    Emits an item only when it differs from the immediately preceding
+    item, by deep structural equality.
     """
     sentinel = object()
     previous: Any = sentinel

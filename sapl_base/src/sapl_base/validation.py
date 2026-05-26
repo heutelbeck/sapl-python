@@ -32,8 +32,8 @@ _VALID_DECISIONS = frozenset({d.value for d in Decision})
 def validate_decision_response(data: Any) -> AuthorizationDecision:
     """Validate and parse a raw decision response into an AuthorizationDecision.
 
-    REQ-FAILCLOSE-1: Any validation failure results in INDETERMINATE.
-    Only recognized fields (decision, obligations, advice, resource) are kept.
+    Any validation failure produces INDETERMINATE. Only recognized
+    fields (decision, obligations, advice, resource) are kept.
     """
     if not isinstance(data, dict):
         logger.error(ERROR_DECISION_NOT_DICT, data_type=type(data).__name__)
