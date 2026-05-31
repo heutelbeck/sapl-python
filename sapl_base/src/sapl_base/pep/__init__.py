@@ -33,6 +33,7 @@ from sapl_base.pep.enforce import (
     pre_enforce,
 )
 from sapl_base.pep.planner import EnforcementPlanner
+from sapl_base.pep.runtime import PepRuntime
 from sapl_base.pep.provider import (
     ConstraintHandlerProvider,
     ConstraintTag,
@@ -63,6 +64,7 @@ __all__ = [
     "OutputSignal",
     "POST_ENFORCE_SUPPORTED",
     "PRE_ENFORCE_SUPPORTED",
+    "PepRuntime",
     "PlanEntry",
     "PlanResult",
     "ScopedHandler",

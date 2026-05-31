@@ -120,6 +120,9 @@ async def pre_enforce(
     finally:
         reset_current_plan(token)
 
+    if decision.has_resource:
+        result = decision.resource
+
     if plan.has_entries(OUTPUT):
         output_result = plan.execute(OutputSignal(value=result))
         if output_result.failure_state:
@@ -158,6 +161,9 @@ async def post_enforce(
             decision=decision,
             reason=_reason_for(decision, decision_result.failure_state),
         )
+
+    if decision.has_resource:
+        result = decision.resource
 
     if plan.has_entries(OUTPUT):
         output_result = plan.execute(OutputSignal(value=result))

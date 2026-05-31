@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
@@ -9,10 +9,8 @@ from fastapi.testclient import TestClient
 from starlette.requests import Request
 
 import sapl_fastapi.dependencies as deps
-from sapl_base.constraint_bundle import ConstraintHandlerBundle
-from sapl_base.constraint_engine import ConstraintEnforcementService
-from sapl_base.pdp_client import PdpClient
 from sapl_base.types import AuthorizationDecision, Decision
+from sapl_fastapi import SaplConfig
 from sapl_fastapi.decorators import (
     _extract_class_name,
     _extract_request,
@@ -22,77 +20,31 @@ from sapl_fastapi.decorators import (
 )
 
 
-def _make_permit_decision() -> AuthorizationDecision:
+def _permit() -> AuthorizationDecision:
     return AuthorizationDecision(decision=Decision.PERMIT)
 
 
-def _make_deny_decision() -> AuthorizationDecision:
+def _deny() -> AuthorizationDecision:
     return AuthorizationDecision(decision=Decision.DENY)
 
 
-def _noop() -> None:
-    pass
-
-
-def _noop_consumer(_v: Any) -> None:
-    pass
-
-
-def _identity(v: Any) -> Any:
-    return v
-
-
-def _always_true(_v: Any) -> bool:
-    return True
-
-
-def _noop_error_handler(_e: Exception) -> None:
-    pass
-
-
-def _identity_error(e: Exception) -> Exception:
-    return e
-
-
-def _noop_method_invocation(_ctx: Any) -> None:
-    pass
-
-
-def _make_passthrough_bundle() -> ConstraintHandlerBundle:
-    """Bundle that passes values through unchanged."""
-    return ConstraintHandlerBundle(
-        on_decision_handlers=_noop,
-        method_invocation_handlers=_noop_method_invocation,
-        on_next_consumers=_noop_consumer,
-        on_next_mappings=_identity,
-        filter_predicates=_always_true,
-        on_error_handlers=_noop_error_handler,
-        on_error_mappings=_identity_error,
-    )
-
-
 @pytest.fixture
-def _mock_sapl(monkeypatch):
-    """Patch sapl_fastapi.dependencies module globals with mocks.
+def _configured(monkeypatch):
+    """Configure SAPL with a real planner and a mocked PDP client.
 
-    Returns a tuple of (mock_pdp_client, mock_constraint_service).
+    Returns the AsyncMock attached to the PDP client's `decide_once` so
+    tests set its `.return_value` per case.
     """
-    mock_pdp = MagicMock(spec=PdpClient)
-    mock_pdp.decide_once = AsyncMock()
-    mock_service = MagicMock(spec=ConstraintEnforcementService)
-    monkeypatch.setattr(deps, "_pdp_client", mock_pdp)
-    monkeypatch.setattr(deps, "_constraint_service", mock_service)
-    return mock_pdp, mock_service
+    deps.configure_sapl(SaplConfig(base_url="http://localhost:8443"))
+    mock_decide = AsyncMock()
+    monkeypatch.setattr(deps.get_pdp_client(), "decide_once", mock_decide)
+    yield mock_decide
+    deps._runtime._reset_for_tests()
 
 
 class TestPreEnforcePermitFlow:
-    """Verify @pre_enforce returns 200 when PDP permits."""
-
-    def test_returns_200_on_permit(self, _mock_sapl):
-        mock_pdp, mock_service = _mock_sapl
-        mock_pdp.decide_once.return_value = _make_permit_decision()
-        mock_service.pre_enforce_bundle_for.return_value = _make_passthrough_bundle()
-
+    def test_returns_200_on_permit(self, _configured) -> None:
+        _configured.return_value = _permit()
         app = FastAPI()
 
         @app.get("/data")
@@ -105,11 +57,8 @@ class TestPreEnforcePermitFlow:
         assert response.status_code == 200
         assert response.json() == {"value": "sensitive"}
 
-    def test_subscription_includes_request_context(self, _mock_sapl):
-        mock_pdp, mock_service = _mock_sapl
-        mock_pdp.decide_once.return_value = _make_permit_decision()
-        mock_service.pre_enforce_bundle_for.return_value = _make_passthrough_bundle()
-
+    def test_subscription_includes_request_context(self, _configured) -> None:
+        _configured.return_value = _permit()
         app = FastAPI()
 
         @app.post("/items/{item_id}")
@@ -120,20 +69,15 @@ class TestPreEnforcePermitFlow:
         client = TestClient(app)
         client.post("/items/42")
 
-        subscription = mock_pdp.decide_once.call_args[0][0]
+        subscription = _configured.call_args[0][0]
         assert subscription.action["method"] == "POST"
         assert subscription.action["handler"] == "update_item"
         assert subscription.resource["path"] == "/items/42"
 
 
 class TestPreEnforceDenyFlow:
-    """Verify @pre_enforce returns 403 when PDP denies."""
-
-    def test_returns_403_on_deny(self, _mock_sapl):
-        mock_pdp, mock_service = _mock_sapl
-        mock_pdp.decide_once.return_value = _make_deny_decision()
-        mock_service.best_effort_bundle_for.return_value = _make_passthrough_bundle()
-
+    def test_returns_403_on_deny(self, _configured) -> None:
+        _configured.return_value = _deny()
         app = FastAPI()
 
         @app.get("/secret")
@@ -145,11 +89,8 @@ class TestPreEnforceDenyFlow:
         response = client.get("/secret")
         assert response.status_code == 403
 
-    def test_returns_403_on_indeterminate(self, _mock_sapl):
-        mock_pdp, mock_service = _mock_sapl
-        mock_pdp.decide_once.return_value = AuthorizationDecision.indeterminate()
-        mock_service.best_effort_bundle_for.return_value = _make_passthrough_bundle()
-
+    def test_returns_403_on_indeterminate(self, _configured) -> None:
+        _configured.return_value = AuthorizationDecision.indeterminate()
         app = FastAPI()
 
         @app.get("/data")
@@ -163,20 +104,16 @@ class TestPreEnforceDenyFlow:
 
 
 class TestPreEnforceOnDenyCallback:
-    """Verify on_deny callback returns custom response instead of 403."""
+    def test_on_deny_returns_custom_response(self, _configured) -> None:
+        _configured.return_value = _deny()
 
-    def test_on_deny_returns_custom_response(self, _mock_sapl):
-        mock_pdp, mock_service = _mock_sapl
-        mock_pdp.decide_once.return_value = _make_deny_decision()
-        mock_service.best_effort_bundle_for.return_value = _make_passthrough_bundle()
-
-        def custom_deny_handler(decision: AuthorizationDecision):
+        def custom_deny(decision: AuthorizationDecision):
             return {"error": "custom_denied", "decision": decision.decision.value}
 
         app = FastAPI()
 
         @app.get("/data")
-        @pre_enforce(on_deny=custom_deny_handler)
+        @pre_enforce(on_deny=custom_deny)
         async def get_data(request: Request):
             return {"data": "value"}
 
@@ -189,13 +126,8 @@ class TestPreEnforceOnDenyCallback:
 
 
 class TestPreEnforceCustomSubscription:
-    """Verify custom subscription fields (static and callable)."""
-
-    def test_static_field_overrides(self, _mock_sapl):
-        mock_pdp, mock_service = _mock_sapl
-        mock_pdp.decide_once.return_value = _make_permit_decision()
-        mock_service.pre_enforce_bundle_for.return_value = _make_passthrough_bundle()
-
+    def test_static_field_overrides(self, _configured) -> None:
+        _configured.return_value = _permit()
         app = FastAPI()
 
         @app.get("/data")
@@ -206,17 +138,15 @@ class TestPreEnforceCustomSubscription:
         client = TestClient(app)
         client.get("/data")
 
-        subscription = mock_pdp.decide_once.call_args[0][0]
+        subscription = _configured.call_args[0][0]
         assert subscription.subject == "admin"
         assert subscription.action == "read"
         assert subscription.resource == "documents"
 
-    def test_callable_field_overrides(self, _mock_sapl):
-        mock_pdp, mock_service = _mock_sapl
-        mock_pdp.decide_once.return_value = _make_permit_decision()
-        mock_service.pre_enforce_bundle_for.return_value = _make_passthrough_bundle()
+    def test_callable_field_overrides(self, _configured) -> None:
+        _configured.return_value = _permit()
 
-        def dynamic_subject(ctx) -> str:
+        def dynamic_subject(ctx: Any) -> str:
             return f"user-via-{ctx.request.method}"
 
         app = FastAPI()
@@ -229,18 +159,13 @@ class TestPreEnforceCustomSubscription:
         client = TestClient(app)
         client.get("/data")
 
-        subscription = mock_pdp.decide_once.call_args[0][0]
+        subscription = _configured.call_args[0][0]
         assert subscription.subject == "user-via-GET"
 
 
 class TestPostEnforcePermitFlow:
-    """Verify @post_enforce returns 200 when PDP permits."""
-
-    def test_returns_200_on_permit(self, _mock_sapl):
-        mock_pdp, mock_service = _mock_sapl
-        mock_pdp.decide_once.return_value = _make_permit_decision()
-        mock_service.post_enforce_bundle_for.return_value = _make_passthrough_bundle()
-
+    def test_returns_200_on_permit(self, _configured) -> None:
+        _configured.return_value = _permit()
         app = FastAPI()
 
         @app.get("/data")
@@ -255,13 +180,8 @@ class TestPostEnforcePermitFlow:
 
 
 class TestPostEnforceDenyFlow:
-    """Verify @post_enforce returns 403 when PDP denies."""
-
-    def test_returns_403_on_deny(self, _mock_sapl):
-        mock_pdp, mock_service = _mock_sapl
-        mock_pdp.decide_once.return_value = _make_deny_decision()
-        mock_service.best_effort_bundle_for.return_value = _make_passthrough_bundle()
-
+    def test_returns_403_on_deny(self, _configured) -> None:
+        _configured.return_value = _deny()
         app = FastAPI()
 
         @app.get("/data")
@@ -273,10 +193,8 @@ class TestPostEnforceDenyFlow:
         response = client.get("/data")
         assert response.status_code == 403
 
-    def test_on_deny_returns_custom_response(self, _mock_sapl):
-        mock_pdp, mock_service = _mock_sapl
-        mock_pdp.decide_once.return_value = _make_deny_decision()
-        mock_service.best_effort_bundle_for.return_value = _make_passthrough_bundle()
+    def test_on_deny_returns_custom_response(self, _configured) -> None:
+        _configured.return_value = _deny()
 
         def custom_deny(decision: AuthorizationDecision):
             return {"denied": True}
@@ -295,73 +213,61 @@ class TestPostEnforceDenyFlow:
 
 
 class TestExtractRequest:
-    """Verify _extract_request finds Request from various argument positions."""
-
-    def test_finds_request_in_positional_args(self):
+    def test_finds_request_in_positional_args(self) -> None:
         scope = {"type": "http", "method": "GET", "path": "/", "query_string": b"", "root_path": "", "headers": [], "path_params": {}}
         request = Request(scope)
-        result = _extract_request((request,), {})
-        assert result is request
+        assert _extract_request((request,), {}) is request
 
-    def test_finds_request_in_named_kwarg(self):
+    def test_finds_request_in_named_kwarg(self) -> None:
         scope = {"type": "http", "method": "GET", "path": "/", "query_string": b"", "root_path": "", "headers": [], "path_params": {}}
         request = Request(scope)
-        result = _extract_request((), {"request": request})
-        assert result is request
+        assert _extract_request((), {"request": request}) is request
 
-    def test_finds_request_in_arbitrary_kwarg(self):
+    def test_finds_request_in_arbitrary_kwarg(self) -> None:
         scope = {"type": "http", "method": "GET", "path": "/", "query_string": b"", "root_path": "", "headers": [], "path_params": {}}
         request = Request(scope)
-        result = _extract_request((), {"req": request})
-        assert result is request
+        assert _extract_request((), {"req": request}) is request
 
-    def test_returns_none_when_no_request_present(self):
-        result = _extract_request(("not-a-request",), {"key": "value"})
-        assert result is None
+    def test_returns_none_when_no_request_present(self) -> None:
+        assert _extract_request(("not-a-request",), {"key": "value"}) is None
 
 
-def _module_level_function():
-    """Module-level function with single-part qualname."""
+def _module_level_function() -> None:
     pass
 
 
 class _TestPatientService:
-    """Test class for class name extraction."""
-
-    def get_patient(self):
+    def get_patient(self) -> None:
         pass
 
 
 class _TestOuter:
     class Inner:
-        def method(self):
+        def method(self) -> None:
             pass
 
 
 class TestExtractClassName:
-    """Verify _extract_class_name detects class names from qualified names."""
-
-    def test_plain_function_returns_empty_string(self):
+    def test_plain_function_returns_empty_string(self) -> None:
         assert _extract_class_name(_module_level_function) == ""
 
-    def test_method_returns_class_name(self):
+    def test_method_returns_class_name(self) -> None:
         assert _extract_class_name(_TestPatientService.get_patient) == "_TestPatientService"
 
-    def test_nested_class_returns_inner_class_name(self):
+    def test_nested_class_returns_inner_class_name(self) -> None:
         assert _extract_class_name(_TestOuter.Inner.method) == "Inner"
 
 
 class TestResolveArgs:
-    """Verify _resolve_args maps arguments to names, excluding Request."""
-
-    def test_resolves_positional_args(self):
+    def test_resolves_positional_args(self) -> None:
         def my_handler(patient_id: str, amount: float):
             pass
 
-        result = _resolve_args(my_handler, ("P-001", 100.0), {})
-        assert result == {"patient_id": "P-001", "amount": 100.0}
+        assert _resolve_args(my_handler, ("P-001", 100.0), {}) == {
+            "patient_id": "P-001", "amount": 100.0,
+        }
 
-    def test_excludes_request_instances(self):
+    def test_excludes_request_instances(self) -> None:
         scope = {"type": "http", "method": "GET", "path": "/", "query_string": b"", "root_path": "", "headers": [], "path_params": {}}
         request = Request(scope)
 
@@ -372,14 +278,13 @@ class TestResolveArgs:
         assert "request" not in result
         assert result == {"patient_id": "P-001"}
 
-    def test_applies_defaults(self):
+    def test_applies_defaults(self) -> None:
         def my_handler(name: str, limit: int = 10):
             pass
 
-        result = _resolve_args(my_handler, ("test",), {})
-        assert result == {"name": "test", "limit": 10}
+        assert _resolve_args(my_handler, ("test",), {}) == {"name": "test", "limit": 10}
 
-    def test_excludes_self(self):
+    def test_excludes_self(self) -> None:
         class MyService:
             def get_data(self, patient_id: str):
                 pass

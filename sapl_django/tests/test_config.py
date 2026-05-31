@@ -7,37 +7,30 @@ from django.core.exceptions import ImproperlyConfigured
 from django.test import override_settings
 
 import sapl_django.config as config_module
-from sapl_base.constraint_engine import ConstraintEnforcementService
-from sapl_base.content_filter import ContentFilteringProvider, ContentFilterPredicateProvider
-from sapl_base.pdp_client import PdpClient
+from sapl_base.pep import EnforcementPlanner
+from sapl_base.pep.filters import ContentFilteringProvider, ContentFilterPredicateProvider
+from sapl_base.transport import HttpPdpClient
 from sapl_django.config import (
     cleanup_sapl,
-    get_constraint_service,
     get_pdp_client,
+    get_planner,
     get_sapl_config,
-    register_constraint_handler,
+    register_provider,
 )
 
 
 @pytest.fixture(autouse=True)
 def _reset_singletons():
-    """Reset module-level singletons before each test."""
-    config_module._pdp_client = None
-    config_module._constraint_service = None
+    config_module._runtime._reset_for_tests()
     yield
-    config_module._pdp_client = None
-    config_module._constraint_service = None
+    config_module._runtime._reset_for_tests()
 
 
 class TestGetSaplConfig:
-    """Tests for reading SAPL_CONFIG from Django settings."""
-
     def test_returns_config_dict_from_settings(self, settings):
-        settings.SAPL_CONFIG = {"base_url": "http://localhost:8443", "allow_insecure_connections": True}
+        settings.SAPL_CONFIG = {"base_url": "http://localhost:8443"}
         result = get_sapl_config()
-
         assert result["base_url"] == "http://localhost:8443"
-        assert result["allow_insecure_connections"] is True
 
     @override_settings()
     def test_raises_improperly_configured_when_missing(self, settings):
@@ -47,98 +40,73 @@ class TestGetSaplConfig:
 
 
 class TestGetPdpClient:
-    """Tests for PDP client singleton creation."""
-
     def test_creates_pdp_client_from_settings(self, settings):
         settings.SAPL_CONFIG = {
             "base_url": "http://localhost:8443",
-            "allow_insecure_connections": True,
-            "timeout": 10.0,
+            "timeout_seconds": 10.0,
         }
         client = get_pdp_client()
-
-        assert isinstance(client, PdpClient)
+        assert isinstance(client, HttpPdpClient)
 
     def test_returns_same_instance_on_repeated_calls(self, settings):
-        settings.SAPL_CONFIG = {
-            "base_url": "http://localhost:8443",
-            "allow_insecure_connections": True,
-        }
+        settings.SAPL_CONFIG = {"base_url": "http://localhost:8443"}
         first = get_pdp_client()
         second = get_pdp_client()
-
         assert first is second
 
     def test_uses_default_base_url_when_not_specified(self, settings):
-        settings.SAPL_CONFIG = {"allow_insecure_connections": False}
-        # This should not raise - defaults to https://localhost:8443
+        settings.SAPL_CONFIG = {}
         client = get_pdp_client()
+        assert isinstance(client, HttpPdpClient)
 
-        assert isinstance(client, PdpClient)
 
-
-class TestGetConstraintService:
-    """Tests for constraint enforcement service singleton."""
-
-    def test_creates_service_with_built_in_providers(self):
-        service = get_constraint_service()
-
-        assert isinstance(service, ConstraintEnforcementService)
-        # Verify built-in providers are registered by checking internal lists
-        mapping_types = [type(p) for p in service._mapping_providers]
-        filter_types = [type(p) for p in service._filter_predicate_providers]
-
-        assert ContentFilteringProvider in mapping_types
-        assert ContentFilterPredicateProvider in filter_types
+class TestGetPlanner:
+    def test_creates_planner_with_built_in_providers(self):
+        planner = get_planner()
+        assert isinstance(planner, EnforcementPlanner)
+        types = {type(p) for p in planner.providers}
+        assert ContentFilteringProvider in types
+        assert ContentFilterPredicateProvider in types
 
     def test_returns_same_instance_on_repeated_calls(self):
-        first = get_constraint_service()
-        second = get_constraint_service()
-
+        first = get_planner()
+        second = get_planner()
         assert first is second
 
 
-class TestRegisterConstraintHandler:
-    """Tests for custom handler registration."""
+class _ProbeProvider:
+    def get_handlers(self, constraint):
+        return ()
 
-    def test_registers_valid_handler_type(self):
-        mock_provider = type("MockProvider", (), {
-            "is_responsible": lambda self, c: False,
-            "get_handler": lambda self, c: lambda: None,
-            "get_signal": lambda self: None,
-        })()
 
-        register_constraint_handler(mock_provider, "runnable")
+class TestRegisterProvider:
+    def test_registers_custom_provider(self):
+        provider = _ProbeProvider()
+        register_provider(provider)
+        planner = get_planner()
+        assert provider in planner.providers
 
-        service = get_constraint_service()
-        assert mock_provider in service._runnable_providers
-
-    def test_raises_value_error_for_unknown_type(self):
-        with pytest.raises(ValueError, match="Unknown handler type"):
-            register_constraint_handler(object(), "nonexistent")
+    def test_register_after_get_planner_rebuilds(self):
+        first = get_planner()
+        provider = _ProbeProvider()
+        register_provider(provider)
+        second = get_planner()
+        assert provider in second.providers
+        assert first is not second
 
 
 class TestCleanupSapl:
-    """Tests for cleanup_sapl resource release."""
-
     @pytest.mark.asyncio
     async def test_closes_pdp_client(self, settings):
-        settings.SAPL_CONFIG = {
-            "base_url": "http://localhost:8443",
-            "allow_insecure_connections": True,
-        }
+        settings.SAPL_CONFIG = {"base_url": "http://localhost:8443"}
         client = get_pdp_client()
         mock_close = AsyncMock()
-
         with patch.object(client, "close", mock_close):
             await cleanup_sapl()
-
         mock_close.assert_awaited_once()
-        assert config_module._pdp_client is None
+        assert not config_module._runtime.is_configured
 
     @pytest.mark.asyncio
     async def test_noop_when_no_client(self):
-        # Should not raise
         await cleanup_sapl()
-
-        assert config_module._pdp_client is None
+        assert not config_module._runtime.is_configured

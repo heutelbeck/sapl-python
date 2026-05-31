@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from sapl_base import AuthorizationDecision, Decision
-from sapl_base.constraint_engine import ConstraintEnforcementService
+from sapl_base.pep import EnforcementPlanner
 from sapl_fastmcp.auth_check import WARN_STEALTH_IGNORED, sapl
 from sapl_fastmcp.context import SaplConfig
 from tests.conftest import make_auth_ctx as _make_ctx
@@ -28,10 +28,10 @@ def _make_decision(
 
 
 def _patched_sapl(decision):
-    """Context manager that patches PDP client and constraint service."""
+    """Context manager that patches PDP client and planner."""
     pdp = AsyncMock()
     pdp.decide_once.return_value = decision
-    service = ConstraintEnforcementService()
+    planner = EnforcementPlanner()
 
     class _PatchedSaplCtx:
         def __init__(self):
@@ -39,7 +39,7 @@ def _patched_sapl(decision):
 
         def __enter__(self):
             self._p1 = patch("sapl_fastmcp.get_pdp_client", return_value=pdp)
-            self._p2 = patch("sapl_fastmcp.get_constraint_service", return_value=service)
+            self._p2 = patch("sapl_fastmcp.get_planner", return_value=planner)
             self._p1.__enter__()
             self._p2.__enter__()
             return self

@@ -1,6 +1,7 @@
 """Tests for sapl_fastmcp.middleware enforcement logic.
 
-Integration tests with mocked PDP and real ConstraintEnforcementService.
+Integration tests with a mocked PDP client and a real EnforcementPlanner
+configured with constraint handler providers.
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -14,9 +15,13 @@ from fastmcp.server.auth import AccessToken
 from fastmcp.tools.tool import Tool, ToolResult
 
 from sapl_base import AuthorizationDecision, Decision, MultiAuthorizationDecision
-from sapl_base.constraint_bundle import AccessDeniedError
-from sapl_base.constraint_engine import ConstraintEnforcementService
-from sapl_base.constraint_types import Signal
+from sapl_base.pep import (
+    DECISION,
+    INPUT,
+    AccessDeniedError,
+    EnforcementPlanner,
+    ScopedHandler,
+)
 from sapl_fastmcp.context import SaplConfig
 from sapl_fastmcp.middleware import (
     SAPLMiddleware,
@@ -363,7 +368,7 @@ class TestPreEnforceTool:
     async def test_permit_executes_tool_and_returns_result(self, _mock_token):
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.permit()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         config = SaplConfig(mode="pre")
         tool = _make_tool(sapl_config=config)
@@ -379,7 +384,7 @@ class TestPreEnforceTool:
     async def test_deny_blocks_tool_execution(self, _mock_token):
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.deny()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         config = SaplConfig(mode="pre")
         tool = _make_tool(sapl_config=config)
@@ -400,7 +405,7 @@ class TestPreEnforceTool:
     async def test_non_permit_denies_fail_closed(self, _mock_token, decision_factory):
         pdp = AsyncMock()
         pdp.decide_once.return_value = decision_factory()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         config = SaplConfig(mode="pre")
         tool = _make_tool(sapl_config=config)
@@ -414,7 +419,7 @@ class TestPreEnforceTool:
     async def test_pdp_unreachable_denies(self, _mock_token):
         pdp = AsyncMock()
         pdp.decide_once.side_effect = ConnectionError("unreachable")
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         config = SaplConfig(mode="pre")
         tool = _make_tool(sapl_config=config)
@@ -432,7 +437,7 @@ class TestPreEnforceTool:
         )
         pdp = AsyncMock()
         pdp.decide_once.return_value = decision
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         config = SaplConfig(mode="pre")
         tool = _make_tool(sapl_config=config)
@@ -452,7 +457,7 @@ class TestPreEnforceTool:
         tool = _make_tool(sapl_config=config)
         context = _make_call_context(tool=tool)
         call_next = AsyncMock(return_value="ok")
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         await middleware.on_call_tool(context, call_next)
 
@@ -470,7 +475,7 @@ class TestPreEnforceTool:
         tool = _make_tool(sapl_config=config)
         context = _make_call_context(tool=tool)
         call_next = AsyncMock()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         with pytest.raises(AccessDeniedError):
             await middleware.on_call_tool(context, call_next)
@@ -489,7 +494,7 @@ class TestPreEnforceTool:
         tool = _make_tool(sapl_config=config)
         context = _make_call_context(tool=tool)
         call_next = AsyncMock()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         with pytest.raises(AccessDeniedError):
             await middleware.on_call_tool(context, call_next)
@@ -503,7 +508,7 @@ class TestPostEnforceTool:
     async def test_tool_always_executes(self, _mock_token):
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.permit()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         config = SaplConfig(mode="post")
         tool = _make_tool(sapl_config=config)
@@ -519,7 +524,7 @@ class TestPostEnforceTool:
     async def test_deny_suppresses_result(self, _mock_token):
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.deny()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         config = SaplConfig(mode="post")
         tool = _make_tool(sapl_config=config)
@@ -535,7 +540,7 @@ class TestPostEnforceTool:
     async def test_subscription_includes_return_value(self, _mock_token):
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.permit()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         config = SaplConfig(
             mode="post",
@@ -558,7 +563,7 @@ class TestPostEnforceTool:
     async def test_tool_result_unwrapped_in_subscription(self, _mock_token):
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.permit()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         config = SaplConfig(
             mode="post",
@@ -582,14 +587,24 @@ class TestPostEnforceTool:
 
 
 def _make_on_decision_provider(constraint_type, handler_fn=None):
-    """Create a mock RunnableConstraintHandlerProvider for ON_DECISION."""
-    provider = MagicMock()
-    provider.is_responsible = lambda c: c.get("type") == constraint_type
-    provider.get_signal.return_value = Signal.ON_DECISION
+    """Create a constraint handler provider that emits a DECISION runner."""
     if handler_fn is None:
         handler_fn = MagicMock()
-    provider.get_handler = MagicMock(return_value=handler_fn)
+
+    class _Provider:
+        def get_handlers(self, constraint):
+            if not isinstance(constraint, dict) or constraint.get("type") != constraint_type:
+                return ()
+            return (ScopedHandler(signal=DECISION, priority=0, shape="runner",
+                                  handler=handler_fn),)
+
+    provider = _Provider()
+    provider.handler_fn = handler_fn
     return provider
+
+
+def _planner_with(*providers):
+    return EnforcementPlanner(providers=tuple(providers))
 
 
 def _multi_decision(**decisions):
@@ -613,7 +628,7 @@ class TestListingFilter:
                     "tool:secret": AuthorizationDecision.permit(),
                 },
             )
-            middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+            middleware = SAPLMiddleware(pdp, EnforcementPlanner())
             context = _make_list_context()
             call_next = AsyncMock(return_value=[stealth])
 
@@ -630,7 +645,7 @@ class TestListingFilter:
                     "tool:secret": AuthorizationDecision.deny(),
                 },
             )
-            middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+            middleware = SAPLMiddleware(pdp, EnforcementPlanner())
             context = _make_list_context()
             call_next = AsyncMock(return_value=[stealth])
 
@@ -651,7 +666,7 @@ class TestListingFilter:
                     "tool:secret": comp_decision,
                 },
             )
-            middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+            middleware = SAPLMiddleware(pdp, EnforcementPlanner())
             context = _make_list_context()
             call_next = AsyncMock(return_value=[stealth])
 
@@ -672,7 +687,7 @@ class TestListingFilter:
                     "tool:secret": comp_decision,
                 },
             )
-            middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+            middleware = SAPLMiddleware(pdp, EnforcementPlanner())
             context = _make_list_context()
             call_next = AsyncMock(return_value=[stealth])
 
@@ -684,8 +699,7 @@ class TestListingFilter:
         async def test_stealth_on_decision_handler_invoked_per_component(self, _mock_token):
             handler_fn = MagicMock()
             provider = _make_on_decision_provider("log_component", handler_fn)
-            constraint_service = ConstraintEnforcementService()
-            constraint_service.register_runnable(provider)
+            planner = _planner_with(provider)
 
             stealth = _make_tool(name="secret", sapl_config=SaplConfig(mode="pre", stealth=True))
             comp_decision = AuthorizationDecision(
@@ -698,7 +712,7 @@ class TestListingFilter:
                     "tool:secret": comp_decision,
                 },
             )
-            middleware = SAPLMiddleware(pdp, constraint_service)
+            middleware = SAPLMiddleware(pdp, planner)
             context = _make_list_context()
             call_next = AsyncMock(return_value=[stealth])
 
@@ -714,7 +728,7 @@ class TestListingFilter:
         async def test_non_stealth_decorated_always_included(self, _mock_token):
             non_stealth = _make_tool(name="visible", sapl_config=SaplConfig(mode="pre", stealth=False))
             pdp = AsyncMock()
-            middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+            middleware = SAPLMiddleware(pdp, EnforcementPlanner())
             context = _make_list_context()
             call_next = AsyncMock(return_value=[non_stealth])
 
@@ -727,7 +741,7 @@ class TestListingFilter:
         async def test_undecorated_always_included(self, _mock_token):
             undecorated = _make_tool(name="open", sapl_config=None)
             pdp = AsyncMock()
-            middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+            middleware = SAPLMiddleware(pdp, EnforcementPlanner())
             context = _make_list_context()
             call_next = AsyncMock(return_value=[undecorated])
 
@@ -741,7 +755,7 @@ class TestListingFilter:
             non_stealth = _make_tool(name="visible", sapl_config=SaplConfig(mode="pre", stealth=False))
             undecorated = _make_tool(name="open", sapl_config=None)
             pdp = AsyncMock()
-            middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+            middleware = SAPLMiddleware(pdp, EnforcementPlanner())
             context = _make_list_context()
             call_next = AsyncMock(return_value=[non_stealth, undecorated])
 
@@ -762,7 +776,7 @@ class TestListingFilter:
                     "tool:secret": AuthorizationDecision.permit(),
                 },
             )
-            middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+            middleware = SAPLMiddleware(pdp, EnforcementPlanner())
             context = _make_list_context()
             call_next = AsyncMock(return_value=[stealth])
 
@@ -776,7 +790,7 @@ class TestListingFilter:
             stealth = _make_tool(name="secret", sapl_config=SaplConfig(mode="pre", stealth=True))
             pdp = AsyncMock()
             pdp.multi_decide_all_once.return_value = _multi_decision()
-            middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+            middleware = SAPLMiddleware(pdp, EnforcementPlanner())
             context = _make_list_context()
             call_next = AsyncMock(return_value=[stealth])
 
@@ -799,7 +813,7 @@ class TestListingFilter:
                     "tool:healthy": AuthorizationDecision.permit(),
                 },
             )
-            middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+            middleware = SAPLMiddleware(pdp, EnforcementPlanner())
             context = _make_list_context()
             call_next = AsyncMock(return_value=[broken, healthy])
 
@@ -815,7 +829,7 @@ class TestListingFilter:
         async def test_enforce_listing_false_skips_pdp_call(self, _mock_token):
             stealth = _make_tool(name="secret", sapl_config=SaplConfig(mode="pre", stealth=True))
             pdp = AsyncMock()
-            middleware = SAPLMiddleware(pdp, ConstraintEnforcementService(), enforce_listing=False)
+            middleware = SAPLMiddleware(pdp, EnforcementPlanner(), enforce_listing=False)
             context = _make_list_context()
             call_next = AsyncMock(return_value=[stealth])
 
@@ -829,7 +843,7 @@ class TestListingFilter:
             non_stealth = _make_tool(name="visible", sapl_config=SaplConfig(mode="pre", stealth=False))
             undecorated = _make_tool(name="open", sapl_config=None)
             pdp = AsyncMock()
-            middleware = SAPLMiddleware(pdp, ConstraintEnforcementService(), enforce_listing=False)
+            middleware = SAPLMiddleware(pdp, EnforcementPlanner(), enforce_listing=False)
             context = _make_list_context()
             call_next = AsyncMock(return_value=[stealth, non_stealth, undecorated])
 
@@ -848,7 +862,7 @@ class TestNoDecoratorPassthrough:
     @patch("sapl_fastmcp.middleware._get_token", return_value=None)
     async def test_undecorated_tool_passes_through(self, _mock_token):
         pdp = AsyncMock()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         tool = _make_tool(sapl_config=None)
         context = _make_call_context(tool=tool, arguments={"x": 1})
@@ -867,7 +881,7 @@ class TestNonExistentComponent:
     @patch("sapl_fastmcp.middleware._get_token", return_value=None)
     async def test_non_existent_tool_raises_not_found_error(self, _mock_token):
         pdp = AsyncMock()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         context = _make_call_context(tool=None)
         call_next = AsyncMock()
@@ -887,7 +901,7 @@ class TestStealthMode:
     async def test_stealth_deny_raises_not_found_error(self, _mock_token):
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.deny()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         config = SaplConfig(mode="pre", stealth=True)
         tool = _make_tool(sapl_config=config)
@@ -901,7 +915,7 @@ class TestStealthMode:
     async def test_non_stealth_deny_raises_access_denied_error(self, _mock_token):
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.deny()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         config = SaplConfig(mode="pre", stealth=False)
         tool = _make_tool(sapl_config=config)
@@ -915,7 +929,7 @@ class TestStealthMode:
     async def test_stealth_permit_returns_normally(self, _mock_token):
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.permit()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         config = SaplConfig(mode="pre", stealth=True)
         tool = _make_tool(sapl_config=config)
@@ -930,7 +944,7 @@ class TestStealthMode:
     async def test_stealth_not_found_error_includes_component_name(self, _mock_token):
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.deny()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         config = SaplConfig(mode="pre", stealth=True)
         tool = _make_tool(name="secret_tool", sapl_config=config)
@@ -950,7 +964,7 @@ class TestStealthMode:
         tool = _make_tool(sapl_config=config)
         context = _make_call_context(tool=tool)
         call_next = AsyncMock()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         with pytest.raises(NotFoundError):
             await middleware.on_call_tool(context, call_next)
@@ -963,7 +977,7 @@ class TestStealthMode:
     async def test_stealth_post_enforce_deny_raises_not_found_error(self, _mock_token):
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.deny()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         config = SaplConfig(mode="post", stealth=True)
         tool = _make_tool(sapl_config=config)
@@ -974,17 +988,31 @@ class TestStealthMode:
             await middleware.on_call_tool(context, call_next)
 
 
-def _make_method_invocation_provider(constraint_type, handler_fn):
-    """Create a mock MethodInvocationConstraintHandlerProvider."""
-    provider = MagicMock()
-    provider.is_responsible = lambda c: isinstance(c, dict) and c.get("type") == constraint_type
-    provider.get_handler = MagicMock(return_value=handler_fn)
-    return provider
+class _LimitResultsProvider:
+    """INPUT mapper provider that clamps the ``limit`` kwarg.
+
+    Handles ``{"type": "limitResults", "maxLimit": N}`` obligations.
+    """
+
+    def get_handlers(self, constraint):
+        if not isinstance(constraint, dict) or constraint.get("type") != "limitResults":
+            return ()
+        max_limit = int(constraint.get("maxLimit", 5))
+
+        def handler(value):
+            args, kwargs = value
+            kwargs = dict(kwargs)
+            current = kwargs.get("limit")
+            if current is not None and current > max_limit:
+                kwargs["limit"] = max_limit
+            return (args, kwargs)
+
+        return (ScopedHandler(signal=INPUT, priority=0, shape="mapper", handler=handler),)
 
 
 @pytest.mark.asyncio
 class TestPreEnforceMethodInvocation:
-    """Tests for method-invocation handlers modifying kwargs via pre-enforce."""
+    """Tests for INPUT mappers modifying kwargs via pre-enforce."""
 
     @patch("sapl_fastmcp.middleware._get_token", return_value=None)
     async def test_obligation_limits_kwargs(self, _mock_token):
@@ -994,15 +1022,7 @@ class TestPreEnforceMethodInvocation:
             captured_kwargs.update(ctx.message.arguments)
             return {"result": "ok"}
 
-        def limit_handler(context):
-            current = context.kwargs.get("limit")
-            if current is not None and current > 5:
-                context.kwargs["limit"] = 5
-
-        constraint_service = ConstraintEnforcementService()
-        constraint_service.register_method_invocation(
-            _make_method_invocation_provider("limitResults", limit_handler),
-        )
+        planner = _planner_with(_LimitResultsProvider())
 
         decision = AuthorizationDecision(
             decision=Decision.PERMIT,
@@ -1010,7 +1030,7 @@ class TestPreEnforceMethodInvocation:
         )
         pdp = AsyncMock()
         pdp.decide_once.return_value = decision
-        middleware = SAPLMiddleware(pdp, constraint_service)
+        middleware = SAPLMiddleware(pdp, planner)
 
         config = SaplConfig(mode="pre")
         tool = _make_tool(sapl_config=config)
@@ -1028,19 +1048,11 @@ class TestPreEnforceMethodInvocation:
             captured_kwargs.update(ctx.message.arguments)
             return {"result": "ok"}
 
-        def limit_handler(context):
-            current = context.kwargs.get("limit")
-            if current is not None and current > 5:
-                context.kwargs["limit"] = 5
-
-        constraint_service = ConstraintEnforcementService()
-        constraint_service.register_method_invocation(
-            _make_method_invocation_provider("limitResults", limit_handler),
-        )
+        planner = _planner_with(_LimitResultsProvider())
 
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.permit()
-        middleware = SAPLMiddleware(pdp, constraint_service)
+        middleware = SAPLMiddleware(pdp, planner)
 
         config = SaplConfig(mode="pre")
         tool = _make_tool(sapl_config=config)
@@ -1057,8 +1069,7 @@ class TestPreEnforceFilterPredicate:
 
     @patch("sapl_fastmcp.middleware._get_token", return_value=None)
     async def test_obligation_filters_list_result(self, _mock_token):
-        constraint_service = ConstraintEnforcementService()
-        constraint_service.register_filter_predicate(FilterByClassificationProvider())
+        planner = _planner_with(FilterByClassificationProvider())
 
         decision = AuthorizationDecision(
             decision=Decision.PERMIT,
@@ -1066,7 +1077,7 @@ class TestPreEnforceFilterPredicate:
         )
         pdp = AsyncMock()
         pdp.decide_once.return_value = decision
-        middleware = SAPLMiddleware(pdp, constraint_service)
+        middleware = SAPLMiddleware(pdp, planner)
 
         config = SaplConfig(mode="pre")
         tool = _make_tool(sapl_config=config)
@@ -1083,12 +1094,11 @@ class TestPreEnforceFilterPredicate:
 
     @patch("sapl_fastmcp.middleware._get_token", return_value=None)
     async def test_no_obligation_keeps_all_elements(self, _mock_token):
-        constraint_service = ConstraintEnforcementService()
-        constraint_service.register_filter_predicate(FilterByClassificationProvider())
+        planner = _planner_with(FilterByClassificationProvider())
 
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.permit()
-        middleware = SAPLMiddleware(pdp, constraint_service)
+        middleware = SAPLMiddleware(pdp, planner)
 
         config = SaplConfig(mode="pre")
         tool = _make_tool(sapl_config=config)
@@ -1105,8 +1115,7 @@ class TestPreEnforceFilterPredicate:
 
     @patch("sapl_fastmcp.middleware._get_token", return_value=None)
     async def test_multiple_allowed_levels_keeps_matching(self, _mock_token):
-        constraint_service = ConstraintEnforcementService()
-        constraint_service.register_filter_predicate(FilterByClassificationProvider())
+        planner = _planner_with(FilterByClassificationProvider())
 
         decision = AuthorizationDecision(
             decision=Decision.PERMIT,
@@ -1114,7 +1123,7 @@ class TestPreEnforceFilterPredicate:
         )
         pdp = AsyncMock()
         pdp.decide_once.return_value = decision
-        middleware = SAPLMiddleware(pdp, constraint_service)
+        middleware = SAPLMiddleware(pdp, planner)
 
         config = SaplConfig(mode="pre")
         tool = _make_tool(sapl_config=config)
@@ -1137,8 +1146,7 @@ class TestPostEnforceConstraintHandlers:
 
     @patch("sapl_fastmcp.middleware._get_token", return_value=None)
     async def test_filter_predicate_transforms_result(self, _mock_token):
-        constraint_service = ConstraintEnforcementService()
-        constraint_service.register_filter_predicate(FilterByClassificationProvider())
+        planner = _planner_with(FilterByClassificationProvider())
 
         decision = AuthorizationDecision(
             decision=Decision.PERMIT,
@@ -1146,7 +1154,7 @@ class TestPostEnforceConstraintHandlers:
         )
         pdp = AsyncMock()
         pdp.decide_once.return_value = decision
-        middleware = SAPLMiddleware(pdp, constraint_service)
+        middleware = SAPLMiddleware(pdp, planner)
 
         config = SaplConfig(mode="post")
         tool = _make_tool(sapl_config=config)
@@ -1162,18 +1170,12 @@ class TestPostEnforceConstraintHandlers:
         assert result[0]["name"] == "a"
 
     @patch("sapl_fastmcp.middleware._get_token", return_value=None)
-    async def test_method_invocation_only_obligation_denies_in_post_enforce(self, _mock_token):
-        """An obligation with only a method-invocation handler is unenforceable
-        in post-enforce (no method-invocation handlers in post path), so it
-        correctly results in denial due to unhandled obligation.
+    async def test_input_only_obligation_denies_in_post_enforce(self, _mock_token):
+        """An obligation whose provider only emits INPUT mappers is unenforceable
+        in post-enforce (INPUT is not a supported signal there), so the planner
+        marks the claim inadmissible and the gate denies via synthetic failure.
         """
-        def invocation_handler(context):
-            context.kwargs["limit"] = 1
-
-        constraint_service = ConstraintEnforcementService()
-        constraint_service.register_method_invocation(
-            _make_method_invocation_provider("limitResults", invocation_handler),
-        )
+        planner = _planner_with(_LimitResultsProvider())
 
         decision = AuthorizationDecision(
             decision=Decision.PERMIT,
@@ -1181,7 +1183,7 @@ class TestPostEnforceConstraintHandlers:
         )
         pdp = AsyncMock()
         pdp.decide_once.return_value = decision
-        middleware = SAPLMiddleware(pdp, constraint_service)
+        middleware = SAPLMiddleware(pdp, planner)
 
         config = SaplConfig(mode="post")
         tool = _make_tool(sapl_config=config)
@@ -1200,7 +1202,7 @@ class TestResourceHook:
     async def test_permit_returns_resource_content(self, _mock_token):
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.permit()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         config = SaplConfig(mode="pre")
         resource = _make_resource(sapl_config=config)
@@ -1216,7 +1218,7 @@ class TestResourceHook:
     async def test_deny_blocks_resource_read(self, _mock_token):
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.deny()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         config = SaplConfig(mode="pre")
         resource = _make_resource(sapl_config=config)
@@ -1229,7 +1231,7 @@ class TestResourceHook:
     @patch("sapl_fastmcp.middleware._get_token", return_value=None)
     async def test_non_existent_resource_raises_not_found(self, _mock_token):
         pdp = AsyncMock()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         context = _make_read_context(uri="data://missing")
         call_next = AsyncMock()
@@ -1240,7 +1242,7 @@ class TestResourceHook:
     @patch("sapl_fastmcp.middleware._get_token", return_value=None)
     async def test_undecorated_resource_passes_through(self, _mock_token):
         pdp = AsyncMock()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         resource = _make_resource(sapl_config=None)
         context = _make_read_context(uri="data://open", resource=resource)
@@ -1260,7 +1262,7 @@ class TestPromptHook:
     async def test_permit_returns_prompt_messages(self, _mock_token):
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.permit()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         config = SaplConfig(mode="pre")
         prompt = _make_prompt_component(sapl_config=config)
@@ -1276,7 +1278,7 @@ class TestPromptHook:
     async def test_deny_blocks_prompt_access(self, _mock_token):
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.deny()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         config = SaplConfig(mode="pre")
         prompt = _make_prompt_component(sapl_config=config)
@@ -1289,7 +1291,7 @@ class TestPromptHook:
     @patch("sapl_fastmcp.middleware._get_token", return_value=None)
     async def test_non_existent_prompt_raises_not_found(self, _mock_token):
         pdp = AsyncMock()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         context = _make_get_context(prompt=None)
         call_next = AsyncMock()
@@ -1306,7 +1308,7 @@ class TestResourceTemplateFallback:
     async def test_template_used_when_resource_not_found(self, _mock_token):
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.permit()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         config = SaplConfig(mode="pre")
         template = MagicMock(spec=ResourceTemplate)
@@ -1352,7 +1354,7 @@ class TestMixedStealthListing:
                 "tool:forbidden": AuthorizationDecision.deny(),
             },
         )
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
         context = _make_list_context()
         call_next = AsyncMock(return_value=[permitted, denied, undecorated])
 
@@ -1374,8 +1376,7 @@ class TestToolResultConstraintRoundTrip:
         The filterByClassification obligation filters the list.
         The result must be a properly rewrapped ToolResult.
         """
-        constraint_service = ConstraintEnforcementService()
-        constraint_service.register_filter_predicate(FilterByClassificationProvider())
+        planner = _planner_with(FilterByClassificationProvider())
 
         decision = AuthorizationDecision(
             decision=Decision.PERMIT,
@@ -1383,7 +1384,7 @@ class TestToolResultConstraintRoundTrip:
         )
         pdp = AsyncMock()
         pdp.decide_once.return_value = decision
-        middleware = SAPLMiddleware(pdp, constraint_service)
+        middleware = SAPLMiddleware(pdp, planner)
 
         config = SaplConfig(mode="pre")
         tool = _make_tool(sapl_config=config)
@@ -1410,7 +1411,7 @@ class TestToolResultConstraintRoundTrip:
         """
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.permit()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         config = SaplConfig(mode="pre")
         tool = _make_tool(sapl_config=config)
@@ -1441,7 +1442,7 @@ class TestStdioBypass:
     @patch("sapl_fastmcp.middleware._is_stdio", return_value=True)
     async def test_access_hooks_bypasses_authorization_on_stdio(self, _mock_stdio, hook, make_context):
         pdp = AsyncMock()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
         context = make_context()
         sentinel = object()
         call_next = AsyncMock(return_value=sentinel)
@@ -1460,7 +1461,7 @@ class TestStdioBypass:
     @patch("sapl_fastmcp.middleware._is_stdio", return_value=True)
     async def test_listing_hooks_bypasses_authorization_on_stdio(self, _mock_stdio, hook):
         pdp = AsyncMock()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
         context = _make_list_context()
         sentinel = [object()]
         call_next = AsyncMock(return_value=sentinel)
@@ -1483,7 +1484,7 @@ class TestListingHookVariants:
         pdp.multi_decide_all_once.return_value = _multi_decision(
             **{"resource:secret_res": AuthorizationDecision.deny()},
         )
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
         context = _make_list_context()
         call_next = AsyncMock(return_value=[visible, stealth])
 
@@ -1507,7 +1508,7 @@ class TestListingHookVariants:
         pdp.multi_decide_all_once.return_value = _multi_decision(
             **{"template:secret_tmpl": AuthorizationDecision.deny()},
         )
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
         context = _make_list_context()
         call_next = AsyncMock(return_value=[stealth])
 
@@ -1524,7 +1525,7 @@ class TestListingHookVariants:
         pdp.multi_decide_all_once.return_value = _multi_decision(
             **{"prompt:secret_prompt": AuthorizationDecision.deny()},
         )
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
         context = _make_list_context()
         call_next = AsyncMock(return_value=[visible, stealth])
 
@@ -1541,7 +1542,7 @@ class TestListingHookVariants:
         pdp.multi_decide_all_once.return_value = _multi_decision(
             **{"resource:secret_res": AuthorizationDecision.permit()},
         )
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
         context = _make_list_context()
         call_next = AsyncMock(return_value=[stealth])
 

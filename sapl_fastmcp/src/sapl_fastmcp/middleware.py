@@ -1,7 +1,7 @@
 """SAPL authorization middleware for FastMCP.
 
 Replaces per-component auth= checks with a single middleware that
-intercepts all MCP operations. Delegates to ``sapl_base.enforcement``
+intercepts all MCP operations. Delegates to ``sapl_base.pep.enforce``
 for the actual pre/post enforcement logic; the middleware adds
 MCP-specific concerns: subscription building, ``call_next`` wrapping,
 ``finalize`` orchestration, and listing filters.
@@ -32,16 +32,15 @@ from fastmcp.tools.tool import Tool, ToolResult
 from sapl_base import (
     AuthorizationDecision,
     MultiAuthorizationSubscription,
-    PdpClient,
 )
-from sapl_base.constraint_bundle import AccessDeniedError
-from sapl_base.constraint_engine import ConstraintEnforcementService
-from sapl_base.enforcement import (
+from sapl_base.pep import AccessDeniedError, EnforcementPlanner
+from sapl_base.pep.enforce import (
     post_enforce as base_post_enforce,
 )
-from sapl_base.enforcement import (
+from sapl_base.pep.enforce import (
     pre_enforce as base_pre_enforce,
 )
+from sapl_base.transport import HttpPdpClient
 from sapl_fastmcp.context import FinalizeCallback, SaplConfig, SubscriptionContext
 from sapl_fastmcp.enforcement import enforce_decision_gate
 from sapl_fastmcp.subscription import build_middleware_subscription
@@ -90,12 +89,12 @@ class SAPLMiddleware(Middleware):
 
     def __init__(
         self,
-        pdp: PdpClient,
-        constraint_service: ConstraintEnforcementService | None = None,
+        pdp: HttpPdpClient,
+        planner: EnforcementPlanner | None = None,
         enforce_listing: bool = True,
     ) -> None:
         self._pdp = pdp
-        self._constraint_service = constraint_service or ConstraintEnforcementService()
+        self._planner = planner or EnforcementPlanner()
         self._enforce_listing = enforce_listing
 
     # -- Listing flow --
@@ -133,7 +132,7 @@ class SAPLMiddleware(Middleware):
         """Filter a component list by hiding stealth components the subject may not access.
 
         Listing is always a gate-level visibility filter, not access enforcement.
-        Only ON_DECISION constraint handlers run here (via ``enforce_decision_gate``).
+        Only DECISION-signal constraint handlers run here (via ``enforce_decision_gate``).
         The pre/post distinction is irrelevant for listing because there is no
         "execution" during a list operation -- post-enforce (which includes the
         return value in the subscription) has no meaning in this context.
@@ -186,7 +185,7 @@ class SAPLMiddleware(Middleware):
         included_stealth: list[Any] = []
         for comp_id, (component, _config) in component_ids.items():
             comp_decision = multi_decision.decisions.get(comp_id)
-            if comp_decision is not None and enforce_decision_gate(self._constraint_service, comp_decision):
+            if comp_decision is not None and enforce_decision_gate(self._planner, comp_decision):
                 included_stealth.append(component)
             else:
                 logger.debug(
@@ -322,20 +321,19 @@ class SAPLMiddleware(Middleware):
         kwargs: dict[str, Any],
         function_name: str,
     ) -> Any:
-        """Delegate to sapl_base enforcement with finalize orchestration."""
+        """Delegate to sapl_base.pep with finalize orchestration."""
         outcome = AuthorizationDecision.deny()
         try:
             if config.mode == "pre":
                 subscription = build_middleware_subscription(sub_ctx, config)
                 _log_subscription(function_name, config.mode, subscription)
                 result = await base_pre_enforce(
+                    protected,
                     pdp_client=self._pdp,
-                    constraint_service=self._constraint_service,
+                    planner=self._planner,
                     subscription=subscription,
-                    protected_function=protected,
-                    args=[],
+                    args=(),
                     kwargs=kwargs,
-                    function_name=function_name,
                 )
             else:
                 def sub_builder(return_value: Any) -> Any:
@@ -352,13 +350,12 @@ class SAPLMiddleware(Middleware):
                     return sub
 
                 result = await base_post_enforce(
+                    protected,
                     pdp_client=self._pdp,
-                    constraint_service=self._constraint_service,
+                    planner=self._planner,
                     subscription_builder=sub_builder,
-                    protected_function=protected,
-                    args=[],
+                    args=(),
                     kwargs=kwargs,
-                    function_name=function_name,
                 )
             outcome = AuthorizationDecision.permit()
             _log_decision(function_name, config.mode, "PERMIT")

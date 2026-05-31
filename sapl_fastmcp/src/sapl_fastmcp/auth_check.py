@@ -41,7 +41,7 @@ def sapl(
         @mcp.tool(auth=sapl(subject=lambda ctx: ctx.token.claims.get("sub")))
         def sensitive_tool(): ...
     """
-    from sapl_fastmcp import get_constraint_service, get_pdp_client
+    from sapl_fastmcp import get_pdp_client, get_planner
 
     async def check(ctx: AuthContext) -> bool:
         _warn_if_stealth(ctx)
@@ -65,7 +65,7 @@ def sapl(
             )
             return False
 
-        return enforce_decision_gate(get_constraint_service(), decision)
+        return enforce_decision_gate(get_planner(), decision)
 
     return check
 

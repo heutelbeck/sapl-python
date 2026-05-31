@@ -1,17 +1,12 @@
-from sapl_fastapi.config import SaplConfig
-from sapl_fastapi.decorators import (
-    enforce_drop_while_denied,
-    enforce_recoverable_if_denied,
-    enforce_till_denied,
-    post_enforce,
-    pre_enforce,
-)
+from sapl_base.transport import HttpPdpClientOptions as SaplConfig
+
+from sapl_fastapi.decorators import post_enforce, pre_enforce, stream_enforce
 from sapl_fastapi.dependencies import (
     cleanup_sapl,
     configure_sapl,
-    get_constraint_service,
     get_pdp_client,
-    register_constraint_handler,
+    get_planner,
+    register_provider,
 )
 from sapl_fastapi.subscription import SubscriptionBuilder
 
@@ -20,12 +15,10 @@ __all__ = [
     "SubscriptionBuilder",
     "cleanup_sapl",
     "configure_sapl",
-    "enforce_drop_while_denied",
-    "enforce_recoverable_if_denied",
-    "enforce_till_denied",
-    "get_constraint_service",
     "get_pdp_client",
+    "get_planner",
     "post_enforce",
     "pre_enforce",
-    "register_constraint_handler",
+    "register_provider",
+    "stream_enforce",
 ]

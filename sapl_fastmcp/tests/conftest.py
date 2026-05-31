@@ -1,6 +1,6 @@
 """Shared test fixtures for SAPL middleware tests."""
 
-from collections.abc import Callable
+from collections.abc import Sequence
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -8,7 +8,7 @@ import pytest
 from fastmcp.server.auth import AccessToken
 
 from sapl_base import AuthorizationDecision
-from sapl_base.constraint_engine import ConstraintEnforcementService
+from sapl_base.pep import OUTPUT, EnforcementPlanner, ScopedHandler
 
 
 @pytest.fixture
@@ -18,9 +18,9 @@ def pdp_client():
 
 
 @pytest.fixture
-def constraint_service():
-    """Real ConstraintEnforcementService (no registered providers)."""
-    return ConstraintEnforcementService()
+def planner():
+    """Real EnforcementPlanner with no registered providers."""
+    return EnforcementPlanner()
 
 
 @pytest.fixture
@@ -56,26 +56,31 @@ def make_auth_ctx(token=None, component_name="test_tool"):
 
 
 class FilterByClassificationProvider:
-    """Filters list results by classification level.
+    """OUTPUT mapper: filters list results by classification level.
 
-    Handles obligations like:
-    {"type": "filterByClassification", "allowedLevels": ["public", "internal"]}
+    Handles obligations like
+    ``{"type": "filterByClassification", "allowedLevels": ["public", "internal"]}``.
 
     Removes list elements whose ``classification`` field is not in the
-    allowed set. Non-dict elements pass through unfiltered.
+    allowed set. Non-list values pass through unchanged. Non-dict
+    elements pass through unfiltered.
 
     Test-local copy of the demo handler for test isolation.
     """
 
-    def is_responsible(self, constraint: Any) -> bool:
-        return isinstance(constraint, dict) and constraint.get("type") == "filterByClassification"
-
-    def get_handler(self, constraint: Any) -> Callable[[Any], bool]:
+    def get_handlers(self, constraint: Any) -> Sequence[ScopedHandler]:
+        if not isinstance(constraint, dict) or constraint.get("type") != "filterByClassification":
+            return ()
         allowed = set(constraint.get("allowedLevels", []))
 
-        def predicate(element: Any) -> bool:
-            if isinstance(element, dict):
-                return element.get("classification") in allowed
-            return True
+        def handler(value: Any) -> Any:
+            if not isinstance(value, list):
+                return value
+            return [
+                element
+                for element in value
+                if not isinstance(element, dict)
+                or element.get("classification") in allowed
+            ]
 
-        return predicate
+        return (ScopedHandler(signal=OUTPUT, priority=20, shape="mapper", handler=handler),)

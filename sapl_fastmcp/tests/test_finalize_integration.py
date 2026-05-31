@@ -11,8 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from sapl_base import AuthorizationDecision, Decision
-from sapl_base.constraint_bundle import AccessDeniedError
-from sapl_base.constraint_engine import ConstraintEnforcementService
+from sapl_base.pep import AccessDeniedError, EnforcementPlanner
 from sapl_fastmcp.context import SaplConfig
 from sapl_fastmcp.middleware import SAPLMiddleware
 
@@ -107,7 +106,7 @@ class TestFinalizeWithDatabase:
 
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.permit()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         await middleware.on_call_tool(context, call_next)
 
@@ -138,7 +137,7 @@ class TestFinalizeWithDatabase:
 
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.deny()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         with pytest.raises(AccessDeniedError):
             await middleware.on_call_tool(context, call_next)
@@ -168,7 +167,7 @@ class TestFinalizeWithDatabase:
 
         pdp = AsyncMock()
         pdp.decide_once.side_effect = ConnectionError("unreachable")
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         with pytest.raises(ConnectionError):
             await middleware.on_call_tool(context, call_next)
@@ -193,7 +192,7 @@ class TestFinalizeCallbackBehavior:
 
         pdp = AsyncMock()
         pdp.decide_once.side_effect = RuntimeError("unexpected")
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         with pytest.raises(RuntimeError, match="unexpected"):
             await middleware.on_call_tool(context, AsyncMock())
@@ -209,7 +208,7 @@ class TestFinalizeCallbackBehavior:
 
         pdp = AsyncMock()
         pdp.decide_once.return_value = AuthorizationDecision.deny()
-        middleware = SAPLMiddleware(pdp, ConstraintEnforcementService())
+        middleware = SAPLMiddleware(pdp, EnforcementPlanner())
 
         with pytest.raises(AccessDeniedError):
             await middleware.on_call_tool(context, call_next)

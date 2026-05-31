@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from sapl_base.constraint_types import SubscriptionContext
+from sapl_base.pep import SubscriptionContext
 from sapl_base.types import AuthorizationSubscription
 
 if TYPE_CHECKING:

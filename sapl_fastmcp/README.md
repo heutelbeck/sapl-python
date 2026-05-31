@@ -10,20 +10,22 @@ Two enforcement approaches are available. The **middleware** approach intercepts
 
 ```python
 from fastmcp import FastMCP
-from sapl_fastmcp import SAPLMiddleware, configure_sapl, get_pdp_client, get_constraint_service
+from sapl_base.transport import HttpPdpClientOptions
+from sapl_fastmcp import SAPLMiddleware, configure_sapl, get_pdp_client, get_planner
 
-configure_sapl(base_url="https://localhost:8443")
+configure_sapl(HttpPdpClientOptions(base_url="https://localhost:8443"))
 mcp = FastMCP("my-server")
-mcp.add_middleware(SAPLMiddleware(get_pdp_client(), get_constraint_service()))
+mcp.add_middleware(SAPLMiddleware(get_pdp_client(), get_planner()))
 ```
 
 ### Per-Component Auth
 
 ```python
 from fastmcp import FastMCP
+from sapl_base.transport import HttpPdpClientOptions
 from sapl_fastmcp import sapl, pre_enforce, configure_sapl
 
-configure_sapl(base_url="https://localhost:8443")
+configure_sapl(HttpPdpClientOptions(base_url="https://localhost:8443"))
 mcp = FastMCP("my-server")
 
 @mcp.tool(auth=sapl())

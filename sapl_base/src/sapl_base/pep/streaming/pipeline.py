@@ -35,7 +35,6 @@ from typing import Any
 import structlog
 
 from sapl_base.pep.boundary_signals import (
-    AccessDeniedError,
     AccessGrantedSignal,
     AccessSuspendedSignal,
 )
@@ -46,7 +45,7 @@ from sapl_base.pep.enforce import (
     DecisionSignal,
     OutputSignal,
 )
-from sapl_base.pep.plan import ABSENT, EnforcementPlan
+from sapl_base.pep.plan import ABSENT
 from sapl_base.pep.planner import EnforcementPlanner
 from sapl_base.pep.signal import SignalKind
 from sapl_base.pep.streaming.mealy import (

@@ -16,9 +16,8 @@ class PatientHandler(tornado.web.RequestHandler):
 ```
 policy "permit doctors to read patient data"
 permit
-  action == "read"
-where
-  "DOCTOR" in subject.roles;
+  action == "read";
+  "DOCTOR" in subject.roles
 ```
 
 If the PDP permits, the handler runs. If not, HTTP 403 is returned. If the decision carries obligations (like access logging or field redaction), they are enforced automatically through registered constraint handlers.
@@ -27,7 +26,7 @@ If the PDP permits, the handler runs. If not, HTTP 403 is returned. If the decis
 
 SAPL goes beyond simple permit/deny. Decisions can carry obligations that must be fulfilled, advice that should be attempted, and resource transformations that modify return values before they reach the caller. The library handles all of this transparently.
 
-For SSE endpoints, streaming decorators (`@enforce_till_denied`, `@enforce_drop_while_denied`, `@enforce_recoverable_if_denied`) maintain a live connection to the PDP, so access rights update in real time as policies, attributes, or the environment change. Built-in constraint handlers cover JSON field redaction and collection filtering. Writing custom handlers follows a simple registration pattern with `register_constraint_handler`.
+For SSE endpoints, the single `stream_enforce` decorator maintains a live connection to the PDP, so access rights update in real time as policies, attributes, or the environment change. Built-in constraint handlers cover JSON field redaction and collection filtering. Writing custom handlers follows a simple registration pattern with `register_provider`.
 
 ## Getting Started
 
@@ -38,7 +37,7 @@ pip install sapl-tornado
 ```python
 import tornado.ioloop
 import tornado.web
-from sapl_tornado.config import SaplConfig
+from sapl_tornado import SaplConfig
 from sapl_tornado.dependencies import configure_sapl, cleanup_sapl
 
 configure_sapl(SaplConfig(base_url="https://localhost:8443"))
@@ -48,12 +47,12 @@ app.listen(8888)
 tornado.ioloop.IOLoop.current().start()
 ```
 
-For setup instructions, configuration options, the constraint handler reference, and the full API, see the [Tornado documentation](https://sapl.io/docs/latest/6_9_PythonTornado/).
+For setup instructions, configuration options, the constraint handler reference, and the full API, see the [Tornado documentation](https://sapl.io/docs/latest/6_8_Tornado/).
 
 ## Links
 
 - [Full Documentation](https://sapl.io/docs/latest/)
-- [Tornado Integration](https://sapl.io/docs/latest/6_9_PythonTornado/)
+- [Tornado Integration](https://sapl.io/docs/latest/6_8_Tornado/)
 - [Demo Application](https://github.com/heutelbeck/sapl-python-demos/tree/main/tornado_demo)
 - [Report an Issue](https://github.com/heutelbeck/sapl-python/issues)
 

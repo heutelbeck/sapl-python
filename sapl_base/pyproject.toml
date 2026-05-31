@@ -46,7 +46,7 @@ dev = [
 
 [project.urls]
 Homepage = "https://sapl.io/"
-Documentation = "https://sapl.io/docs/latest/8_1_PEPImplementationSpecification/"
+Documentation = "https://sapl.io/docs/latest/"
 Repository = "https://github.com/heutelbeck/sapl-python"
 
 [tool.setuptools.packages.find]

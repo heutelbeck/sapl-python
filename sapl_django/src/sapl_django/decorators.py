@@ -10,23 +10,20 @@ import structlog
 from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, JsonResponse, StreamingHttpResponse
 
-from sapl_base.constraint_bundle import AccessDeniedError
-from sapl_base.enforcement import post_enforce as _post_enforce
-from sapl_base.enforcement import pre_enforce as _pre_enforce
-from sapl_base.streaming import (
-    enforce_drop_while_denied as _enforce_drop_while_denied,
+from sapl_base.pep import (
+    AccessDeniedError,
+    AccessGrantedSignal,
+    AccessSuspendedSignal,
+    post_enforce as _post_enforce,
+    pre_enforce as _pre_enforce,
 )
-from sapl_base.streaming import (
-    enforce_recoverable_if_denied as _enforce_recoverable_if_denied,
-)
-from sapl_base.streaming import (
-    enforce_till_denied as _enforce_till_denied,
-)
-from sapl_django.config import get_constraint_service, get_pdp_client
+from sapl_base.pep.streaming import run_pipeline
+
+from sapl_django.config import get_pdp_client, get_planner
 from sapl_django.subscription import SubscriptionBuilder, SubscriptionField
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import AsyncIterator, Callable
 
     from sapl_base.types import AuthorizationDecision, AuthorizationSubscription
 
@@ -34,20 +31,12 @@ log = structlog.get_logger()
 
 
 def _extract_class_name(func: Callable) -> str:
-    """Extract the class name from a method's qualified name.
-
-    Returns empty string for plain functions.
-    """
     qualname = getattr(func, "__qualname__", "")
     parts = qualname.split(".")
     return parts[-2] if len(parts) >= 2 else ""
 
 
 def _resolve_args(func: Callable, args: tuple, kwargs: dict) -> dict[str, Any]:
-    """Resolve all positional and keyword arguments into a named dict.
-
-    Excludes ``self``, ``cls``, and ``HttpRequest`` parameters.
-    """
     try:
         sig = inspect.signature(func)
         bound = sig.bind(*args, **kwargs)
@@ -55,23 +44,12 @@ def _resolve_args(func: Callable, args: tuple, kwargs: dict) -> dict[str, Any]:
         resolved = dict(bound.arguments)
         resolved.pop("self", None)
         resolved.pop("cls", None)
-        resolved = {
-            k: v for k, v in resolved.items()
-            if not isinstance(v, HttpRequest)
-        }
-        return resolved
+        return {k: v for k, v in resolved.items() if not isinstance(v, HttpRequest)}
     except (TypeError, ValueError):
-        return {
-            k: v for k, v in kwargs.items()
-            if not isinstance(v, HttpRequest)
-        }
+        return {k: v for k, v in kwargs.items() if not isinstance(v, HttpRequest)}
 
 
 def _extract_request(args: tuple, kwargs: dict) -> HttpRequest | None:
-    """Extract Django HttpRequest from view function arguments.
-
-    Returns None if no HttpRequest is found (enables service-layer usage).
-    """
     for arg in args:
         if isinstance(arg, HttpRequest):
             return arg
@@ -86,9 +64,7 @@ def _extract_request(args: tuple, kwargs: dict) -> HttpRequest | None:
 def _wrap_response(result: Any, request: HttpRequest | None) -> Any:
     """Auto-wrap dict/list results as JsonResponse for Django views.
 
-    Only wraps when called from a view context (HttpRequest present).
-    Service-layer methods (no HttpRequest) return raw values so the
-    calling view can handle response formatting itself.
+    Service-layer calls (no HttpRequest) return raw values unchanged.
     """
     if request is None:
         return result
@@ -97,6 +73,35 @@ def _wrap_response(result: Any, request: HttpRequest | None) -> Any:
     if isinstance(result, list):
         return JsonResponse(result, safe=False)
     return result
+
+
+def _build_subscription(
+    func: Callable,
+    args: tuple,
+    kwargs: dict,
+    *,
+    subject: SubscriptionField,
+    action: SubscriptionField,
+    resource: SubscriptionField,
+    environment: SubscriptionField,
+    secrets: SubscriptionField,
+    return_value: Any = None,
+) -> tuple[AuthorizationSubscription, HttpRequest | None]:
+    request = _extract_request(args, kwargs)
+    resolved = _resolve_args(func, args, kwargs)
+    subscription = SubscriptionBuilder.build(
+        request,
+        subject=subject,
+        action=action,
+        resource=resource,
+        environment=environment,
+        secrets=secrets,
+        function_name=func.__name__,
+        class_name=_extract_class_name(func),
+        resolved_args=resolved,
+        return_value=return_value,
+    )
+    return subscription, request
 
 
 def pre_enforce(
@@ -110,57 +115,47 @@ def pre_enforce(
 ) -> Callable:
     """Decorator: authorize BEFORE view execution.
 
-    Usage::
-
-        @pre_enforce(action="read", resource="patient")
-        async def patient_detail(request, patient_id):
-            ...
-
-    Args:
-        subject: Override for subject field.
-        action: Override for action field.
-        resource: Override for resource field.
-        environment: Override for environment field.
-        secrets: Override for secrets field.
-        on_deny: Optional callback invoked on deny. If it returns a value,
-                 that value is returned instead of raising PermissionDenied.
+    Works on both sync and async views. Sync views are run via
+    `asyncio.run`; async views are awaited directly.
     """
     def decorator(func: Callable) -> Callable:
-        class_name = _extract_class_name(func)
+        is_async = asyncio.iscoroutinefunction(func)
+
+        async def _async_target(*args: Any, **kwargs: Any) -> Any:
+            if is_async:
+                return await func(*args, **kwargs)
+            return func(*args, **kwargs)
 
         @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            request = _extract_request(args, kwargs)
-            resolved = _resolve_args(func, args, kwargs)
-            subscription = SubscriptionBuilder.build(
-                request,
-                subject=subject,
-                action=action,
-                resource=resource,
-                environment=environment,
-                secrets=secrets,
-                function_name=func.__name__,
-                class_name=class_name,
-                resolved_args=resolved,
+        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+            subscription, request = _build_subscription(
+                func, args, kwargs,
+                subject=subject, action=action, resource=resource,
+                environment=environment, secrets=secrets,
             )
-
             try:
                 result = await _pre_enforce(
+                    _async_target,
                     pdp_client=get_pdp_client(),
-                    constraint_service=get_constraint_service(),
+                    planner=get_planner(),
                     subscription=subscription,
-                    protected_function=func,
-                    args=list(args),
-                    kwargs=kwargs,
-                    function_name=func.__name__,
-                    on_deny=on_deny,
-                    class_name=class_name,
-                    request=request,
+                    args=tuple(args),
+                    kwargs=dict(kwargs),
                 )
                 return _wrap_response(result, request)
-            except AccessDeniedError:
+            except AccessDeniedError as exc:
+                if on_deny is not None:
+                    return _wrap_response(on_deny(exc.decision), request)
                 raise PermissionDenied() from None
-        return wrapper
+
+        if is_async:
+            return async_wrapper
+
+        @functools.wraps(func)
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+            return asyncio.run(async_wrapper(*args, **kwargs))
+
+        return sync_wrapper
     return decorator
 
 
@@ -173,249 +168,125 @@ def post_enforce(
     secrets: SubscriptionField = None,
     on_deny: Callable[[AuthorizationDecision], Any] | None = None,
 ) -> Callable:
-    """Decorator: authorize AFTER view execution.
-
-    The view runs first, then the return value is included in the subscription
-    for the PDP decision.
-
-    Args:
-        subject: Override for subject field.
-        action: Override for action field.
-        resource: Override for resource field.
-        environment: Override for environment field.
-        secrets: Override for secrets field.
-        on_deny: Optional callback invoked on deny.
-    """
+    """Decorator: authorize AFTER view execution."""
     def decorator(func: Callable) -> Callable:
-        class_name = _extract_class_name(func)
+        is_async = asyncio.iscoroutinefunction(func)
+
+        async def _async_target(*args: Any, **kwargs: Any) -> Any:
+            if is_async:
+                return await func(*args, **kwargs)
+            return func(*args, **kwargs)
 
         @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            request = _extract_request(args, kwargs)
-            resolved = _resolve_args(func, args, kwargs)
+        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+            _, request = _extract_request_and_resolve(func, args, kwargs)
 
-            def subscription_builder(return_value: Any) -> AuthorizationSubscription:
-                return SubscriptionBuilder.build(
-                    request,
-                    subject=subject,
-                    action=action,
-                    resource=resource,
-                    environment=environment,
-                    secrets=secrets,
-                    function_name=func.__name__,
-                    class_name=class_name,
-                    resolved_args=resolved,
+            def _subscription_builder(return_value: Any) -> AuthorizationSubscription:
+                subscription, _ = _build_subscription(
+                    func, args, kwargs,
+                    subject=subject, action=action, resource=resource,
+                    environment=environment, secrets=secrets,
                     return_value=return_value,
                 )
+                return subscription
 
             try:
                 result = await _post_enforce(
+                    _async_target,
                     pdp_client=get_pdp_client(),
-                    constraint_service=get_constraint_service(),
-                    subscription_builder=subscription_builder,
-                    protected_function=func,
-                    args=list(args),
-                    kwargs=kwargs,
-                    function_name=func.__name__,
-                    on_deny=on_deny,
-                    class_name=class_name,
-                    request=request,
+                    planner=get_planner(),
+                    subscription_builder=_subscription_builder,
+                    args=tuple(args),
+                    kwargs=dict(kwargs),
                 )
                 return _wrap_response(result, request)
-            except AccessDeniedError:
+            except AccessDeniedError as exc:
+                if on_deny is not None:
+                    return _wrap_response(on_deny(exc.decision), request)
                 raise PermissionDenied() from None
-        return wrapper
+
+        if is_async:
+            return async_wrapper
+
+        @functools.wraps(func)
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+            return asyncio.run(async_wrapper(*args, **kwargs))
+
+        return sync_wrapper
     return decorator
 
 
-def enforce_till_denied(
+def _extract_request_and_resolve(func: Callable, args: tuple, kwargs: dict):
+    request = _extract_request(args, kwargs)
+    return _resolve_args(func, args, kwargs), request
+
+
+def stream_enforce(
     *,
     subject: SubscriptionField = None,
     action: SubscriptionField = None,
     resource: SubscriptionField = None,
     environment: SubscriptionField = None,
     secrets: SubscriptionField = None,
-    on_stream_deny: Callable[[AuthorizationDecision], Any] | None = None,
+    signal_transitions: bool = False,
+    pause_rap_during_suspend: bool = False,
 ) -> Callable:
-    """Decorator: streaming enforcement that terminates on first deny.
+    """Decorator: SAPL-enforced SSE streaming via Django StreamingHttpResponse.
 
-    The decorated function must return an async generator.
-    Returns a Django StreamingHttpResponse with SSE format.
+    The decorated function returns an async iterator. Flags map to
+    `run_pipeline`:
 
-    Args:
-        subject: Override for subject field.
-        action: Override for action field.
-        resource: Override for resource field.
-        environment: Override for environment field.
-        secrets: Override for secrets field.
-        on_stream_deny: Optional callback invoked when the stream is denied.
+    - `signal_transitions`: emit ACCESS_SUSPENDED / ACCESS_RESTORED SSE frames
+      on Suspended/Permitting boundary transitions.
+    - `pause_rap_during_suspend`: cancel the upstream iterator on entry to
+      Suspended; re-subscribe on exit.
     """
     def decorator(func: Callable) -> Callable:
-        class_name = _extract_class_name(func)
-
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> StreamingHttpResponse:
-            request = _extract_request(args, kwargs)
-            resolved = _resolve_args(func, args, kwargs)
-            subscription = SubscriptionBuilder.build(
-                request,
-                subject=subject,
-                action=action,
-                resource=resource,
-                environment=environment,
-                secrets=secrets,
-                function_name=func.__name__,
-                class_name=class_name,
-                resolved_args=resolved,
+            subscription, _ = _build_subscription(
+                func, args, kwargs,
+                subject=subject, action=action, resource=resource,
+                environment=environment, secrets=secrets,
             )
 
-            async def data_source():
+            async def _async_rap() -> AsyncIterator[Any]:
                 result = func(*args, **kwargs)
                 if asyncio.iscoroutine(result):
                     result = await result
-                return result
+                async for item in result:
+                    yield item
 
-            async def sse_generator():
-                async for item in _enforce_till_denied(
-                    pdp_client=get_pdp_client(),
-                    constraint_service=get_constraint_service(),
-                    subscription=subscription,
-                    data_source=data_source,
-                    on_stream_deny=on_stream_deny,
-                ):
-                    yield _format_sse(item)
+            def _rap_factory() -> AsyncIterator[Any]:
+                return _async_rap()
 
-            return StreamingHttpResponse(sse_generator(), content_type="text/event-stream")
-        return wrapper
-    return decorator
+            async def _sse_generator() -> AsyncIterator[str]:
+                pipeline = run_pipeline(
+                    decisions=get_pdp_client().decide(subscription),
+                    planner=get_planner(),
+                    rap_factory=_rap_factory,
+                    signal_transitions=signal_transitions,
+                    pause_rap_during_suspend=pause_rap_during_suspend,
+                )
+                try:
+                    async for item in pipeline:
+                        yield _format_sse(item)
+                except AccessDeniedError as exc:
+                    yield _format_sse({
+                        "type": "ACCESS_DENIED",
+                        "reason": getattr(exc, "reason", None),
+                    })
 
-
-def enforce_drop_while_denied(
-    *,
-    subject: SubscriptionField = None,
-    action: SubscriptionField = None,
-    resource: SubscriptionField = None,
-    environment: SubscriptionField = None,
-    secrets: SubscriptionField = None,
-) -> Callable:
-    """Decorator: streaming enforcement that silently drops data during deny.
-
-    The decorated function must return an async generator.
-    Returns a Django StreamingHttpResponse with SSE format.
-
-    Args:
-        subject: Override for subject field.
-        action: Override for action field.
-        resource: Override for resource field.
-        environment: Override for environment field.
-        secrets: Override for secrets field.
-    """
-    def decorator(func: Callable) -> Callable:
-        class_name = _extract_class_name(func)
-
-        @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> StreamingHttpResponse:
-            request = _extract_request(args, kwargs)
-            resolved = _resolve_args(func, args, kwargs)
-            subscription = SubscriptionBuilder.build(
-                request,
-                subject=subject,
-                action=action,
-                resource=resource,
-                environment=environment,
-                secrets=secrets,
-                function_name=func.__name__,
-                class_name=class_name,
-                resolved_args=resolved,
-            )
-
-            async def data_source():
-                result = func(*args, **kwargs)
-                if asyncio.iscoroutine(result):
-                    result = await result
-                return result
-
-            async def sse_generator():
-                async for item in _enforce_drop_while_denied(
-                    pdp_client=get_pdp_client(),
-                    constraint_service=get_constraint_service(),
-                    subscription=subscription,
-                    data_source=data_source,
-                ):
-                    yield _format_sse(item)
-
-            return StreamingHttpResponse(sse_generator(), content_type="text/event-stream")
-        return wrapper
-    return decorator
-
-
-def enforce_recoverable_if_denied(
-    *,
-    subject: SubscriptionField = None,
-    action: SubscriptionField = None,
-    resource: SubscriptionField = None,
-    environment: SubscriptionField = None,
-    secrets: SubscriptionField = None,
-    on_stream_deny: Callable[[AuthorizationDecision], Any] | None = None,
-    on_stream_recover: Callable[[AuthorizationDecision], Any] | None = None,
-) -> Callable:
-    """Decorator: streaming enforcement with suspend/resume signals.
-
-    The decorated function must return an async generator.
-    Returns a Django StreamingHttpResponse with SSE format.
-
-    Args:
-        subject: Override for subject field.
-        action: Override for action field.
-        resource: Override for resource field.
-        environment: Override for environment field.
-        secrets: Override for secrets field.
-        on_stream_deny: Optional callback invoked on PERMIT->DENY transition.
-        on_stream_recover: Optional callback invoked on DENY->PERMIT transition.
-    """
-    def decorator(func: Callable) -> Callable:
-        class_name = _extract_class_name(func)
-
-        @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> StreamingHttpResponse:
-            request = _extract_request(args, kwargs)
-            resolved = _resolve_args(func, args, kwargs)
-            subscription = SubscriptionBuilder.build(
-                request,
-                subject=subject,
-                action=action,
-                resource=resource,
-                environment=environment,
-                secrets=secrets,
-                function_name=func.__name__,
-                class_name=class_name,
-                resolved_args=resolved,
-            )
-
-            async def data_source():
-                result = func(*args, **kwargs)
-                if asyncio.iscoroutine(result):
-                    result = await result
-                return result
-
-            async def sse_generator():
-                async for item in _enforce_recoverable_if_denied(
-                    pdp_client=get_pdp_client(),
-                    constraint_service=get_constraint_service(),
-                    subscription=subscription,
-                    data_source=data_source,
-                    on_stream_deny=on_stream_deny,
-                    on_stream_recover=on_stream_recover,
-                ):
-                    yield _format_sse(item)
-
-            return StreamingHttpResponse(sse_generator(), content_type="text/event-stream")
+            return StreamingHttpResponse(_sse_generator(), content_type="text/event-stream")
         return wrapper
     return decorator
 
 
 def _format_sse(data: Any) -> str:
-    """Format a data item as a Server-Sent Events message."""
+    if isinstance(data, AccessSuspendedSignal):
+        return "data: " + json.dumps({"type": "ACCESS_SUSPENDED"}) + "\n\n"
+    if isinstance(data, AccessGrantedSignal):
+        return "data: " + json.dumps({"type": "ACCESS_RESTORED"}) + "\n\n"
     if isinstance(data, str):
         return f"data: {data}\n\n"
     if isinstance(data, dict):

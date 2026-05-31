@@ -28,9 +28,9 @@ FinalizeCallback = Callable[["AuthorizationDecision", "SubscriptionContext"], Aw
 class SubscriptionContext:
     """MCP-specific context for building authorization subscriptions.
 
-    Richer than ``sapl_base.constraint_types.SubscriptionContext`` because
-    middleware has access to the OAuth token, the FastMCP component object,
-    tool arguments, resource URIs, and return values.
+    Richer than ``sapl_base.pep.SubscriptionContext`` because middleware
+    has access to the OAuth token, the FastMCP component object, tool
+    arguments, resource URIs, and return values.
     """
 
     token: AccessToken | None = None

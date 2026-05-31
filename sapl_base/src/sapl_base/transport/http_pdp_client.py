@@ -252,15 +252,22 @@ class HttpPdpClient:
         self._token_provider = options.token_provider
         self._static_authorization: str | None = self._build_static_authorization(options)
         self._timeout = httpx.Timeout(options.timeout_seconds)
+        self._streaming_timeout = httpx.Timeout(
+            connect=options.timeout_seconds,
+            read=None,
+            write=options.timeout_seconds,
+            pool=options.timeout_seconds,
+        )
         self._retry_base = options.streaming_retry_base_delay_seconds
         self._retry_cap = options.streaming_retry_max_delay_seconds
         self._max_retries = options.streaming_max_retries
 
-        verify: Any = True
+        self._verify: Any = True
         self._temp_files: list[str] = []
         if options.tls is not None and parsed.scheme == "https":
-            verify, self._temp_files = _build_ssl_context(options.tls)
-        self._client = httpx.AsyncClient(timeout=self._timeout, verify=verify)
+            self._verify, self._temp_files = _build_ssl_context(options.tls)
+        self._client: httpx.AsyncClient | None = None
+        self._client_loop: asyncio.AbstractEventLoop | None = None
 
         base = options.base_url if options.base_url.endswith("/") else options.base_url + "/"
         prefix = urljoin(base, PDP_API_PREFIX.lstrip("/"))
@@ -369,8 +376,30 @@ class HttpPdpClient:
             ),
         )
 
+    def _get_client(self) -> httpx.AsyncClient:
+        """Return a usable AsyncClient bound to the current event loop.
+
+        Sync frameworks (e.g., Flask under `asyncio.run`) create a fresh
+        event loop per request; the AsyncClient bound to a previous
+        loop becomes unusable. We detect this and rebuild the client.
+        """
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
+        if (
+            self._client is None
+            or self._client.is_closed
+            or current_loop is not self._client_loop
+        ):
+            self._client = httpx.AsyncClient(timeout=self._timeout, verify=self._verify)
+            self._client_loop = current_loop
+        return self._client
+
     async def close(self) -> None:
-        await self._client.aclose()
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
         for path in self._temp_files:
             try:
                 import os
@@ -393,7 +422,7 @@ class HttpPdpClient:
             authorization = await self._resolve_authorization()
             if authorization:
                 headers["Authorization"] = authorization
-            response = await self._client.post(url, json=body, headers=headers)
+            response = await self._get_client().post(url, json=body, headers=headers)
             if response.status_code >= 400:
                 excerpt = truncate(response.text or "")
                 logger.error(
@@ -481,8 +510,8 @@ class HttpPdpClient:
         authorization = await self._resolve_authorization()
         if authorization:
             headers["Authorization"] = authorization
-        async with self._client.stream(
-            "POST", url, json=body, headers=headers
+        async with self._get_client().stream(
+            "POST", url, json=body, headers=headers, timeout=self._streaming_timeout
         ) as response:
             if response.status_code >= 400:
                 excerpt = truncate(

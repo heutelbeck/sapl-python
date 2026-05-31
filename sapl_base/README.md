@@ -7,10 +7,10 @@ Core SAPL Policy Enforcement Point (PEP) library for Python. Provides the async 
 Your application sends authorization subscriptions to the Policy Decision Point (PDP) and enforces the decision. The PDP evaluates SAPL policies and returns permit/deny decisions with optional obligations, advice, and resource transformations.
 
 ```python
-from sapl_base.pdp_client import PdpClient, PdpConfig
+from sapl_base.transport import HttpPdpClient, HttpPdpClientOptions
 from sapl_base.types import AuthorizationSubscription
 
-client = PdpClient(PdpConfig(base_url="https://localhost:8443"))
+client = HttpPdpClient(HttpPdpClientOptions(base_url="https://localhost:8443"))
 decision = await client.decide_once(AuthorizationSubscription(
     subject={"user": "alice", "roles": ["DOCTOR"]},
     action="read",
@@ -22,9 +22,8 @@ print(decision.decision)  # PERMIT, DENY, INDETERMINATE, or NOT_APPLICABLE
 ```
 policy "permit doctors to read patient data"
 permit
-  action == "read"
-where
-  "DOCTOR" in subject.roles;
+  action == "read";
+  "DOCTOR" in subject.roles
 ```
 
 For streaming decisions that update as policies change:
@@ -38,10 +37,10 @@ async for decision in client.decide(subscription):
 
 - Async HTTP client for all PDP REST endpoints (`decide-once`, `decide`, `multi-decide-once`, `multi-decide`, `multi-decide-all-once`, `multi-decide-all`)
 - Streaming SSE subscriptions with automatic reconnect and exponential backoff
-- Constraint enforcement engine with seven handler types (runnable, consumer, mapping, filter predicate, error handler, error mapping, method invocation)
+- Constraint enforcement via a single `ConstraintHandlerProvider`, returning `ScopedHandler` entries whose shape is a runner (no value), a consumer (observes a value), or a mapper (transforms a value)
 - Built-in content filtering via `filterJsonContent` (blacken, delete, replace)
 - Pre-enforce and post-enforce primitives for request/response authorization
-- Three streaming enforcement strategies: enforce-till-denied, enforce-drop-while-denied, enforce-recoverable-if-denied
+- Streaming enforcement through a single `stream_enforce` decorator backed by the `run_pipeline` engine
 - Bearer token and HTTP basic auth support; HTTPS by default
 
 Most applications should use a framework integration instead of this package directly.
@@ -52,12 +51,12 @@ Most applications should use a framework integration instead of this package dir
 pip install sapl-base
 ```
 
-For the PEP implementation specification and constraint handler reference, see the [PEP documentation](https://sapl.io/docs/latest/8_1_PEPImplementationSpecification/).
+For the decision-verb semantics and the unified enforcement model, see the [SAPL documentation](https://sapl.io/docs/latest/2_3_AuthorizationDecisions/).
 
 ## Links
 
 - [Full Documentation](https://sapl.io/docs/latest/)
-- [PEP Implementation Specification](https://sapl.io/docs/latest/8_1_PEPImplementationSpecification/)
+- [Authorization Decisions](https://sapl.io/docs/latest/2_3_AuthorizationDecisions/)
 - [Report an Issue](https://github.com/heutelbeck/sapl-python/issues)
 
 ## License

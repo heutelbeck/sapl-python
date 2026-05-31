@@ -10,6 +10,8 @@ Policy Enforcement Point (PEP) implementations for Python web frameworks, built 
 | sapl-fastapi | FastAPI integration | [sapl-fastapi](https://pypi.org/project/sapl-fastapi/) |
 | sapl-django | Django integration | [sapl-django](https://pypi.org/project/sapl-django/) |
 | sapl-flask | Flask integration | [sapl-flask](https://pypi.org/project/sapl-flask/) |
+| sapl-tornado | Tornado integration | [sapl-tornado](https://pypi.org/project/sapl-tornado/) |
+| sapl-fastmcp | FastMCP integration | [sapl-fastmcp](https://pypi.org/project/sapl-fastmcp/) |
 
 ## Quick Start
 
@@ -27,7 +29,7 @@ Connect to a SAPL PDP and protect an endpoint:
 # FastAPI example
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
-from sapl_fastapi.config import SaplConfig
+from sapl_fastapi import SaplConfig
 from sapl_fastapi.dependencies import configure_sapl, cleanup_sapl
 from sapl_fastapi.decorators import pre_enforce
 
@@ -45,7 +47,7 @@ async def get_data(request: Request):
     return {"data": "sensitive"}
 ```
 
-On a DENY decision, the endpoint returns HTTP 403. Obligations attached to PERMIT decisions are executed automatically by the constraint engine.
+On a DENY decision, the endpoint returns HTTP 403. Obligations attached to PERMIT decisions are executed automatically by the enforcement planner.
 
 ## Requirements
 
@@ -79,4 +81,4 @@ Apache 2.0
 
 ## Documentation
 
-Full documentation is available at [sapl.io/docs](https://sapl.io/docs/latest/8_1_PEPImplementationSpecification/).
+Full documentation is available at [sapl.io/docs](https://sapl.io/docs/latest/).

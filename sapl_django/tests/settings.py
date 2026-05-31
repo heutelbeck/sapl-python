@@ -14,7 +14,6 @@ MIDDLEWARE = [
 
 SAPL_CONFIG = {
     "base_url": "http://localhost:8443",
-    "allow_insecure_connections": True,
 }
 
 ROOT_URLCONF = "tests.urls"

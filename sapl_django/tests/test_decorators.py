@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, JsonResponse
 
+from sapl_base.pep import EnforcementPlanner
 from sapl_base.types import AuthorizationDecision
 from sapl_django.decorators import (
     _extract_class_name,
@@ -23,7 +24,6 @@ def _make_request(
     path: str = "/api/test",
     username: str = "testuser",
 ) -> HttpRequest:
-    """Create a minimal Django HttpRequest for testing."""
     request = HttpRequest()
     request.method = method
     request.path = path
@@ -32,62 +32,34 @@ def _make_request(
     return request
 
 
-def _mock_pdp_permit() -> AsyncMock:
-    """Create a mock PDP client that returns PERMIT."""
+def _mock_pdp(decision: AuthorizationDecision) -> AsyncMock:
     mock = AsyncMock()
-    mock.decide_once.return_value = AuthorizationDecision.permit()
+    mock.decide_once.return_value = decision
     return mock
 
 
-def _mock_pdp_deny() -> AsyncMock:
-    """Create a mock PDP client that returns DENY."""
-    mock = AsyncMock()
-    mock.decide_once.return_value = AuthorizationDecision.deny()
-    return mock
-
-
-def _mock_constraint_service() -> MagicMock:
-    """Create a mock constraint enforcement service."""
-    mock = MagicMock()
-    bundle = MagicMock()
-    bundle.handle_on_decision_constraints.return_value = None
-    bundle.handle_method_invocation_handlers.return_value = None
-    bundle.handle_all_on_next_constraints.side_effect = lambda v: v
-    mock.pre_enforce_bundle_for.return_value = bundle
-    mock.post_enforce_bundle_for.return_value = bundle
-    mock.best_effort_bundle_for.return_value = bundle
-    return mock
+def _real_planner() -> EnforcementPlanner:
+    return EnforcementPlanner()
 
 
 class TestExtractRequest:
-    """Tests for _extract_request helper."""
-
     def test_extracts_from_positional_args(self):
         request = _make_request()
-        result = _extract_request((request,), {})
-
-        assert result is request
+        assert _extract_request((request,), {}) is request
 
     def test_extracts_from_kwargs_by_name(self):
         request = _make_request()
-        result = _extract_request((), {"request": request})
-
-        assert result is request
+        assert _extract_request((), {"request": request}) is request
 
     def test_extracts_from_kwargs_by_type(self):
         request = _make_request()
-        result = _extract_request((), {"my_req": request})
-
-        assert result is request
+        assert _extract_request((), {"my_req": request}) is request
 
     def test_returns_none_when_no_request(self):
-        result = _extract_request(("not_a_request",), {"key": "value"})
-        assert result is None
+        assert _extract_request(("not_a_request",), {"key": "value"}) is None
 
 
 class TestPreEnforce:
-    """Tests for the pre_enforce decorator."""
-
     @pytest.mark.asyncio
     async def test_permit_returns_view_result(self):
         @pre_enforce(action="read", resource="data")
@@ -95,11 +67,10 @@ class TestPreEnforce:
             return JsonResponse({"result": "ok"})
 
         request = _make_request()
-
-        with patch("sapl_django.decorators.get_pdp_client", return_value=_mock_pdp_permit()), \
-             patch("sapl_django.decorators.get_constraint_service", return_value=_mock_constraint_service()):
+        with patch("sapl_django.decorators.get_pdp_client",
+                   return_value=_mock_pdp(AuthorizationDecision.permit())), \
+             patch("sapl_django.decorators.get_planner", return_value=_real_planner()):
             result = await my_view(request)
-
         assert isinstance(result, JsonResponse)
 
     @pytest.mark.asyncio
@@ -109,9 +80,9 @@ class TestPreEnforce:
             return JsonResponse({"result": "ok"})
 
         request = _make_request()
-
-        with patch("sapl_django.decorators.get_pdp_client", return_value=_mock_pdp_deny()), \
-             patch("sapl_django.decorators.get_constraint_service", return_value=_mock_constraint_service()), \
+        with patch("sapl_django.decorators.get_pdp_client",
+                   return_value=_mock_pdp(AuthorizationDecision.deny())), \
+             patch("sapl_django.decorators.get_planner", return_value=_real_planner()), \
              pytest.raises(PermissionDenied):
             await my_view(request)
 
@@ -128,11 +99,10 @@ class TestPreEnforce:
             return JsonResponse({"result": "ok"})
 
         request = _make_request()
-
-        with patch("sapl_django.decorators.get_pdp_client", return_value=_mock_pdp_deny()), \
-             patch("sapl_django.decorators.get_constraint_service", return_value=_mock_constraint_service()):
+        with patch("sapl_django.decorators.get_pdp_client",
+                   return_value=_mock_pdp(AuthorizationDecision.deny())), \
+             patch("sapl_django.decorators.get_planner", return_value=_real_planner()):
             result = await my_view(request)
-
         assert result is custom_response
 
     @pytest.mark.asyncio
@@ -145,8 +115,6 @@ class TestPreEnforce:
 
 
 class TestPostEnforce:
-    """Tests for the post_enforce decorator."""
-
     @pytest.mark.asyncio
     async def test_permit_returns_view_result(self):
         @post_enforce(action="read", resource="data")
@@ -154,11 +122,10 @@ class TestPostEnforce:
             return JsonResponse({"result": "ok"})
 
         request = _make_request()
-
-        with patch("sapl_django.decorators.get_pdp_client", return_value=_mock_pdp_permit()), \
-             patch("sapl_django.decorators.get_constraint_service", return_value=_mock_constraint_service()):
+        with patch("sapl_django.decorators.get_pdp_client",
+                   return_value=_mock_pdp(AuthorizationDecision.permit())), \
+             patch("sapl_django.decorators.get_planner", return_value=_real_planner()):
             result = await my_view(request)
-
         assert isinstance(result, JsonResponse)
 
     @pytest.mark.asyncio
@@ -168,9 +135,9 @@ class TestPostEnforce:
             return JsonResponse({"result": "ok"})
 
         request = _make_request()
-
-        with patch("sapl_django.decorators.get_pdp_client", return_value=_mock_pdp_deny()), \
-             patch("sapl_django.decorators.get_constraint_service", return_value=_mock_constraint_service()), \
+        with patch("sapl_django.decorators.get_pdp_client",
+                   return_value=_mock_pdp(AuthorizationDecision.deny())), \
+             patch("sapl_django.decorators.get_planner", return_value=_real_planner()), \
              pytest.raises(PermissionDenied):
             await my_view(request)
 
@@ -180,13 +147,6 @@ class TestPostEnforce:
 
         mock_pdp = AsyncMock()
         mock_pdp.decide_once.return_value = AuthorizationDecision.deny()
-
-        @post_enforce(action="read", resource="data")
-        async def my_view(request):
-            call_order.append("view")
-            return {"result": "ok"}
-
-        # Track when decide_once is called
         original_decide = mock_pdp.decide_once
 
         async def tracked_decide(*a, **kw):
@@ -195,13 +155,16 @@ class TestPostEnforce:
 
         mock_pdp.decide_once = tracked_decide
 
-        request = _make_request()
+        @post_enforce(action="read", resource="data")
+        async def my_view(request):
+            call_order.append("view")
+            return {"result": "ok"}
 
+        request = _make_request()
         with patch("sapl_django.decorators.get_pdp_client", return_value=mock_pdp), \
-             patch("sapl_django.decorators.get_constraint_service", return_value=_mock_constraint_service()), \
+             patch("sapl_django.decorators.get_planner", return_value=_real_planner()), \
              pytest.raises(PermissionDenied):
             await my_view(request)
-
         assert call_order == ["view", "pdp"]
 
     @pytest.mark.asyncio
@@ -217,22 +180,18 @@ class TestPostEnforce:
             return {"result": "ok"}
 
         request = _make_request()
-
-        with patch("sapl_django.decorators.get_pdp_client", return_value=_mock_pdp_deny()), \
-             patch("sapl_django.decorators.get_constraint_service", return_value=_mock_constraint_service()):
+        with patch("sapl_django.decorators.get_pdp_client",
+                   return_value=_mock_pdp(AuthorizationDecision.deny())), \
+             patch("sapl_django.decorators.get_planner", return_value=_real_planner()):
             result = await my_view(request)
-
         assert result is custom_response
 
 
 def _module_level_function():
-    """Module-level function with single-part qualname."""
     pass
 
 
 class _TestPatientService:
-    """Test class for class name extraction."""
-
     def get_patient(self):
         pass
 
@@ -244,8 +203,6 @@ class _TestOuter:
 
 
 class TestExtractClassName:
-    """Verify _extract_class_name detects class names from qualified names."""
-
     def test_plain_function_returns_empty_string(self):
         assert _extract_class_name(_module_level_function) == ""
 
@@ -257,14 +214,13 @@ class TestExtractClassName:
 
 
 class TestResolveArgs:
-    """Verify _resolve_args maps arguments to names, excluding HttpRequest."""
-
     def test_resolves_positional_args(self):
         def my_view(patient_id: str, amount: float):
             pass
 
-        result = _resolve_args(my_view, ("P-001", 100.0), {})
-        assert result == {"patient_id": "P-001", "amount": 100.0}
+        assert _resolve_args(my_view, ("P-001", 100.0), {}) == {
+            "patient_id": "P-001", "amount": 100.0,
+        }
 
     def test_excludes_http_request_instances(self):
         request = _make_request()
@@ -280,8 +236,7 @@ class TestResolveArgs:
         def my_view(name: str, limit: int = 10):
             pass
 
-        result = _resolve_args(my_view, ("test",), {})
-        assert result == {"name": "test", "limit": 10}
+        assert _resolve_args(my_view, ("test",), {}) == {"name": "test", "limit": 10}
 
     def test_excludes_self(self):
         class MyService:
@@ -291,5 +246,3 @@ class TestResolveArgs:
         result = _resolve_args(MyService.get_data, (MyService(), "P-001"), {})
         assert "self" not in result
         assert result == {"patient_id": "P-001"}
-
-

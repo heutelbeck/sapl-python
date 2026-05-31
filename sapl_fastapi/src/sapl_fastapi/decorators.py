@@ -11,23 +11,20 @@ from fastapi import HTTPException
 from starlette.requests import Request
 from starlette.responses import StreamingResponse
 
-from sapl_base.constraint_bundle import AccessDeniedError
-from sapl_base.enforcement import post_enforce as _post_enforce
-from sapl_base.enforcement import pre_enforce as _pre_enforce
-from sapl_base.streaming import (
-    enforce_drop_while_denied as _enforce_drop_while_denied,
+from sapl_base.pep import (
+    AccessDeniedError,
+    AccessGrantedSignal,
+    AccessSuspendedSignal,
+    post_enforce as _post_enforce,
+    pre_enforce as _pre_enforce,
 )
-from sapl_base.streaming import (
-    enforce_recoverable_if_denied as _enforce_recoverable_if_denied,
-)
-from sapl_base.streaming import (
-    enforce_till_denied as _enforce_till_denied,
-)
-from sapl_fastapi.dependencies import get_constraint_service, get_pdp_client
+from sapl_base.pep.streaming import run_pipeline
+
+from sapl_fastapi.dependencies import get_pdp_client, get_planner
 from sapl_fastapi.subscription import SubscriptionBuilder, SubscriptionField
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import AsyncIterator, Callable
 
     from sapl_base.types import AuthorizationDecision, AuthorizationSubscription
 
@@ -35,20 +32,12 @@ log = structlog.get_logger()
 
 
 def _extract_class_name(func: Callable) -> str:
-    """Extract the class name from a method's qualified name.
-
-    Returns empty string for plain functions.
-    """
     qualname = getattr(func, "__qualname__", "")
     parts = qualname.split(".")
     return parts[-2] if len(parts) >= 2 else ""
 
 
 def _resolve_args(func: Callable, args: tuple, kwargs: dict) -> dict[str, Any]:
-    """Resolve all positional and keyword arguments into a named dict.
-
-    Excludes ``self``, ``cls``, and ``Request`` parameters.
-    """
     try:
         sig = inspect.signature(func)
         bound = sig.bind(*args, **kwargs)
@@ -56,23 +45,12 @@ def _resolve_args(func: Callable, args: tuple, kwargs: dict) -> dict[str, Any]:
         resolved = dict(bound.arguments)
         resolved.pop("self", None)
         resolved.pop("cls", None)
-        resolved = {
-            k: v for k, v in resolved.items()
-            if not isinstance(v, Request)
-        }
-        return resolved
+        return {k: v for k, v in resolved.items() if not isinstance(v, Request)}
     except (TypeError, ValueError):
-        return {
-            k: v for k, v in kwargs.items()
-            if not isinstance(v, Request)
-        }
+        return {k: v for k, v in kwargs.items() if not isinstance(v, Request)}
 
 
 def _extract_request(args: tuple, kwargs: dict) -> Request | None:
-    """Extract Starlette Request from function arguments.
-
-    Returns None if no Request is found (enables service-layer usage).
-    """
     for arg in args:
         if isinstance(arg, Request):
             return arg
@@ -84,6 +62,34 @@ def _extract_request(args: tuple, kwargs: dict) -> Request | None:
     return None
 
 
+def _build_subscription(
+    func: Callable,
+    args: tuple,
+    kwargs: dict,
+    *,
+    subject: SubscriptionField,
+    action: SubscriptionField,
+    resource: SubscriptionField,
+    environment: SubscriptionField,
+    secrets: SubscriptionField,
+    return_value: Any = None,
+) -> AuthorizationSubscription:
+    request = _extract_request(args, kwargs)
+    resolved = _resolve_args(func, args, kwargs)
+    return SubscriptionBuilder.build(
+        request,
+        subject=subject,
+        action=action,
+        resource=resource,
+        environment=environment,
+        secrets=secrets,
+        function_name=func.__name__,
+        class_name=_extract_class_name(func),
+        resolved_args=resolved,
+        return_value=return_value,
+    )
+
+
 def pre_enforce(
     *,
     subject: SubscriptionField = None,
@@ -93,47 +99,27 @@ def pre_enforce(
     secrets: SubscriptionField = None,
     on_deny: Callable[[AuthorizationDecision], Any] | None = None,
 ) -> Callable:
-    """Decorator: authorize BEFORE method execution.
-
-    Usage:
-        @app.get("/data")
-        @pre_enforce(action="read", resource="data")
-        async def get_data(request: Request):
-            return {"data": "sensitive"}
-    """
+    """Decorator: authorize BEFORE method execution."""
     def decorator(func: Callable) -> Callable:
-        class_name = _extract_class_name(func)
-
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            request = _extract_request(args, kwargs)
-            resolved = _resolve_args(func, args, kwargs)
-            subscription = SubscriptionBuilder.build(
-                request,
-                subject=subject,
-                action=action,
-                resource=resource,
-                environment=environment,
-                secrets=secrets,
-                function_name=func.__name__,
-                class_name=class_name,
-                resolved_args=resolved,
+            subscription = _build_subscription(
+                func, args, kwargs,
+                subject=subject, action=action, resource=resource,
+                environment=environment, secrets=secrets,
             )
-
             try:
                 return await _pre_enforce(
+                    func,
                     pdp_client=get_pdp_client(),
-                    constraint_service=get_constraint_service(),
+                    planner=get_planner(),
                     subscription=subscription,
-                    protected_function=func,
-                    args=list(args),
-                    kwargs=kwargs,
-                    function_name=func.__name__,
-                    on_deny=on_deny,
-                    class_name=class_name,
-                    request=request,
+                    args=tuple(args),
+                    kwargs=dict(kwargs),
                 )
-            except AccessDeniedError:
+            except AccessDeniedError as exc:
+                if on_deny is not None:
+                    return on_deny(exc.decision)
                 raise HTTPException(status_code=403) from None
         return wrapper
     return decorator
@@ -148,204 +134,109 @@ def post_enforce(
     secrets: SubscriptionField = None,
     on_deny: Callable[[AuthorizationDecision], Any] | None = None,
 ) -> Callable:
-    """Decorator: authorize AFTER method execution."""
-    def decorator(func: Callable) -> Callable:
-        class_name = _extract_class_name(func)
+    """Decorator: authorize AFTER method execution.
 
+    The view runs first, then the PDP is queried with a subscription that
+    can reference the return value through the `resource`/`action`/...
+    callables (each receives a `SubscriptionContext` whose `return_value`
+    is populated).
+    """
+    def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            request = _extract_request(args, kwargs)
-            resolved = _resolve_args(func, args, kwargs)
-
-            def subscription_builder(return_value: Any) -> AuthorizationSubscription:
-                return SubscriptionBuilder.build(
-                    request,
-                    subject=subject,
-                    action=action,
-                    resource=resource,
-                    environment=environment,
-                    secrets=secrets,
-                    function_name=func.__name__,
-                    class_name=class_name,
-                    resolved_args=resolved,
+            def _subscription_builder(return_value: Any) -> AuthorizationSubscription:
+                return _build_subscription(
+                    func, args, kwargs,
+                    subject=subject, action=action, resource=resource,
+                    environment=environment, secrets=secrets,
                     return_value=return_value,
                 )
-
             try:
                 return await _post_enforce(
+                    func,
                     pdp_client=get_pdp_client(),
-                    constraint_service=get_constraint_service(),
-                    subscription_builder=subscription_builder,
-                    protected_function=func,
-                    args=list(args),
-                    kwargs=kwargs,
-                    function_name=func.__name__,
-                    on_deny=on_deny,
-                    class_name=class_name,
-                    request=request,
+                    planner=get_planner(),
+                    subscription_builder=_subscription_builder,
+                    args=tuple(args),
+                    kwargs=dict(kwargs),
                 )
-            except AccessDeniedError:
+            except AccessDeniedError as exc:
+                if on_deny is not None:
+                    return on_deny(exc.decision)
                 raise HTTPException(status_code=403) from None
         return wrapper
     return decorator
 
 
-def enforce_till_denied(
+def stream_enforce(
     *,
     subject: SubscriptionField = None,
     action: SubscriptionField = None,
     resource: SubscriptionField = None,
     environment: SubscriptionField = None,
     secrets: SubscriptionField = None,
-    on_stream_deny: Callable[[AuthorizationDecision], Any] | None = None,
+    signal_transitions: bool = False,
+    pause_rap_during_suspend: bool = False,
 ) -> Callable:
-    """Decorator: streaming enforcement that terminates on first deny.
+    """Decorator: SAPL-enforced SSE streaming.
 
-    The decorated function must return an async generator.
-    Returns an SSE StreamingResponse.
+    The decorated function returns an async iterator. The wrapper drives
+    the Mealy FSM and yields items as SSE frames on `text/event-stream`.
+
+    - `signal_transitions=True`: emit ACCESS_SUSPENDED / ACCESS_RESTORED
+      SSE frames on Suspended/Permitting boundary transitions.
+    - `pause_rap_during_suspend=True`: cancel the upstream iterator on
+      entry to Suspended; re-subscribe on exit.
+
+    DENY is terminal; a final ACCESS_DENIED SSE frame is emitted before
+    the stream closes. Use SUSPEND in policies for keep-alive semantics.
     """
     def decorator(func: Callable) -> Callable:
-        class_name = _extract_class_name(func)
-
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> StreamingResponse:
-            request = _extract_request(args, kwargs)
-            resolved = _resolve_args(func, args, kwargs)
-            subscription = SubscriptionBuilder.build(
-                request,
-                subject=subject,
-                action=action,
-                resource=resource,
-                environment=environment,
-                secrets=secrets,
-                function_name=func.__name__,
-                class_name=class_name,
-                resolved_args=resolved,
+            subscription = _build_subscription(
+                func, args, kwargs,
+                subject=subject, action=action, resource=resource,
+                environment=environment, secrets=secrets,
             )
 
-            async def data_source():
+            async def _async_rap() -> AsyncIterator[Any]:
                 result = func(*args, **kwargs)
                 if asyncio.iscoroutine(result):
                     result = await result
-                return result
+                async for item in result:
+                    yield item
 
-            async def sse_generator():
-                async for item in _enforce_till_denied(
-                    pdp_client=get_pdp_client(),
-                    constraint_service=get_constraint_service(),
-                    subscription=subscription,
-                    data_source=data_source,
-                    on_stream_deny=on_stream_deny,
-                ):
-                    yield _format_sse(item)
+            def _rap_factory() -> AsyncIterator[Any]:
+                return _async_rap()
 
-            return StreamingResponse(sse_generator(), media_type="text/event-stream")
-        return wrapper
-    return decorator
+            async def _sse_generator() -> AsyncIterator[bytes]:
+                pipeline = run_pipeline(
+                    decisions=get_pdp_client().decide(subscription),
+                    planner=get_planner(),
+                    rap_factory=_rap_factory,
+                    signal_transitions=signal_transitions,
+                    pause_rap_during_suspend=pause_rap_during_suspend,
+                )
+                try:
+                    async for item in pipeline:
+                        yield _format_sse(item).encode("utf-8")
+                except AccessDeniedError as exc:
+                    yield _format_sse({
+                        "type": "ACCESS_DENIED",
+                        "reason": getattr(exc, "reason", None),
+                    }).encode("utf-8")
 
-
-def enforce_drop_while_denied(
-    *,
-    subject: SubscriptionField = None,
-    action: SubscriptionField = None,
-    resource: SubscriptionField = None,
-    environment: SubscriptionField = None,
-    secrets: SubscriptionField = None,
-) -> Callable:
-    """Decorator: streaming enforcement that drops data during deny."""
-    def decorator(func: Callable) -> Callable:
-        class_name = _extract_class_name(func)
-
-        @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> StreamingResponse:
-            request = _extract_request(args, kwargs)
-            resolved = _resolve_args(func, args, kwargs)
-            subscription = SubscriptionBuilder.build(
-                request,
-                subject=subject,
-                action=action,
-                resource=resource,
-                environment=environment,
-                secrets=secrets,
-                function_name=func.__name__,
-                class_name=class_name,
-                resolved_args=resolved,
-            )
-
-            async def data_source():
-                result = func(*args, **kwargs)
-                if asyncio.iscoroutine(result):
-                    result = await result
-                return result
-
-            async def sse_generator():
-                async for item in _enforce_drop_while_denied(
-                    pdp_client=get_pdp_client(),
-                    constraint_service=get_constraint_service(),
-                    subscription=subscription,
-                    data_source=data_source,
-                ):
-                    yield _format_sse(item)
-
-            return StreamingResponse(sse_generator(), media_type="text/event-stream")
-        return wrapper
-    return decorator
-
-
-def enforce_recoverable_if_denied(
-    *,
-    subject: SubscriptionField = None,
-    action: SubscriptionField = None,
-    resource: SubscriptionField = None,
-    environment: SubscriptionField = None,
-    secrets: SubscriptionField = None,
-    on_stream_deny: Callable[[AuthorizationDecision], Any] | None = None,
-    on_stream_recover: Callable[[AuthorizationDecision], Any] | None = None,
-) -> Callable:
-    """Decorator: streaming enforcement with suspend/resume signals."""
-    def decorator(func: Callable) -> Callable:
-        class_name = _extract_class_name(func)
-
-        @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> StreamingResponse:
-            request = _extract_request(args, kwargs)
-            resolved = _resolve_args(func, args, kwargs)
-            subscription = SubscriptionBuilder.build(
-                request,
-                subject=subject,
-                action=action,
-                resource=resource,
-                environment=environment,
-                secrets=secrets,
-                function_name=func.__name__,
-                class_name=class_name,
-                resolved_args=resolved,
-            )
-
-            async def data_source():
-                result = func(*args, **kwargs)
-                if asyncio.iscoroutine(result):
-                    result = await result
-                return result
-
-            async def sse_generator():
-                async for item in _enforce_recoverable_if_denied(
-                    pdp_client=get_pdp_client(),
-                    constraint_service=get_constraint_service(),
-                    subscription=subscription,
-                    data_source=data_source,
-                    on_stream_deny=on_stream_deny,
-                    on_stream_recover=on_stream_recover,
-                ):
-                    yield _format_sse(item)
-
-            return StreamingResponse(sse_generator(), media_type="text/event-stream")
+            return StreamingResponse(_sse_generator(), media_type="text/event-stream")
         return wrapper
     return decorator
 
 
 def _format_sse(data: Any) -> str:
-    """Format data as SSE event."""
+    if isinstance(data, AccessSuspendedSignal):
+        return "data: " + json.dumps({"type": "ACCESS_SUSPENDED"}) + "\n\n"
+    if isinstance(data, AccessGrantedSignal):
+        return "data: " + json.dumps({"type": "ACCESS_RESTORED"}) + "\n\n"
     if isinstance(data, str):
         return f"data: {data}\n\n"
     if isinstance(data, dict):
