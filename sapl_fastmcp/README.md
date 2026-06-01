@@ -42,12 +42,12 @@ If the PDP permits, the tool runs. If not, access is denied. If the decision car
 pip install sapl-fastmcp
 ```
 
-For setup instructions, configuration options, and the constraint handler reference, see the [FastMCP documentation](https://sapl.io/docs/latest/6_10_PythonFastMCP/).
+For setup instructions, configuration options, and the constraint handler reference, see the [FastMCP documentation](https://sapl.io/docs/latest/6_9_FastMCP/).
 
 ## Links
 
 - [Full Documentation](https://sapl.io/docs/latest/)
-- [FastMCP Integration](https://sapl.io/docs/latest/6_10_PythonFastMCP/)
+- [FastMCP Integration](https://sapl.io/docs/latest/6_9_FastMCP/)
 - [Demo Application](https://github.com/heutelbeck/sapl-python-demos/tree/main/fastmcp_demo)
 - [Report an Issue](https://github.com/heutelbeck/sapl-python/issues)
 

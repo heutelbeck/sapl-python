@@ -16,7 +16,7 @@ decision = await client.decide_once(AuthorizationSubscription(
     action="read",
     resource="patient-record",
 ))
-print(decision.decision)  # PERMIT, DENY, INDETERMINATE, or NOT_APPLICABLE
+print(decision.decision)  # PERMIT, DENY, INDETERMINATE, NOT_APPLICABLE, or SUSPEND
 ```
 
 ```
@@ -35,7 +35,7 @@ async for decision in client.decide(subscription):
 
 ## What You Get
 
-- Async HTTP client for all PDP REST endpoints (`decide-once`, `decide`, `multi-decide-once`, `multi-decide`, `multi-decide-all-once`, `multi-decide-all`)
+- Async HTTP client for all PDP REST endpoints (`decide-once`, `decide`, `multi-decide`, `multi-decide-all`, `multi-decide-all-once`)
 - Streaming SSE subscriptions with automatic reconnect and exponential backoff
 - Constraint enforcement via a single `ConstraintHandlerProvider`, returning `ScopedHandler` entries whose shape is a runner (no value), a consumer (observes a value), or a mapper (transforms a value)
 - Built-in content filtering via `filterJsonContent` (blacken, delete, replace)
