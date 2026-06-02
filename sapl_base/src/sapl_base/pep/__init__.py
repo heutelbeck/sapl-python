@@ -34,6 +34,11 @@ from sapl_base.pep.enforce import (
 )
 from sapl_base.pep.planner import EnforcementPlanner
 from sapl_base.pep.runtime import PepRuntime
+from sapl_base.pep.shim_signals import (
+    register_shim_signal,
+    shim_signals,
+    unregister_shim_signal,
+)
 from sapl_base.pep.provider import (
     ConstraintHandlerProvider,
     ConstraintTag,
@@ -80,5 +85,8 @@ __all__ = [
     "from_sync_context",
     "post_enforce",
     "pre_enforce",
+    "register_shim_signal",
+    "shim_signals",
     "transaction_scope",
+    "unregister_shim_signal",
 ]

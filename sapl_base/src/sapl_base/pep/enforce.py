@@ -26,6 +26,7 @@ from sapl_base.pep.boundary_signals import AccessDeniedError
 from sapl_base.pep.plan import ABSENT
 from sapl_base.pep.planner import EnforcementPlanner
 from sapl_base.pep.request_context import reset_current_plan, set_current_plan
+from sapl_base.pep.shim_signals import shim_signals
 from sapl_base.pep.signal import SignalKind
 from sapl_base.pep.transaction import TransactionProvider, transaction_scope
 from sapl_base.transport.pdp_client import PdpClient
@@ -97,7 +98,7 @@ async def pre_enforce(
     """
     kwargs = dict(kwargs or {})
     decision = await pdp_client.decide_once(subscription)
-    plan = planner.plan(decision, PRE_ENFORCE_SUPPORTED)
+    plan = planner.plan(decision, PRE_ENFORCE_SUPPORTED | shim_signals())
 
     decision_result = plan.execute(DecisionSignal(decision=decision))
     if decision_result.failure_state or decision.decision is not Decision.PERMIT:

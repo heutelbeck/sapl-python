@@ -11,6 +11,7 @@ from sqlalchemy.orm import ORMExecuteState, Session
 from sapl_base.pep.boundary_signals import AccessDeniedError
 from sapl_base.pep.plan import ABSENT
 from sapl_base.pep.request_context import current_plan
+from sapl_base.pep.shim_signals import register_shim_signal, unregister_shim_signal
 
 from sapl_sqlalchemy.signal import SQL_QUERY, SqlQuerySignal
 
@@ -67,7 +68,12 @@ def register_orm_listener(
     from the statement. order="last" is an audited escape hatch.
 
     Idempotent: a second call with the same listener is a no-op.
+
+    Also advertises SQL_QUERY as a supported signal so the planner schedules
+    a matching `sql:queryManipulation` obligation onto this shim instead of
+    failing it closed as inadmissible.
     """
+    register_shim_signal(SQL_QUERY)
     if event.contains(target, "do_orm_execute", _sapl_listener):
         return
     event.listen(
@@ -79,5 +85,6 @@ def register_orm_listener(
 
 
 def unregister_orm_listener(target: Any = Session) -> None:
+    unregister_shim_signal(SQL_QUERY)
     if event.contains(target, "do_orm_execute", _sapl_listener):
         event.remove(target, "do_orm_execute", _sapl_listener)
