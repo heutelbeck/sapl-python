@@ -20,13 +20,13 @@ from sapl_base.pep import (
 )
 from sapl_base.pep.streaming import run_pipeline
 
-from sapl_fastapi.dependencies import get_pdp_client, get_planner
+from sapl_fastapi.dependencies import get_pdp_client, get_planner, get_transaction_provider
 from sapl_fastapi.subscription import SubscriptionBuilder, SubscriptionField
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
 
-    from sapl_base.types import AuthorizationDecision, AuthorizationSubscription
+    from sapl_base.types import AuthorizationSubscription
 
 log = structlog.get_logger()
 
@@ -97,7 +97,6 @@ def pre_enforce(
     resource: SubscriptionField = None,
     environment: SubscriptionField = None,
     secrets: SubscriptionField = None,
-    on_deny: Callable[[AuthorizationDecision], Any] | None = None,
 ) -> Callable:
     """Decorator: authorize BEFORE method execution."""
     def decorator(func: Callable) -> Callable:
@@ -116,10 +115,9 @@ def pre_enforce(
                     subscription=subscription,
                     args=tuple(args),
                     kwargs=dict(kwargs),
+                    transaction=get_transaction_provider(),
                 )
-            except AccessDeniedError as exc:
-                if on_deny is not None:
-                    return on_deny(exc.decision)
+            except AccessDeniedError:
                 raise HTTPException(status_code=403) from None
         return wrapper
     return decorator
@@ -132,7 +130,6 @@ def post_enforce(
     resource: SubscriptionField = None,
     environment: SubscriptionField = None,
     secrets: SubscriptionField = None,
-    on_deny: Callable[[AuthorizationDecision], Any] | None = None,
 ) -> Callable:
     """Decorator: authorize AFTER method execution.
 
@@ -159,10 +156,9 @@ def post_enforce(
                     subscription_builder=_subscription_builder,
                     args=tuple(args),
                     kwargs=dict(kwargs),
+                    transaction=get_transaction_provider(),
                 )
-            except AccessDeniedError as exc:
-                if on_deny is not None:
-                    return on_deny(exc.decision)
+            except AccessDeniedError:
                 raise HTTPException(status_code=403) from None
         return wrapper
     return decorator

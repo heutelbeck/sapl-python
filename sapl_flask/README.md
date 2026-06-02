@@ -28,6 +28,21 @@ SAPL goes beyond simple permit/deny. Decisions can carry obligations that must b
 
 For SSE endpoints, the single `stream_enforce` decorator maintains a live connection to the PDP, so access rights update in real time as policies, attributes, or the environment change. Built-in constraint handlers cover JSON field redaction and collection filtering. Writing custom handlers follows a simple registration pattern with `register_provider` on the `SaplFlask` extension.
 
+## Database Transactions
+
+If you configure a transaction provider, a denial that lands after the view has written to the database rolls the transaction back. Three triggers cause a rollback: a `post_enforce` DENY, a `post_enforce` output-obligation failure, and a `pre_enforce` output-obligation failure (the pre-decision permits, but its output obligations run after the method writes). A clean permit commits. It is opt-in: with no provider set, the PEP owns no transaction.
+
+`set_transaction_provider` is a method on the extension. Flask views are synchronous, so wrap a sync session or `transaction.atomic` with `from_sync_context`:
+
+```python
+from sapl_base.pep import from_sync_context
+
+sapl = SaplFlask(app)
+sapl.set_transaction_provider(from_sync_context(lambda: get_current_session().begin()))
+```
+
+The factory should resolve the current request's session. With an async SQLAlchemy session you can pass the async scope directly: `sapl.set_transaction_provider(lambda: get_current_session().begin())`.
+
 ## Getting Started
 
 ```bash

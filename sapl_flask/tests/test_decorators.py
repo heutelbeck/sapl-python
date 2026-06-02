@@ -106,27 +106,6 @@ class TestPreEnforceDeny:
         assert executed == []
 
 
-class TestPreEnforceOnDeny:
-    def test_on_deny_callback_returns_custom_response(self, app: Flask) -> None:
-        def custom_deny(decision: AuthorizationDecision) -> str:
-            return "custom deny"
-
-        @app.route("/custom")
-        @pre_enforce(action="read", resource="custom", on_deny=custom_deny)
-        def get_custom():
-            return "should not reach"
-
-        with patch.object(
-            app.extensions["sapl"].pdp_client,
-            "decide_once",
-            _mock_decide_once(AuthorizationDecision.deny()),
-        ), app.test_client() as client:
-            response = client.get("/custom")
-
-        assert response.status_code == 200
-        assert response.data == b"custom deny"
-
-
 class TestPostEnforcePermit:
     def test_permit_returns_200_with_result(self, app: Flask) -> None:
         @app.route("/post-data")
@@ -164,27 +143,6 @@ class TestPostEnforceDeny:
 
         assert response.status_code == 403
         assert executed == [True]
-
-
-class TestPostEnforceOnDeny:
-    def test_on_deny_callback_returns_custom_response(self, app: Flask) -> None:
-        def custom_deny(decision: AuthorizationDecision) -> str:
-            return "post custom deny"
-
-        @app.route("/post-custom")
-        @post_enforce(action="read", resource="post-custom", on_deny=custom_deny)
-        def get_post_custom():
-            return "should execute then deny"
-
-        with patch.object(
-            app.extensions["sapl"].pdp_client,
-            "decide_once",
-            _mock_decide_once(AuthorizationDecision.deny()),
-        ), app.test_client() as client:
-            response = client.get("/post-custom")
-
-        assert response.status_code == 200
-        assert response.data == b"post custom deny"
 
 
 class TestDecoratorPreservesMetadata:

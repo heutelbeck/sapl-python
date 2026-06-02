@@ -6,6 +6,7 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
 from sapl_base.pep import ConstraintHandlerProvider, EnforcementPlanner, PepRuntime
+from sapl_base.pep.transaction import TransactionProvider
 from sapl_base.transport import HttpPdpClient, HttpPdpClientOptions
 
 ERROR_MISSING_CONFIG = "SAPL_CONFIG not found in Django settings"
@@ -41,6 +42,22 @@ def get_planner() -> EnforcementPlanner:
 def register_provider(provider: ConstraintHandlerProvider) -> None:
     """Register a custom constraint handler provider. Rebuilds the planner."""
     _runtime.register_provider(provider)
+
+
+def set_transaction_provider(provider: TransactionProvider | None) -> None:
+    """Set (or clear) the transaction provider that pre/post enforce wrap DB writes in.
+
+    A provider is a zero-arg factory returning an async context manager that commits on
+    success and rolls back on a propagated exception. For Django's ORM use
+    ``set_transaction_provider(from_sync_context(transaction.atomic))``. When set, a
+    post-write denial (DENY or output-obligation failure) rolls the transaction back.
+    """
+    _runtime.set_transaction_provider(provider)
+
+
+def get_transaction_provider() -> TransactionProvider | None:
+    """Get the configured transaction provider, or None if unset."""
+    return _runtime.transaction_provider
 
 
 async def cleanup_sapl() -> None:

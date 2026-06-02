@@ -19,6 +19,7 @@ from collections.abc import Iterable
 from sapl_base.pep.filters import ContentFilteringProvider, ContentFilterPredicateProvider
 from sapl_base.pep.planner import EnforcementPlanner
 from sapl_base.pep.provider import ConstraintHandlerProvider
+from sapl_base.pep.transaction import TransactionProvider
 from sapl_base.transport import HttpPdpClient, HttpPdpClientOptions
 
 ERROR_NOT_CONFIGURED = "SAPL not configured. Call configure() first."
@@ -27,7 +28,7 @@ ERROR_NOT_CONFIGURED = "SAPL not configured. Call configure() first."
 class PepRuntime:
     """Lazy singleton: PDP client + EnforcementPlanner + provider list."""
 
-    __slots__ = ("_lock", "_pdp_client", "_planner", "_providers")
+    __slots__ = ("_lock", "_pdp_client", "_planner", "_providers", "_transaction_provider")
 
     def __init__(
         self,
@@ -36,6 +37,7 @@ class PepRuntime:
     ) -> None:
         self._lock = threading.Lock()
         self._providers: list[ConstraintHandlerProvider] = list(providers)
+        self._transaction_provider: TransactionProvider | None = None
         if options is not None:
             self._pdp_client: HttpPdpClient | None = HttpPdpClient(options)
             self._planner: EnforcementPlanner | None = self._build_planner_unlocked()
@@ -58,6 +60,21 @@ class PepRuntime:
             self._providers.append(provider)
             if self._planner is not None:
                 self._planner = self._build_planner_unlocked()
+
+    def set_transaction_provider(self, provider: TransactionProvider | None) -> None:
+        """Set (or clear) the transaction provider that pre/post enforce wrap writes in.
+
+        A provider is a zero-arg factory returning an async context manager that commits
+        on clean exit and rolls back on a propagated exception. When set, a post-write
+        denial (DENY or output-obligation failure) rolls the transaction back.
+        """
+        with self._lock:
+            self._transaction_provider = provider
+
+    @property
+    def transaction_provider(self) -> TransactionProvider | None:
+        with self._lock:
+            return self._transaction_provider
 
     @property
     def is_configured(self) -> bool:
@@ -94,6 +111,7 @@ class PepRuntime:
             self._pdp_client = None
             self._planner = None
             self._providers.clear()
+            self._transaction_provider = None
 
     def _build_planner_unlocked(self) -> EnforcementPlanner:
         defaults: list[ConstraintHandlerProvider] = [

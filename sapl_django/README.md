@@ -27,6 +27,22 @@ SAPL goes beyond simple permit/deny. Decisions can carry obligations that must b
 
 For streaming views, the single `stream_enforce` decorator maintains a live connection to the PDP, so access rights update in real time as policies, attributes, or the environment change. Built-in constraint handlers cover JSON field redaction and collection filtering. Writing custom handlers follows a simple registration pattern with `register_provider`.
 
+## Database Transactions
+
+If you configure a transaction provider, a denial that lands after the view has written to the database rolls the transaction back. Three triggers cause a rollback: a `post_enforce` DENY, a `post_enforce` output-obligation failure, and a `pre_enforce` output-obligation failure (the pre-decision permits, but its output obligations run after the method writes). A clean permit commits. It is opt-in: with no provider set, the PEP owns no transaction.
+
+`transaction.atomic` is synchronous, so wrap it with `from_sync_context`:
+
+```python
+from django.db import transaction
+from sapl_base.pep import from_sync_context
+from sapl_django.config import set_transaction_provider
+
+set_transaction_provider(from_sync_context(transaction.atomic))
+```
+
+A sync SQLAlchemy `session.begin` is wrapped the same way: `from_sync_context(lambda: get_current_session().begin())`.
+
 ## Getting Started
 
 ```bash

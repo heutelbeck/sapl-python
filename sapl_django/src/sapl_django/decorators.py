@@ -19,13 +19,13 @@ from sapl_base.pep import (
 )
 from sapl_base.pep.streaming import run_pipeline
 
-from sapl_django.config import get_pdp_client, get_planner
+from sapl_django.config import get_pdp_client, get_planner, get_transaction_provider
 from sapl_django.subscription import SubscriptionBuilder, SubscriptionField
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
 
-    from sapl_base.types import AuthorizationDecision, AuthorizationSubscription
+    from sapl_base.types import AuthorizationSubscription
 
 log = structlog.get_logger()
 
@@ -111,7 +111,6 @@ def pre_enforce(
     resource: SubscriptionField = None,
     environment: SubscriptionField = None,
     secrets: SubscriptionField = None,
-    on_deny: Callable[[AuthorizationDecision], Any] | None = None,
 ) -> Callable:
     """Decorator: authorize BEFORE view execution.
 
@@ -141,11 +140,10 @@ def pre_enforce(
                     subscription=subscription,
                     args=tuple(args),
                     kwargs=dict(kwargs),
+                    transaction=get_transaction_provider(),
                 )
                 return _wrap_response(result, request)
-            except AccessDeniedError as exc:
-                if on_deny is not None:
-                    return _wrap_response(on_deny(exc.decision), request)
+            except AccessDeniedError:
                 raise PermissionDenied() from None
 
         if is_async:
@@ -166,7 +164,6 @@ def post_enforce(
     resource: SubscriptionField = None,
     environment: SubscriptionField = None,
     secrets: SubscriptionField = None,
-    on_deny: Callable[[AuthorizationDecision], Any] | None = None,
 ) -> Callable:
     """Decorator: authorize AFTER view execution."""
     def decorator(func: Callable) -> Callable:
@@ -198,11 +195,10 @@ def post_enforce(
                     subscription_builder=_subscription_builder,
                     args=tuple(args),
                     kwargs=dict(kwargs),
+                    transaction=get_transaction_provider(),
                 )
                 return _wrap_response(result, request)
-            except AccessDeniedError as exc:
-                if on_deny is not None:
-                    return _wrap_response(on_deny(exc.decision), request)
+            except AccessDeniedError:
                 raise PermissionDenied() from None
 
         if is_async:

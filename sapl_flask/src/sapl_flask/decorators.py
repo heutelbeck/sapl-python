@@ -23,7 +23,7 @@ from sapl_flask.subscription import SubscriptionBuilder, SubscriptionField
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
 
-    from sapl_base.types import AuthorizationDecision, AuthorizationSubscription
+    from sapl_base.types import AuthorizationSubscription
 
 
 def _extract_class_name(func: Callable) -> str:
@@ -78,13 +78,11 @@ def pre_enforce(
     resource: SubscriptionField = None,
     environment: SubscriptionField = None,
     secrets: SubscriptionField = None,
-    on_deny: Callable[[AuthorizationDecision], Any] | None = None,
 ) -> Callable:
     """Decorator: authorize BEFORE view execution.
 
     Queries the PDP with the built subscription. On PERMIT the view
-    executes; on any other verb the wrapper aborts with 403 (or calls
-    `on_deny(decision)` if supplied and returns its result).
+    executes; on any other verb the wrapper aborts with 403.
     """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
@@ -107,10 +105,9 @@ def pre_enforce(
                     subscription=subscription,
                     args=tuple(args),
                     kwargs=dict(kwargs),
+                    transaction=sapl.transaction_provider,
                 ))
-            except AccessDeniedError as exc:
-                if on_deny is not None:
-                    return on_deny(exc.decision)
+            except AccessDeniedError:
                 abort(403)
         return wrapper
     return decorator
@@ -123,13 +120,12 @@ def post_enforce(
     resource: SubscriptionField = None,
     environment: SubscriptionField = None,
     secrets: SubscriptionField = None,
-    on_deny: Callable[[AuthorizationDecision], Any] | None = None,
 ) -> Callable:
     """Decorator: authorize AFTER view execution.
 
     The view runs first; the PDP is then queried with a subscription
     that can reference the return value. On deny the wrapper aborts
-    with 403 (or calls `on_deny(decision)`).
+    with 403.
     """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
@@ -155,10 +151,9 @@ def post_enforce(
                     subscription_builder=_subscription_builder,
                     args=tuple(args),
                     kwargs=dict(kwargs),
+                    transaction=sapl.transaction_provider,
                 ))
-            except AccessDeniedError as exc:
-                if on_deny is not None:
-                    return on_deny(exc.decision)
+            except AccessDeniedError:
                 abort(403)
         return wrapper
     return decorator

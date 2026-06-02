@@ -103,28 +103,6 @@ class TestPreEnforceDenyFlow:
         assert response.status_code == 403
 
 
-class TestPreEnforceOnDenyCallback:
-    def test_on_deny_returns_custom_response(self, _configured) -> None:
-        _configured.return_value = _deny()
-
-        def custom_deny(decision: AuthorizationDecision):
-            return {"error": "custom_denied", "decision": decision.decision.value}
-
-        app = FastAPI()
-
-        @app.get("/data")
-        @pre_enforce(on_deny=custom_deny)
-        async def get_data(request: Request):
-            return {"data": "value"}
-
-        client = TestClient(app)
-        response = client.get("/data")
-        assert response.status_code == 200
-        body = response.json()
-        assert body["error"] == "custom_denied"
-        assert body["decision"] == "DENY"
-
-
 class TestPreEnforceCustomSubscription:
     def test_static_field_overrides(self, _configured) -> None:
         _configured.return_value = _permit()
@@ -192,24 +170,6 @@ class TestPostEnforceDenyFlow:
         client = TestClient(app)
         response = client.get("/data")
         assert response.status_code == 403
-
-    def test_on_deny_returns_custom_response(self, _configured) -> None:
-        _configured.return_value = _deny()
-
-        def custom_deny(decision: AuthorizationDecision):
-            return {"denied": True}
-
-        app = FastAPI()
-
-        @app.get("/data")
-        @post_enforce(on_deny=custom_deny)
-        async def get_data(request: Request):
-            return {"value": "result"}
-
-        client = TestClient(app)
-        response = client.get("/data")
-        assert response.status_code == 200
-        assert response.json() == {"denied": True}
 
 
 class TestExtractRequest:

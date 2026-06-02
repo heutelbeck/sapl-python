@@ -27,6 +27,7 @@ from sapl_base.pep.plan import ABSENT
 from sapl_base.pep.planner import EnforcementPlanner
 from sapl_base.pep.request_context import reset_current_plan, set_current_plan
 from sapl_base.pep.signal import SignalKind
+from sapl_base.pep.transaction import TransactionProvider, transaction_scope
 from sapl_base.transport.pdp_client import PdpClient
 from sapl_base.types import AuthorizationDecision, AuthorizationSubscription, Decision
 
@@ -86,8 +87,14 @@ async def pre_enforce(
     subscription: AuthorizationSubscription,
     args: tuple[Any, ...] = (),
     kwargs: dict[str, Any] | None = None,
+    transaction: TransactionProvider | None = None,
 ) -> Any:
-    """Authorize, transform inputs, invoke, transform output."""
+    """Authorize, transform inputs, invoke, transform output.
+
+    When ``transaction`` is supplied, the method call and the OUTPUT-obligation
+    stage run inside that transaction scope, so an output-obligation failure (a
+    post-write denial) rolls the transaction back instead of committing.
+    """
     kwargs = dict(kwargs or {})
     decision = await pdp_client.decide_once(subscription)
     plan = planner.plan(decision, PRE_ENFORCE_SUPPORTED)
@@ -110,27 +117,28 @@ async def pre_enforce(
         if transformed is not ABSENT and isinstance(transformed, tuple) and len(transformed) == 2:
             args, kwargs = transformed[0], transformed[1]
 
-    token = set_current_plan(plan)
-    try:
-        result = await method(*args, **kwargs)
-    except Exception as error:
-        if plan.has_entries(ERROR):
-            plan.execute(ErrorSignal(error=error))
-        raise
-    finally:
-        reset_current_plan(token)
+    async with transaction_scope(transaction):
+        token = set_current_plan(plan)
+        try:
+            result = await method(*args, **kwargs)
+        except Exception as error:
+            if plan.has_entries(ERROR):
+                plan.execute(ErrorSignal(error=error))
+            raise
+        finally:
+            reset_current_plan(token)
 
-    if decision.has_resource:
-        result = decision.resource
+        if decision.has_resource:
+            result = decision.resource
 
-    if plan.has_entries(OUTPUT):
-        output_result = plan.execute(OutputSignal(value=result))
-        if output_result.failure_state:
-            raise AccessDeniedError(
-                "Access denied", decision=decision, reason="OUTPUT_FAILURE"
-            )
-        if output_result.value is not ABSENT:
-            return output_result.value
+        if plan.has_entries(OUTPUT):
+            output_result = plan.execute(OutputSignal(value=result))
+            if output_result.failure_state:
+                raise AccessDeniedError(
+                    "Access denied", decision=decision, reason="OUTPUT_FAILURE"
+                )
+            if output_result.value is not ABSENT:
+                result = output_result.value
     return result
 
 
@@ -142,37 +150,42 @@ async def post_enforce(
     subscription_builder: Callable[[Any], AuthorizationSubscription],
     args: tuple[Any, ...] = (),
     kwargs: dict[str, Any] | None = None,
+    transaction: TransactionProvider | None = None,
 ) -> Any:
-    """Invoke first, then authorize against a subscription built from the return value."""
+    """Invoke first, then authorize against a subscription built from the return value.
+
+    When ``transaction`` is supplied, the method call and the post-invocation
+    authorization (decision + OUTPUT obligations) run inside that transaction
+    scope, so a denial or output-obligation failure after the method has written
+    rolls the transaction back instead of committing.
+    """
     kwargs = dict(kwargs or {})
-    try:
+    async with transaction_scope(transaction):
         result = await method(*args, **kwargs)
-    except Exception:
-        raise
 
-    subscription = subscription_builder(result)
-    decision = await pdp_client.decide_once(subscription)
-    plan = planner.plan(decision, POST_ENFORCE_SUPPORTED)
+        subscription = subscription_builder(result)
+        decision = await pdp_client.decide_once(subscription)
+        plan = planner.plan(decision, POST_ENFORCE_SUPPORTED)
 
-    decision_result = plan.execute(DecisionSignal(decision=decision))
-    if decision_result.failure_state or decision.decision is not Decision.PERMIT:
-        raise AccessDeniedError(
-            "Access denied",
-            decision=decision,
-            reason=_reason_for(decision, decision_result.failure_state),
-        )
-
-    if decision.has_resource:
-        result = decision.resource
-
-    if plan.has_entries(OUTPUT):
-        output_result = plan.execute(OutputSignal(value=result))
-        if output_result.failure_state:
+        decision_result = plan.execute(DecisionSignal(decision=decision))
+        if decision_result.failure_state or decision.decision is not Decision.PERMIT:
             raise AccessDeniedError(
-                "Access denied", decision=decision, reason="OUTPUT_FAILURE"
+                "Access denied",
+                decision=decision,
+                reason=_reason_for(decision, decision_result.failure_state),
             )
-        if output_result.value is not ABSENT:
-            return output_result.value
+
+        if decision.has_resource:
+            result = decision.resource
+
+        if plan.has_entries(OUTPUT):
+            output_result = plan.execute(OutputSignal(value=result))
+            if output_result.failure_state:
+                raise AccessDeniedError(
+                    "Access denied", decision=decision, reason="OUTPUT_FAILURE"
+                )
+            if output_result.value is not ABSENT:
+                result = output_result.value
     return result
 
 

@@ -18,7 +18,7 @@ from sapl_base.pep import (
 )
 from sapl_base.pep.streaming import run_pipeline
 
-from sapl_tornado.dependencies import get_pdp_client, get_planner
+from sapl_tornado.dependencies import get_pdp_client, get_planner, get_transaction_provider
 from sapl_tornado.subscription import SubscriptionBuilder, SubscriptionField
 
 if TYPE_CHECKING:
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
     from tornado.httputil import HTTPServerRequest
 
-    from sapl_base.types import AuthorizationDecision, AuthorizationSubscription
+    from sapl_base.types import AuthorizationSubscription
 
 log = structlog.get_logger()
 
@@ -133,7 +133,6 @@ def pre_enforce(
     resource: SubscriptionField = None,
     environment: SubscriptionField = None,
     secrets: SubscriptionField = None,
-    on_deny: Callable[[AuthorizationDecision], Any] | None = None,
 ) -> Callable:
     """Decorator: authorize BEFORE handler execution."""
     def decorator(func: Callable) -> Callable:
@@ -152,13 +151,9 @@ def pre_enforce(
                     subscription=subscription,
                     args=tuple(args),
                     kwargs=dict(kwargs),
+                    transaction=get_transaction_provider(),
                 )
-            except AccessDeniedError as exc:
-                if on_deny is not None:
-                    deny_result = on_deny(exc.decision)
-                    if handler is not None and deny_result is not None:
-                        _write_response(handler, deny_result)
-                    return deny_result
+            except AccessDeniedError:
                 raise HTTPError(403) from None
             if handler is not None and result is not None:
                 _write_response(handler, result)
@@ -174,7 +169,6 @@ def post_enforce(
     resource: SubscriptionField = None,
     environment: SubscriptionField = None,
     secrets: SubscriptionField = None,
-    on_deny: Callable[[AuthorizationDecision], Any] | None = None,
 ) -> Callable:
     """Decorator: authorize AFTER handler execution."""
     def decorator(func: Callable) -> Callable:
@@ -199,13 +193,9 @@ def post_enforce(
                     subscription_builder=_subscription_builder,
                     args=tuple(args),
                     kwargs=dict(kwargs),
+                    transaction=get_transaction_provider(),
                 )
-            except AccessDeniedError as exc:
-                if on_deny is not None:
-                    deny_result = on_deny(exc.decision)
-                    if handler is not None and deny_result is not None:
-                        _write_response(handler, deny_result)
-                    return deny_result
+            except AccessDeniedError:
                 raise HTTPError(403) from None
             if handler is not None and result is not None:
                 _write_response(handler, result)

@@ -45,6 +45,18 @@ async for decision in client.decide(subscription):
 
 Most applications should use a framework integration instead of this package directly.
 
+## Database Transactions
+
+One-shot enforcement can own a transaction boundary. When you configure a transaction provider, `pre_enforce` and `post_enforce` wrap the protected call plus enforcement in it, so a denial that lands after a DB write rolls the write back. The three triggers are a `post_enforce` DENY, a `post_enforce` output-obligation failure, and a `pre_enforce` output-obligation failure (the pre-decision permits, but its output obligations run after the method writes). A clean permit commits. This is opt-in: with no provider, the PEP owns no transaction and behaviour is unchanged.
+
+A provider is a zero-arg factory returning an async context manager that commits on clean exit and rolls back on a propagated exception, exactly the semantics of SQLAlchemy `AsyncSession.begin()` and Django `transaction.atomic()`. The framework integrations expose `set_transaction_provider(provider)`. For a sync transaction boundary (sync SQLAlchemy `session.begin` or Django `transaction.atomic`), wrap it with `from_sync_context`:
+
+```python
+from sapl_base.pep import from_sync_context
+```
+
+The provider factory should resolve the current request's session or transaction.
+
 ## Getting Started
 
 ```bash

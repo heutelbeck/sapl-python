@@ -87,25 +87,6 @@ class TestPreEnforce:
             await my_view(request)
 
     @pytest.mark.asyncio
-    async def test_on_deny_callback_returns_custom_response(self):
-        custom_response = JsonResponse({"error": "custom_deny"}, status=403)
-
-        @pre_enforce(
-            action="read",
-            resource="data",
-            on_deny=lambda decision: custom_response,
-        )
-        async def my_view(request):
-            return JsonResponse({"result": "ok"})
-
-        request = _make_request()
-        with patch("sapl_django.decorators.get_pdp_client",
-                   return_value=_mock_pdp(AuthorizationDecision.deny())), \
-             patch("sapl_django.decorators.get_planner", return_value=_real_planner()):
-            result = await my_view(request)
-        assert result is custom_response
-
-    @pytest.mark.asyncio
     async def test_preserves_function_name(self):
         @pre_enforce(action="read", resource="data")
         async def specific_view_name(request):
@@ -166,25 +147,6 @@ class TestPostEnforce:
              pytest.raises(PermissionDenied):
             await my_view(request)
         assert call_order == ["view", "pdp"]
-
-    @pytest.mark.asyncio
-    async def test_on_deny_callback_returns_custom_response(self):
-        custom_response = JsonResponse({"error": "post_deny"}, status=403)
-
-        @post_enforce(
-            action="read",
-            resource="data",
-            on_deny=lambda decision: custom_response,
-        )
-        async def my_view(request):
-            return {"result": "ok"}
-
-        request = _make_request()
-        with patch("sapl_django.decorators.get_pdp_client",
-                   return_value=_mock_pdp(AuthorizationDecision.deny())), \
-             patch("sapl_django.decorators.get_planner", return_value=_real_planner()):
-            result = await my_view(request)
-        assert result is custom_response
 
 
 def _module_level_function():

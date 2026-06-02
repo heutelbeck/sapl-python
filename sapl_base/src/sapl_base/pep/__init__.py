@@ -42,6 +42,11 @@ from sapl_base.pep.provider import (
 )
 from sapl_base.pep.signal import Signal, SignalKind
 from sapl_base.pep.subscription_context import SubscriptionContext
+from sapl_base.pep.transaction import (
+    TransactionProvider,
+    from_sync_context,
+    transaction_scope,
+)
 
 __all__ = [
     "ABSENT",
@@ -71,6 +76,9 @@ __all__ = [
     "Signal",
     "SignalKind",
     "SubscriptionContext",
+    "TransactionProvider",
+    "from_sync_context",
     "post_enforce",
     "pre_enforce",
+    "transaction_scope",
 ]

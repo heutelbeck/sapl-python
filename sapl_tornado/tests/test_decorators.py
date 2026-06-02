@@ -88,27 +88,6 @@ class TestPreEnforceDenyFlow(_SaplTestCase):
         assert response.code == 403
 
 
-class TestPreEnforceOnDenyCallback(_SaplTestCase):
-    def get_app(self) -> tornado.web.Application:
-        def custom_deny(decision: AuthorizationDecision) -> dict[str, Any]:
-            return {"error": "custom_denied", "decision": decision.decision.value}
-
-        class DataHandler(tornado.web.RequestHandler):
-            @pre_enforce(on_deny=custom_deny)
-            async def get(self) -> dict[str, Any]:
-                return {"data": "value"}
-
-        return tornado.web.Application([(r"/data", DataHandler)])
-
-    def test_on_deny_returns_custom_response(self) -> None:
-        self.mock_decide.return_value = _deny()
-        response = self.fetch("/data")
-        assert response.code == 200
-        body = json.loads(response.body)
-        assert body["error"] == "custom_denied"
-        assert body["decision"] == "DENY"
-
-
 class TestPreEnforceCustomSubscription(_SaplTestCase):
     def get_app(self) -> tornado.web.Application:
         class StaticHandler(tornado.web.RequestHandler):
@@ -164,26 +143,12 @@ class TestPostEnforceDenyFlow(_SaplTestCase):
             async def get(self) -> dict[str, Any]:
                 return {"value": "result"}
 
-        class OnDenyHandler(tornado.web.RequestHandler):
-            @post_enforce(on_deny=lambda d: {"denied": True})
-            async def get(self) -> dict[str, Any]:
-                return {"value": "result"}
-
-        return tornado.web.Application([
-            (r"/data", DataHandler),
-            (r"/on-deny", OnDenyHandler),
-        ])
+        return tornado.web.Application([(r"/data", DataHandler)])
 
     def test_returns_403_on_deny(self) -> None:
         self.mock_decide.return_value = _deny()
         response = self.fetch("/data")
         assert response.code == 403
-
-    def test_on_deny_returns_custom_response(self) -> None:
-        self.mock_decide.return_value = _deny()
-        response = self.fetch("/on-deny")
-        assert response.code == 200
-        assert json.loads(response.body) == {"denied": True}
 
 
 class TestExtractRequestAndHandler:
