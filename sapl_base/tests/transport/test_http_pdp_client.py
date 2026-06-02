@@ -177,9 +177,9 @@ class TestMultiDecideAllOnce:
 
 @pytest.mark.asyncio
 class TestStreaming:
-    async def test_yields_decoded_frames_until_end_of_stream(self) -> None:
+    async def test_yields_decoded_frames(self) -> None:
         sse_body = b'data: {"decision":"PERMIT"}\n\ndata: {"decision":"DENY"}\n\n'
-        async with _client_for_test(streaming_max_retries=0) as client:
+        async with _client_for_test(streaming_retry_base_delay_seconds=5.0) as client:
             with respx.mock() as mock:
                 mock.post(_DECIDE).mock(
                     return_value=Response(200, content=sse_body, headers={"content-type": "text/event-stream"})
@@ -191,7 +191,7 @@ class TestStreaming:
 
     async def test_skips_comment_and_blank_lines(self) -> None:
         sse_body = b': keep-alive\n\n\ndata: {"decision":"PERMIT"}\n\n'
-        async with _client_for_test(streaming_max_retries=0) as client:
+        async with _client_for_test(streaming_retry_base_delay_seconds=5.0) as client:
             with respx.mock() as mock:
                 mock.post(_DECIDE).mock(
                     return_value=Response(200, content=sse_body)
@@ -203,7 +203,6 @@ class TestStreaming:
         sse_body_a = b'data: {"decision":"PERMIT"}\n\n'
         sse_body_b = b'data: {"decision":"DENY"}\n\n'
         async with _client_for_test(
-            streaming_max_retries=2,
             streaming_retry_base_delay_seconds=0.01,
             streaming_retry_max_delay_seconds=0.05,
         ) as client:
@@ -215,7 +214,7 @@ class TestStreaming:
                         Response(200, content=sse_body_b),
                     ]
                 )
-                decisions = await _drain(client.decide(AuthorizationSubscription()))
+                decisions = await _take(client.decide(AuthorizationSubscription()), 3)
                 verbs = [d.decision for d in decisions]
                 assert Decision.PERMIT in verbs
                 assert Decision.INDETERMINATE in verbs
@@ -223,7 +222,7 @@ class TestStreaming:
 
     async def test_dedupes_consecutive_equal_decisions_within_attempt(self) -> None:
         sse_body = b'data: {"decision":"PERMIT"}\n\ndata: {"decision":"PERMIT"}\n\n'
-        async with _client_for_test(streaming_max_retries=0) as client:
+        async with _client_for_test(streaming_retry_base_delay_seconds=5.0) as client:
             with respx.mock() as mock:
                 mock.post(_DECIDE).mock(return_value=Response(200, content=sse_body))
                 decisions = await _drain(client.decide(AuthorizationSubscription()))
@@ -253,6 +252,21 @@ async def _drain(iterator: AsyncIterator[object], limit_seconds: float = 1.0) ->
     async def _collect() -> None:
         async for item in iterator:
             items.append(item)
+    try:
+        await asyncio.wait_for(_collect(), timeout=limit_seconds)
+    except asyncio.TimeoutError:
+        pass
+    return items
+
+
+async def _take(iterator: AsyncIterator[object], count: int, limit_seconds: float = 2.0) -> list[object]:
+    """Take the first `count` items from a (now never-ending) subscription, then stop."""
+    items: list[object] = []
+    async def _collect() -> None:
+        async for item in iterator:
+            items.append(item)
+            if len(items) >= count:
+                break
     try:
         await asyncio.wait_for(_collect(), timeout=limit_seconds)
     except asyncio.TimeoutError:

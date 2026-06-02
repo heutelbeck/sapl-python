@@ -14,20 +14,33 @@ exactly as before.
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable, Generator
 from contextlib import (
     AbstractAsyncContextManager,
     AbstractContextManager,
     asynccontextmanager,
+    contextmanager,
 )
 from typing import Any
 
 TransactionProvider = Callable[[], AbstractAsyncContextManager[Any]]
 """Zero-arg factory returning a commit-on-success / rollback-on-error async scope."""
 
+SyncTransactionProvider = Callable[[], AbstractContextManager[Any]]
+"""Zero-arg factory returning a commit-on-success / rollback-on-error sync scope.
+
+The blocking enforcement path uses this directly (no async wrapping): SQLAlchemy
+``session.begin()`` or Django ``transaction.atomic()`` are already sync context managers.
+"""
+
 
 @asynccontextmanager
 async def _null_scope() -> AsyncGenerator[None]:
+    yield
+
+
+@contextmanager
+def _null_scope_sync() -> Generator[None]:
     yield
 
 
@@ -37,6 +50,15 @@ def transaction_scope(
     """Return the provider's transaction context manager, or a no-op when unset."""
     if provider is None:
         return _null_scope()
+    return provider()
+
+
+def transaction_scope_sync(
+    provider: SyncTransactionProvider | None,
+) -> AbstractContextManager[Any]:
+    """Return the provider's sync transaction context manager, or a no-op when unset."""
+    if provider is None:
+        return _null_scope_sync()
     return provider()
 
 

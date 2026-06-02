@@ -96,7 +96,6 @@ class HttpPdpClientOptions:
     token_provider: TokenProvider | None = None
     tls: TlsConfig | None = None
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
-    streaming_max_retries: int | None = None
     streaming_retry_base_delay_seconds: float = DEFAULT_RETRY_BASE_DELAY_SECONDS
     streaming_retry_max_delay_seconds: float = DEFAULT_RETRY_MAX_DELAY_SECONDS
 
@@ -260,7 +259,6 @@ class HttpPdpClient:
         )
         self._retry_base = options.streaming_retry_base_delay_seconds
         self._retry_cap = options.streaming_retry_max_delay_seconds
-        self._max_retries = options.streaming_max_retries
 
         self._verify: Any = True
         self._temp_files: list[str] = []
@@ -459,9 +457,11 @@ class HttpPdpClient:
         seed: Callable[[], Any] | None = None,
         seed_many: Callable[[], list[Any]] | None = None,
     ) -> AsyncIterator[Any]:
+        """Subscription. Never terminates: a transport error OR a graceful server
+        completion both seed INDETERMINATE and reconnect with bounded exponential
+        backoff, forever. Ends only when the consumer stops iterating."""
         attempt = 0
         last_emitted: Any = _UNSET
-        max_retries = self._max_retries
         while True:
             if attempt > 0:
                 delay = _backoff_delay(attempt, self._retry_base, self._retry_cap)
@@ -488,6 +488,7 @@ class HttpPdpClient:
                     validated = validate(parsed)
                     if validated is None:
                         continue
+                    attempt = 0
                     if validated != last_emitted:
                         last_emitted = validated
                         yield validated
@@ -498,10 +499,6 @@ class HttpPdpClient:
             except (httpx.HTTPError, OSError) as error:
                 attempt += 1
                 logger.warning("pdp_streaming_connection_lost", url=url, error=str(error))
-
-            if max_retries is not None and attempt > max_retries:
-                logger.error("pdp_streaming_giving_up", url=url, attempts=attempt)
-                return
 
     async def _sse_lines(
         self, url: str, body: dict[str, Any]

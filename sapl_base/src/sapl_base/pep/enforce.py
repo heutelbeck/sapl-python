@@ -16,8 +16,10 @@ dataclasses.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from inspect import isawaitable
 from typing import Any
 
 import structlog
@@ -28,7 +30,12 @@ from sapl_base.pep.planner import EnforcementPlanner
 from sapl_base.pep.request_context import reset_current_plan, set_current_plan
 from sapl_base.pep.shim_signals import shim_signals
 from sapl_base.pep.signal import SignalKind
-from sapl_base.pep.transaction import TransactionProvider, transaction_scope
+from sapl_base.pep.transaction import (
+    SyncTransactionProvider,
+    TransactionProvider,
+    transaction_scope,
+    transaction_scope_sync,
+)
 from sapl_base.transport.pdp_client import PdpClient
 from sapl_base.types import AuthorizationDecision, AuthorizationSubscription, Decision
 
@@ -188,6 +195,124 @@ async def post_enforce(
             if output_result.value is not ABSENT:
                 result = output_result.value
     return result
+
+
+def pre_enforce_blocking(
+    method: Callable[..., Any],
+    *,
+    pdp_client: PdpClient,
+    planner: EnforcementPlanner,
+    subscription: AuthorizationSubscription,
+    args: tuple[Any, ...] = (),
+    kwargs: dict[str, Any] | None = None,
+    transaction: SyncTransactionProvider | None = None,
+) -> Any:
+    """Blocking counterpart of `pre_enforce`.
+
+    Runs the method synchronously, off any event loop, so synchronous ORM access
+    (and its query-manipulation cut point) works. Only the PDP decision is bridged:
+    an async client is driven to completion before the method runs, so the method
+    executes with no running event loop. Plan execution and obligation handling are
+    already synchronous.
+    """
+    kwargs = dict(kwargs or {})
+    decision = _decide_blocking(pdp_client, subscription)
+    plan = planner.plan(decision, PRE_ENFORCE_SUPPORTED | shim_signals())
+
+    decision_result = plan.execute(DecisionSignal(decision=decision))
+    if decision_result.failure_state or decision.decision is not Decision.PERMIT:
+        raise AccessDeniedError(
+            "Access denied",
+            decision=decision,
+            reason=_reason_for(decision, decision_result.failure_state),
+        )
+
+    if plan.has_entries(INPUT):
+        input_result = plan.execute(InputSignal(args=args, kwargs=kwargs))
+        if input_result.failure_state:
+            raise AccessDeniedError(
+                "Access denied", decision=decision, reason="INPUT_FAILURE"
+            )
+        transformed = input_result.value
+        if transformed is not ABSENT and isinstance(transformed, tuple) and len(transformed) == 2:
+            args, kwargs = transformed[0], transformed[1]
+
+    with transaction_scope_sync(transaction):
+        token = set_current_plan(plan)
+        try:
+            result = method(*args, **kwargs)
+        except Exception as error:
+            if plan.has_entries(ERROR):
+                plan.execute(ErrorSignal(error=error))
+            raise
+        finally:
+            reset_current_plan(token)
+
+        if decision.has_resource:
+            result = decision.resource
+
+        if plan.has_entries(OUTPUT):
+            output_result = plan.execute(OutputSignal(value=result))
+            if output_result.failure_state:
+                raise AccessDeniedError(
+                    "Access denied", decision=decision, reason="OUTPUT_FAILURE"
+                )
+            if output_result.value is not ABSENT:
+                result = output_result.value
+    return result
+
+
+def post_enforce_blocking(
+    method: Callable[..., Any],
+    *,
+    pdp_client: PdpClient,
+    planner: EnforcementPlanner,
+    subscription_builder: Callable[[Any], AuthorizationSubscription],
+    args: tuple[Any, ...] = (),
+    kwargs: dict[str, Any] | None = None,
+    transaction: SyncTransactionProvider | None = None,
+) -> Any:
+    """Blocking counterpart of `post_enforce`. Runs the method synchronously, then
+    authorizes against a subscription built from its return value."""
+    kwargs = dict(kwargs or {})
+    with transaction_scope_sync(transaction):
+        result = method(*args, **kwargs)
+
+        subscription = subscription_builder(result)
+        decision = _decide_blocking(pdp_client, subscription)
+        plan = planner.plan(decision, POST_ENFORCE_SUPPORTED)
+
+        decision_result = plan.execute(DecisionSignal(decision=decision))
+        if decision_result.failure_state or decision.decision is not Decision.PERMIT:
+            raise AccessDeniedError(
+                "Access denied",
+                decision=decision,
+                reason=_reason_for(decision, decision_result.failure_state),
+            )
+
+        if decision.has_resource:
+            result = decision.resource
+
+        if plan.has_entries(OUTPUT):
+            output_result = plan.execute(OutputSignal(value=result))
+            if output_result.failure_state:
+                raise AccessDeniedError(
+                    "Access denied", decision=decision, reason="OUTPUT_FAILURE"
+                )
+            if output_result.value is not ABSENT:
+                result = output_result.value
+    return result
+
+
+def _decide_blocking(
+    pdp_client: PdpClient, subscription: AuthorizationSubscription
+) -> AuthorizationDecision:
+    """Obtain a decision synchronously. An async `decide_once` is run to completion;
+    a synchronous client's return value passes through unchanged."""
+    outcome = pdp_client.decide_once(subscription)
+    if isawaitable(outcome):
+        return asyncio.run(outcome)
+    return outcome
 
 
 def _reason_for(decision: AuthorizationDecision, failure: bool) -> str:

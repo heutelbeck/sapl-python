@@ -48,9 +48,11 @@ from sapl_base.pep.provider import (
 from sapl_base.pep.signal import Signal, SignalKind
 from sapl_base.pep.subscription_context import SubscriptionContext
 from sapl_base.pep.transaction import (
+    SyncTransactionProvider,
     TransactionProvider,
     from_sync_context,
     transaction_scope,
+    transaction_scope_sync,
 )
 
 __all__ = [
@@ -81,6 +83,7 @@ __all__ = [
     "Signal",
     "SignalKind",
     "SubscriptionContext",
+    "SyncTransactionProvider",
     "TransactionProvider",
     "from_sync_context",
     "post_enforce",
@@ -88,5 +91,6 @@ __all__ = [
     "register_shim_signal",
     "shim_signals",
     "transaction_scope",
+    "transaction_scope_sync",
     "unregister_shim_signal",
 ]
