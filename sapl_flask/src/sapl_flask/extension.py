@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 from sapl_base.pep import ConstraintHandlerProvider, EnforcementPlanner, PepRuntime
-from sapl_base.pep.transaction import TransactionProvider
+from sapl_base.pep.transaction import SyncTransactionProvider, TransactionProvider
 from sapl_base.transport import HttpPdpClient, HttpPdpClientOptions
 
 if TYPE_CHECKING:
@@ -74,16 +74,19 @@ class SaplFlask:
         self._runtime.register_provider(provider)
 
     @property
-    def transaction_provider(self) -> TransactionProvider | None:
+    def transaction_provider(self) -> SyncTransactionProvider | TransactionProvider | None:
         return self._runtime.transaction_provider
 
-    def set_transaction_provider(self, provider: TransactionProvider | None) -> None:
+    def set_transaction_provider(
+        self, provider: SyncTransactionProvider | TransactionProvider | None
+    ) -> None:
         """Set (or clear) the transaction provider that pre/post enforce wrap DB writes in.
 
-        A provider is a zero-arg factory returning an async context manager that commits on
-        success and rolls back on a propagated exception. For a sync SQLAlchemy session use
-        ``set_transaction_provider(from_sync_context(lambda: session.begin()))``. When set, a
-        post-write denial (DENY or output-obligation failure) rolls the transaction back.
+        Flask is WSGI (always sync), so the provider is a zero-arg factory returning a sync
+        context manager that commits on success and rolls back on a propagated exception. For
+        a sync SQLAlchemy session use ``set_transaction_provider(lambda: session.begin())``.
+        When set, a post-write denial (DENY or output-obligation failure) rolls the
+        transaction back.
         """
         self._runtime.set_transaction_provider(provider)
 

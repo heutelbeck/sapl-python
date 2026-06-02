@@ -1,5 +1,4 @@
 from sapl_base.transport import HttpPdpClientOptions as SaplConfig
-
 from sapl_fastapi.decorators import post_enforce, pre_enforce, stream_enforce
 from sapl_fastapi.dependencies import (
     cleanup_sapl,

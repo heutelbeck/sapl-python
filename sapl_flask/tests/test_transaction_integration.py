@@ -5,9 +5,8 @@ sync sqlite database and are protected by ``@pre_enforce`` / ``@post_enforce``.
 Proves the wrapper threads the configured transaction provider into the
 enforcement core, so a post-write denial rolls the DB transaction back.
 
-A sync SQLAlchemy session is used deliberately: Flask runs the async enforce via
-``asyncio.run`` per request, so a sync (not loop-bound) session avoids any
-event-loop fragility around the per-request loop.
+Flask is WSGI (always sync). The views run on the blocking enforcement core with
+a raw sync transaction provider, so a sync SQLAlchemy session is used directly.
 """
 
 from __future__ import annotations
@@ -23,7 +22,6 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sess
 
 import sapl_flask.decorators as decorators
 from sapl_base.pep import OUTPUT, EnforcementPlanner, ScopedHandler
-from sapl_base.pep.transaction import from_sync_context
 from sapl_base.types import AuthorizationDecision, Decision
 from sapl_flask.decorators import post_enforce, pre_enforce
 
@@ -100,7 +98,7 @@ def _wire(monkeypatch, decision: AuthorizationDecision, session: Session, *, fai
     extension = types.SimpleNamespace(
         pdp_client=StubPdp(decision),
         planner=EnforcementPlanner(providers=providers),
-        transaction_provider=from_sync_context(lambda: session.begin()),
+        transaction_provider=lambda: session.begin(),
     )
     monkeypatch.setattr(decorators, "get_sapl_extension", lambda: extension)
 

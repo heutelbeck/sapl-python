@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from sapl_base.pep import ConstraintHandlerProvider, EnforcementPlanner, PepRuntime
-from sapl_base.pep.transaction import TransactionProvider
+from sapl_base.pep.transaction import SyncTransactionProvider, TransactionProvider
 from sapl_base.transport import HttpPdpClient, HttpPdpClientOptions
 
 _runtime = PepRuntime()
@@ -32,7 +32,9 @@ def register_provider(provider: ConstraintHandlerProvider) -> None:
     _runtime.register_provider(provider)
 
 
-def set_transaction_provider(provider: TransactionProvider | None) -> None:
+def set_transaction_provider(
+    provider: SyncTransactionProvider | TransactionProvider | None,
+) -> None:
     """Set (or clear) the transaction provider that pre/post enforce wrap DB writes in.
 
     A provider is a zero-arg factory returning an async context manager that commits on
@@ -43,6 +45,6 @@ def set_transaction_provider(provider: TransactionProvider | None) -> None:
     _runtime.set_transaction_provider(provider)
 
 
-def get_transaction_provider() -> TransactionProvider | None:
+def get_transaction_provider() -> SyncTransactionProvider | TransactionProvider | None:
     """Get the configured transaction provider, or None if unset."""
     return _runtime.transaction_provider

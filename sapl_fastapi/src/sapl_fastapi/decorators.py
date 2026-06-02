@@ -15,11 +15,20 @@ from sapl_base.pep import (
     AccessDeniedError,
     AccessGrantedSignal,
     AccessSuspendedSignal,
+)
+from sapl_base.pep import (
     post_enforce as _post_enforce,
+)
+from sapl_base.pep import (
     pre_enforce as _pre_enforce,
 )
+from sapl_base.pep.enforce import (
+    post_enforce_blocking as _post_enforce_blocking,
+)
+from sapl_base.pep.enforce import (
+    pre_enforce_blocking as _pre_enforce_blocking,
+)
 from sapl_base.pep.streaming import run_pipeline
-
 from sapl_fastapi.dependencies import get_pdp_client, get_planner, get_transaction_provider
 from sapl_fastapi.subscription import SubscriptionBuilder, SubscriptionField
 
@@ -98,17 +107,47 @@ def pre_enforce(
     environment: SubscriptionField = None,
     secrets: SubscriptionField = None,
 ) -> Callable:
-    """Decorator: authorize BEFORE method execution."""
+    """Decorator: authorize BEFORE method execution.
+
+    Auto-detects the endpoint kind. Async endpoints run on the async enforcement
+    core; sync endpoints run on the blocking core via a sync wrapper, which
+    FastAPI/Starlette then runs in its threadpool so the bridged PDP call executes
+    with no running event loop. The configured transaction provider must match the
+    endpoint kind: an async provider for async endpoints, a sync context-manager
+    factory for sync ones.
+    """
     def decorator(func: Callable) -> Callable:
+        if asyncio.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                subscription = _build_subscription(
+                    func, args, kwargs,
+                    subject=subject, action=action, resource=resource,
+                    environment=environment, secrets=secrets,
+                )
+                try:
+                    return await _pre_enforce(
+                        func,
+                        pdp_client=get_pdp_client(),
+                        planner=get_planner(),
+                        subscription=subscription,
+                        args=tuple(args),
+                        kwargs=dict(kwargs),
+                        transaction=get_transaction_provider(),
+                    )
+                except AccessDeniedError:
+                    raise HTTPException(status_code=403) from None
+            return async_wrapper
+
         @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
             subscription = _build_subscription(
                 func, args, kwargs,
                 subject=subject, action=action, resource=resource,
                 environment=environment, secrets=secrets,
             )
             try:
-                return await _pre_enforce(
+                return _pre_enforce_blocking(
                     func,
                     pdp_client=get_pdp_client(),
                     planner=get_planner(),
@@ -119,7 +158,7 @@ def pre_enforce(
                 )
             except AccessDeniedError:
                 raise HTTPException(status_code=403) from None
-        return wrapper
+        return sync_wrapper
     return decorator
 
 
@@ -139,8 +178,7 @@ def post_enforce(
     is populated).
     """
     def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def _builder(args: tuple, kwargs: dict) -> Callable[[Any], AuthorizationSubscription]:
             def _subscription_builder(return_value: Any) -> AuthorizationSubscription:
                 return _build_subscription(
                     func, args, kwargs,
@@ -148,19 +186,40 @@ def post_enforce(
                     environment=environment, secrets=secrets,
                     return_value=return_value,
                 )
+            return _subscription_builder
+
+        if asyncio.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                try:
+                    return await _post_enforce(
+                        func,
+                        pdp_client=get_pdp_client(),
+                        planner=get_planner(),
+                        subscription_builder=_builder(args, kwargs),
+                        args=tuple(args),
+                        kwargs=dict(kwargs),
+                        transaction=get_transaction_provider(),
+                    )
+                except AccessDeniedError:
+                    raise HTTPException(status_code=403) from None
+            return async_wrapper
+
+        @functools.wraps(func)
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
-                return await _post_enforce(
+                return _post_enforce_blocking(
                     func,
                     pdp_client=get_pdp_client(),
                     planner=get_planner(),
-                    subscription_builder=_subscription_builder,
+                    subscription_builder=_builder(args, kwargs),
                     args=tuple(args),
                     kwargs=dict(kwargs),
                     transaction=get_transaction_provider(),
                 )
             except AccessDeniedError:
                 raise HTTPException(status_code=403) from None
-        return wrapper
+        return sync_wrapper
     return decorator
 
 

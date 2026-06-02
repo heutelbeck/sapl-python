@@ -14,11 +14,20 @@ from sapl_base.pep import (
     AccessDeniedError,
     AccessGrantedSignal,
     AccessSuspendedSignal,
+)
+from sapl_base.pep import (
     post_enforce as _post_enforce,
+)
+from sapl_base.pep import (
     pre_enforce as _pre_enforce,
 )
+from sapl_base.pep.enforce import (
+    post_enforce_blocking as _post_enforce_blocking,
+)
+from sapl_base.pep.enforce import (
+    pre_enforce_blocking as _pre_enforce_blocking,
+)
 from sapl_base.pep.streaming import run_pipeline
-
 from sapl_django.config import get_pdp_client, get_planner, get_transaction_provider
 from sapl_django.subscription import SubscriptionBuilder, SubscriptionField
 
@@ -114,27 +123,46 @@ def pre_enforce(
 ) -> Callable:
     """Decorator: authorize BEFORE view execution.
 
-    Works on both sync and async views. Sync views are run via
-    `asyncio.run`; async views are awaited directly.
+    Auto-detects the view. Async views run on the async enforcement core; sync
+    views run on the blocking core, which executes the view off the event loop so
+    synchronous ORM access works (no ``SynchronousOnlyOperation``). The configured
+    transaction provider must match the view kind: an async provider for async
+    views, a sync context-manager factory (e.g. ``transaction.atomic``) for sync ones.
     """
     def decorator(func: Callable) -> Callable:
-        is_async = asyncio.iscoroutinefunction(func)
-
-        async def _async_target(*args: Any, **kwargs: Any) -> Any:
-            if is_async:
-                return await func(*args, **kwargs)
-            return func(*args, **kwargs)
+        if asyncio.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                subscription, request = _build_subscription(
+                    func, args, kwargs,
+                    subject=subject, action=action, resource=resource,
+                    environment=environment, secrets=secrets,
+                )
+                try:
+                    result = await _pre_enforce(
+                        func,
+                        pdp_client=get_pdp_client(),
+                        planner=get_planner(),
+                        subscription=subscription,
+                        args=tuple(args),
+                        kwargs=dict(kwargs),
+                        transaction=get_transaction_provider(),
+                    )
+                    return _wrap_response(result, request)
+                except AccessDeniedError:
+                    raise PermissionDenied() from None
+            return async_wrapper
 
         @functools.wraps(func)
-        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
             subscription, request = _build_subscription(
                 func, args, kwargs,
                 subject=subject, action=action, resource=resource,
                 environment=environment, secrets=secrets,
             )
             try:
-                result = await _pre_enforce(
-                    _async_target,
+                result = _pre_enforce_blocking(
+                    func,
                     pdp_client=get_pdp_client(),
                     planner=get_planner(),
                     subscription=subscription,
@@ -145,14 +173,6 @@ def pre_enforce(
                 return _wrap_response(result, request)
             except AccessDeniedError:
                 raise PermissionDenied() from None
-
-        if is_async:
-            return async_wrapper
-
-        @functools.wraps(func)
-        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-            return asyncio.run(async_wrapper(*args, **kwargs))
-
         return sync_wrapper
     return decorator
 
@@ -165,19 +185,13 @@ def post_enforce(
     environment: SubscriptionField = None,
     secrets: SubscriptionField = None,
 ) -> Callable:
-    """Decorator: authorize AFTER view execution."""
+    """Decorator: authorize AFTER view execution.
+
+    Async views use the async core; sync views use the blocking core (run off the
+    event loop). The configured transaction provider must match the view kind.
+    """
     def decorator(func: Callable) -> Callable:
-        is_async = asyncio.iscoroutinefunction(func)
-
-        async def _async_target(*args: Any, **kwargs: Any) -> Any:
-            if is_async:
-                return await func(*args, **kwargs)
-            return func(*args, **kwargs)
-
-        @functools.wraps(func)
-        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-            _, request = _extract_request_and_resolve(func, args, kwargs)
-
+        def _builder(args: tuple, kwargs: dict) -> Callable[[Any], AuthorizationSubscription]:
             def _subscription_builder(return_value: Any) -> AuthorizationSubscription:
                 subscription, _ = _build_subscription(
                     func, args, kwargs,
@@ -186,13 +200,36 @@ def post_enforce(
                     return_value=return_value,
                 )
                 return subscription
+            return _subscription_builder
 
+        if asyncio.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                _, request = _extract_request_and_resolve(func, args, kwargs)
+                try:
+                    result = await _post_enforce(
+                        func,
+                        pdp_client=get_pdp_client(),
+                        planner=get_planner(),
+                        subscription_builder=_builder(args, kwargs),
+                        args=tuple(args),
+                        kwargs=dict(kwargs),
+                        transaction=get_transaction_provider(),
+                    )
+                    return _wrap_response(result, request)
+                except AccessDeniedError:
+                    raise PermissionDenied() from None
+            return async_wrapper
+
+        @functools.wraps(func)
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+            _, request = _extract_request_and_resolve(func, args, kwargs)
             try:
-                result = await _post_enforce(
-                    _async_target,
+                result = _post_enforce_blocking(
+                    func,
                     pdp_client=get_pdp_client(),
                     planner=get_planner(),
-                    subscription_builder=_subscription_builder,
+                    subscription_builder=_builder(args, kwargs),
                     args=tuple(args),
                     kwargs=dict(kwargs),
                     transaction=get_transaction_provider(),
@@ -200,14 +237,6 @@ def post_enforce(
                 return _wrap_response(result, request)
             except AccessDeniedError:
                 raise PermissionDenied() from None
-
-        if is_async:
-            return async_wrapper
-
-        @functools.wraps(func)
-        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-            return asyncio.run(async_wrapper(*args, **kwargs))
-
         return sync_wrapper
     return decorator
 

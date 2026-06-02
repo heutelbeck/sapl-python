@@ -12,11 +12,14 @@ from sapl_base.pep import (
     AccessDeniedError,
     AccessGrantedSignal,
     AccessSuspendedSignal,
-    post_enforce as _post_enforce,
-    pre_enforce as _pre_enforce,
+)
+from sapl_base.pep.enforce import (
+    post_enforce_blocking as _post_enforce_blocking,
+)
+from sapl_base.pep.enforce import (
+    pre_enforce_blocking as _pre_enforce_blocking,
 )
 from sapl_base.pep.streaming import run_pipeline
-
 from sapl_flask.extension import get_sapl_extension
 from sapl_flask.subscription import SubscriptionBuilder, SubscriptionField
 
@@ -81,8 +84,9 @@ def pre_enforce(
 ) -> Callable:
     """Decorator: authorize BEFORE view execution.
 
-    Queries the PDP with the built subscription. On PERMIT the view
-    executes; on any other verb the wrapper aborts with 403.
+    Queries the PDP with the built subscription, then runs the sync view on the
+    blocking enforcement core (off the event loop). On PERMIT the view executes;
+    on any other verb the wrapper aborts with 403.
     """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
@@ -94,19 +98,16 @@ def pre_enforce(
                 environment=environment, secrets=secrets,
             )
 
-            async def _async_func(*a: Any, **kw: Any) -> Any:
-                return func(*a, **kw)
-
             try:
-                return asyncio.run(_pre_enforce(
-                    _async_func,
+                return _pre_enforce_blocking(
+                    func,
                     pdp_client=sapl.pdp_client,
                     planner=sapl.planner,
                     subscription=subscription,
                     args=tuple(args),
                     kwargs=dict(kwargs),
                     transaction=sapl.transaction_provider,
-                ))
+                )
             except AccessDeniedError:
                 abort(403)
         return wrapper
@@ -123,9 +124,9 @@ def post_enforce(
 ) -> Callable:
     """Decorator: authorize AFTER view execution.
 
-    The view runs first; the PDP is then queried with a subscription
-    that can reference the return value. On deny the wrapper aborts
-    with 403.
+    The sync view runs first on the blocking enforcement core (off the event
+    loop); the PDP is then queried with a subscription that can reference the
+    return value. On deny the wrapper aborts with 403.
     """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
@@ -140,19 +141,16 @@ def post_enforce(
                     return_value=return_value,
                 )
 
-            async def _async_func(*a: Any, **kw: Any) -> Any:
-                return func(*a, **kw)
-
             try:
-                return asyncio.run(_post_enforce(
-                    _async_func,
+                return _post_enforce_blocking(
+                    func,
                     pdp_client=sapl.pdp_client,
                     planner=sapl.planner,
                     subscription_builder=_subscription_builder,
                     args=tuple(args),
                     kwargs=dict(kwargs),
                     transaction=sapl.transaction_provider,
-                ))
+                )
             except AccessDeniedError:
                 abort(403)
         return wrapper

@@ -34,14 +34,12 @@ class TestSaplConfigCustomValues:
             base_url="https://pdp.example.com:9443",
             token="my-token",
             timeout_seconds=10.0,
-            streaming_max_retries=5,
             streaming_retry_base_delay_seconds=2.0,
             streaming_retry_max_delay_seconds=60.0,
         )
         assert config.base_url == "https://pdp.example.com:9443"
         assert config.token == "my-token"
         assert config.timeout_seconds == 10.0
-        assert config.streaming_max_retries == 5
         assert config.streaming_retry_base_delay_seconds == 2.0
         assert config.streaming_retry_max_delay_seconds == 60.0
 

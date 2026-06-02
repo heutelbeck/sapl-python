@@ -73,7 +73,6 @@ def _options_from_settings() -> HttpPdpClientOptions:
         username=config.get("username"),
         secret=config.get("secret"),
         timeout_seconds=config.get("timeout_seconds", 5.0),
-        streaming_max_retries=config.get("streaming_max_retries"),
         streaming_retry_base_delay_seconds=config.get(
             "streaming_retry_base_delay_seconds", 1.0
         ),
