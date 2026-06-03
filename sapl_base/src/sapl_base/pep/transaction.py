@@ -67,10 +67,16 @@ def from_sync_context(
 ) -> TransactionProvider:
     """Adapt a synchronous transaction context-manager factory into a provider.
 
-    Use for sync transaction boundaries such as Django ``transaction.atomic`` or a sync
-    SQLAlchemy ``session.begin``: ``set_transaction_provider(from_sync_context(transaction.atomic))``.
-    The sync context manager commits on clean exit and rolls back on a propagated
-    exception; this wraps it so the async enforcement scope can drive it.
+    Use this to drive a sync transaction boundary, such as a sync SQLAlchemy
+    ``session.begin``, from the async enforcement scope:
+    ``set_transaction_provider(from_sync_context(lambda: session.begin()))``. The sync
+    context manager commits on clean exit and rolls back on a propagated exception.
+
+    The wrapped context manager is entered on the event loop thread, so it must not touch
+    a resource that forbids sync access there. Django's ``transaction.atomic`` is one such
+    resource (it raises ``SynchronousOnlyOperation`` under a running loop), so back an
+    async view with an async provider and reserve ``transaction.atomic`` for sync views,
+    where the blocking core uses it directly without this adapter.
     """
 
     @asynccontextmanager
