@@ -46,10 +46,13 @@ jobs:
           mvn -U -B install -pl sapl-node -am -Dmaven.test.skip=true
           mvn -B spring-boot:build-image -pl sapl-node -Dmaven.test.skip=true
 
+      # The ITs drive a wire protocol against a Java Node, so they are largely Python-version
+      # independent. Run them on the ceiling of the supported range only (newest asyncio is
+      # the one place version drift bites the transport); the 3.12 floor is covered by tests.yml.
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
-          python-version: '3.12'
+          python-version: '3.13'
 
       - name: Install sapl_base
         run: |
