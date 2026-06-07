@@ -1,0 +1,62 @@
+name: Integration tests (SAPL Node)
+
+# The container integration tests in sapl_base/tests/integration run the PDP client
+# against a real SAPL Node. They need the sapl-node image locally; if it is absent the
+# whole suite skips. Until the 4.1 image is published to ghcr.io, build it from the
+# engine's 4.1.0 branch with the same commands the engine CI uses. Once
+# ghcr.io/heutelbeck/sapl-node:4.1.0 is public, replace the engine checkout and the two
+# build steps with a single `docker pull` of that tag.
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - '**.gitignore'
+      - '**.md'
+  workflow_dispatch:
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sapl-node-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out sapl-python
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Check out SAPL engine (4.1.0 branch)
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          repository: heutelbeck/sapl-policy-engine
+          ref: 4.1.0
+          path: sapl-policy-engine
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build SAPL Node image (ghcr.io/heutelbeck/sapl-node:4.1.0-SNAPSHOT)
+        working-directory: sapl-policy-engine
+        run: |
+          mvn -U -B install -pl sapl-node -am -Dmaven.test.skip=true
+          mvn -B spring-boot:build-image -pl sapl-node -Dmaven.test.skip=true
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.12'
+
+      - name: Install sapl_base
+        run: |
+          python -m pip install --upgrade pip
+          pip install ./sapl_base[dev]
+
+      - name: Run sapl_base integration tests
+        run: |
+          cd sapl_base
+          python -m pytest tests/integration -v
