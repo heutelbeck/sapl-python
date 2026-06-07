@@ -8,8 +8,7 @@ list to native SQLAlchemy expression objects.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     Delete,
@@ -27,8 +26,10 @@ from sqlalchemy.sql.elements import TextClause
 from sqlalchemy.sql.selectable import CompoundSelect
 
 from sapl_base.pep.provider import ScopedHandler
-
 from sapl_sqlalchemy.signal import SQL_QUERY
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 _CONSTRAINT_TYPE_SQL: str = "sql:queryManipulation"
 _CONSTRAINT_TYPE_RELATIONAL: str = "relational:queryManipulation"
@@ -108,7 +109,7 @@ def _is_responsible(constraint: Any) -> bool:
     if not isinstance(constraint, dict):
         return False
     ctype = constraint.get("type")
-    return ctype == _CONSTRAINT_TYPE_SQL or ctype == _CONSTRAINT_TYPE_RELATIONAL
+    return ctype in (_CONSTRAINT_TYPE_SQL, _CONSTRAINT_TYPE_RELATIONAL)
 
 
 def _extract_array(constraint: Any, field: str) -> list[Any]:
@@ -265,7 +266,4 @@ def _apply_columns(statement: Any, columns: list[str]) -> Any:
 
 
 def _is_entity_typed_select(statement: Select) -> bool:
-    for desc in statement.column_descriptions:
-        if desc.get("entity") is not None:
-            return True
-    return False
+    return any(desc.get("entity") is not None for desc in statement.column_descriptions)

@@ -14,8 +14,7 @@ from __future__ import annotations
 
 import os
 import tempfile
-from collections.abc import Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import tornado.testing
 import tornado.web
@@ -31,6 +30,9 @@ from sapl_base.pep import (
 )
 from sapl_base.types import AuthorizationDecision, AuthorizationSubscription, Decision
 from sapl_tornado.decorators import post_enforce, pre_enforce
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 FAIL_OUTPUT = {"type": "failOutput"}
 

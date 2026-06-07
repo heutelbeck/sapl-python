@@ -10,7 +10,7 @@ This is the load-bearing proof that the connector + plan + planner
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -22,13 +22,15 @@ from sapl_base.pep import (
 from sapl_base.pep.filters import ContentFilteringProvider
 from sapl_base.transport import HttpPdpClient, HttpPdpClientOptions
 from sapl_base.types import AuthorizationSubscription
-
 from tests.integration.conftest import (
     _free_port,
     _start_sapl_node,
     _stop_container,
     _wait_for_pdp_ready,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @pytest.fixture

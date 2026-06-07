@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from sapl_base.transport.codec import sapl_types_pb2 as types
 from sapl_base.transport.codec.sapl_proto_codec import (
     decode_decision,
     decode_identifiable_decision,
@@ -9,10 +10,8 @@ from sapl_base.transport.codec.sapl_proto_codec import (
     encode_multi_subscription,
     encode_subscription,
 )
-from sapl_base.transport.codec import sapl_types_pb2 as types
 from sapl_base.types import (
     RESOURCE_ABSENT,
-    AuthorizationDecision,
     AuthorizationSubscription,
     Decision,
     MultiAuthorizationSubscription,

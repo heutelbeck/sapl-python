@@ -14,10 +14,13 @@ from __future__ import annotations
 import socket
 import subprocess
 import time
-from collections.abc import Generator
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+    from pathlib import Path
 
 SAPL_NODE_IMAGE = "ghcr.io/heutelbeck/sapl-node:4.1.0-SNAPSHOT"
 
@@ -884,8 +887,6 @@ def _wait_for_pdp_ready_with_basic(
     base_url: str, username: str, secret: str, timeout_seconds: float
 ) -> None:
     import base64
-    import urllib.error
-    import urllib.request
 
     encoded = base64.b64encode(f"{username}:{secret}".encode()).decode()
     _wait_for_pdp_ready_with_header(

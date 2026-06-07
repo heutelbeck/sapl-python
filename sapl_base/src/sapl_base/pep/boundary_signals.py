@@ -16,8 +16,10 @@ Three types, two channels:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from sapl_base.types import AuthorizationDecision
+if TYPE_CHECKING:
+    from sapl_base.types import AuthorizationDecision
 
 
 class AccessDeniedError(Exception):

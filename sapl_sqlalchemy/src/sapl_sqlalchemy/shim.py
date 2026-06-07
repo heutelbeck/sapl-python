@@ -12,7 +12,6 @@ from sapl_base.pep.boundary_signals import AccessDeniedError
 from sapl_base.pep.plan import ABSENT
 from sapl_base.pep.request_context import current_plan
 from sapl_base.pep.shim_signals import register_shim_signal, unregister_shim_signal
-
 from sapl_sqlalchemy.signal import SQL_QUERY, SqlQuerySignal
 
 logger = structlog.get_logger(__name__)

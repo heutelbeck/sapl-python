@@ -8,13 +8,15 @@ These helpers let subscribers react to them without manual
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sapl_base.pep.boundary_signals import (
     AccessGrantedSignal,
     AccessSuspendedSignal,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Callable
 
 
 async def on_suspend(

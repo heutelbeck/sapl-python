@@ -9,11 +9,13 @@ that stamps a start time on `decision` and records elapsed time on
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
 
-from sapl_base.pep.signal import SignalKind
+if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
+
+    from sapl_base.pep.signal import SignalKind
 
 HandlerShape = Literal["runner", "consumer", "mapper"]
 """A runner is `() -> None`. A consumer is `(value) -> None`.

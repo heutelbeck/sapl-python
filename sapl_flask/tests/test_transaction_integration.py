@@ -12,8 +12,7 @@ a raw sync transaction provider, so a sync SQLAlchemy session is used directly.
 from __future__ import annotations
 
 import types
-from collections.abc import Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from flask import Flask
@@ -24,6 +23,9 @@ import sapl_flask.decorators as decorators
 from sapl_base.pep import OUTPUT, EnforcementPlanner, ScopedHandler
 from sapl_base.types import AuthorizationDecision, Decision
 from sapl_flask.decorators import post_enforce, pre_enforce
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 FAIL_OUTPUT = {"type": "failOutput"}
 

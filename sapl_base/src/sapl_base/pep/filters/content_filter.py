@@ -29,8 +29,7 @@ from __future__ import annotations
 
 import copy
 import re
-from collections.abc import Callable, Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -38,6 +37,9 @@ from sapl_base.logging_utils import truncate
 from sapl_base.pep.enforce import OUTPUT
 from sapl_base.pep.plan import DROP
 from sapl_base.pep.provider import ScopedHandler
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
 
 log = structlog.get_logger(__name__)
 

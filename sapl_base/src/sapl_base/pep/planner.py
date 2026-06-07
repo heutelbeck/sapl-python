@@ -20,21 +20,24 @@ the synthetic-failure-runner outcome.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import structlog
 
 from sapl_base.pep.plan import EnforcementPlan, PlanEntry
-from sapl_base.pep.provider import (
-    ConstraintHandlerProvider,
-    ConstraintTag,
-    HandlerShape,
-    ScopedHandler,
-)
 from sapl_base.pep.signal import SignalKind
-from sapl_base.types import AuthorizationDecision
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+
+    from sapl_base.pep.provider import (
+        ConstraintHandlerProvider,
+        ConstraintTag,
+        HandlerShape,
+        ScopedHandler,
+    )
+    from sapl_base.types import AuthorizationDecision
 
 logger = structlog.get_logger(__name__)
 
@@ -56,7 +59,7 @@ include a signal kind named `decision` in its supported set.
 
 
 @dataclass(frozen=True, slots=True)
-class _SyntheticFailure(Exception):
+class _SyntheticFailureError(Exception):
     """Raised by a synthetic failure runner to signal obligation failure."""
 
     reason: str = "synthetic failure"
@@ -198,7 +201,7 @@ def _make_synthetic_entry(
             constraint=constraint,
         )
         if tag == "obligation":
-            raise _SyntheticFailure(reason=reason)
+            raise _SyntheticFailureError(reason=reason)
 
     return PlanEntry(
         signal=_DECISION,

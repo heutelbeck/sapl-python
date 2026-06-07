@@ -5,10 +5,9 @@ from typing import Any
 import pytest
 from sqlalchemy import delete, insert, select, union, update
 from sqlalchemy.dialects import sqlite
+from tests.models import Patient
 
 from sapl_sqlalchemy import SQL_QUERY, SqlQueryManipulationProvider
-
-from tests.models import Patient
 
 
 def _provider() -> SqlQueryManipulationProvider:

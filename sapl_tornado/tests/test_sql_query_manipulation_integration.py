@@ -15,7 +15,6 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from typing import Any
 
 import tornado.testing
 import tornado.web
@@ -26,12 +25,12 @@ from tornado.web import RequestHandler
 import sapl_tornado.decorators as decorators
 from sapl_base.pep import EnforcementPlanner
 from sapl_base.types import AuthorizationDecision, AuthorizationSubscription, Decision
-from sapl_tornado.decorators import pre_enforce
 from sapl_sqlalchemy import (
     SqlQueryManipulationProvider,
     register_orm_listener,
     unregister_orm_listener,
 )
+from sapl_tornado.decorators import pre_enforce
 
 OWNER_OBLIGATION = {
     "type": "sql:queryManipulation",

@@ -5,4 +5,4 @@ from sapl_base.pep.filters.content_filter import (
     ContentFilterPredicateProvider,
 )
 
-__all__ = ["ContentFilteringProvider", "ContentFilterPredicateProvider"]
+__all__ = ["ContentFilterPredicateProvider", "ContentFilteringProvider"]

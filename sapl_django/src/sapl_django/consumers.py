@@ -15,12 +15,11 @@ except ImportError:
 
 if _HAS_CHANNELS:
     from sapl_base.pep import (
+        PRE_ENFORCE_SUPPORTED,
         AccessDeniedError,
         DecisionSignal,
-        PRE_ENFORCE_SUPPORTED,
     )
     from sapl_base.types import AuthorizationSubscription, Decision
-
     from sapl_django.config import get_pdp_client, get_planner
 
     class SaplWebsocketConsumer(AsyncJsonWebsocketConsumer):  # type: ignore[misc]

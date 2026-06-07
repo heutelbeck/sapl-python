@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import re
-from collections.abc import AsyncIterator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 import respx
@@ -17,12 +17,14 @@ from sapl_base.transport.http_pdp_client import (
     HttpPdpClient,
     HttpPdpClientOptions,
 )
-from sapl_base.transport.oauth2 import TokenProvider
 from sapl_base.types import (
     AuthorizationSubscription,
     Decision,
     MultiAuthorizationSubscription,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 _BASE = "http://127.0.0.1:8080"
 _DECIDE_ONCE = f"{_BASE}/api/pdp/decide-once"
@@ -252,10 +254,8 @@ async def _drain(iterator: AsyncIterator[object], limit_seconds: float = 1.0) ->
     async def _collect() -> None:
         async for item in iterator:
             items.append(item)
-    try:
+    with contextlib.suppress(TimeoutError):
         await asyncio.wait_for(_collect(), timeout=limit_seconds)
-    except asyncio.TimeoutError:
-        pass
     return items
 
 
@@ -267,8 +267,6 @@ async def _take(iterator: AsyncIterator[object], count: int, limit_seconds: floa
             items.append(item)
             if len(items) >= count:
                 break
-    try:
+    with contextlib.suppress(TimeoutError):
         await asyncio.wait_for(_collect(), timeout=limit_seconds)
-    except asyncio.TimeoutError:
-        pass
     return items

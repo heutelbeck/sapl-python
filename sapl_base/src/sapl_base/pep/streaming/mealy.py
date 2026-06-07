@@ -47,15 +47,17 @@ Invariants (paper §6):
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sapl_base.pep.boundary_signals import AccessDeniedError
-from sapl_base.pep.plan import EnforcementPlan
-from sapl_base.types import AuthorizationDecision
+
+if TYPE_CHECKING:
+    from sapl_base.pep.plan import EnforcementPlan
+    from sapl_base.types import AuthorizationDecision
 
 
 class _Singleton:
-    _INSTANCE: "Any | None" = None
+    _INSTANCE: Any | None = None
 
     def __new__(cls) -> Any:
         if cls._INSTANCE is None:

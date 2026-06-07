@@ -11,18 +11,11 @@ listener fires.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from sqlalchemy import event, select
 from sqlalchemy.orm import ORMExecuteState, Session
-
-from sapl_base.pep import AccessDeniedError, EnforcementPlanner, pre_enforce
-from sapl_base.types import AuthorizationDecision
-
-from sapl_sqlalchemy import register_orm_listener, unregister_orm_listener
-
 from tests.models import Patient
 from tests.sql_harness import (
     BAD_OPERATOR_OBLIGATION,
@@ -36,6 +29,14 @@ from tests.sql_harness import (
     permit,
     tenant_obligation,
 )
+
+from sapl_base.pep import AccessDeniedError, EnforcementPlanner, pre_enforce
+from sapl_sqlalchemy import register_orm_listener, unregister_orm_listener
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from sapl_base.types import AuthorizationDecision
 
 TENANT_1 = tenant_obligation(1)
 TENANT_2 = tenant_obligation(2)

@@ -13,8 +13,10 @@ without further wiring.
 from __future__ import annotations
 
 from contextvars import ContextVar, Token
+from typing import TYPE_CHECKING
 
-from sapl_base.pep.plan import EnforcementPlan
+if TYPE_CHECKING:
+    from sapl_base.pep.plan import EnforcementPlan
 
 _current_plan: ContextVar[EnforcementPlan | None] = ContextVar(
     "sapl_current_plan", default=None

@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
 from sapl_base.pep import ConstraintHandlerProvider, EnforcementPlanner, PepRuntime
-from sapl_base.pep.transaction import SyncTransactionProvider, TransactionProvider
 from sapl_base.transport import HttpPdpClient, HttpPdpClientOptions
+
+if TYPE_CHECKING:
+    from sapl_base.pep.transaction import SyncTransactionProvider, TransactionProvider
 
 ERROR_MISSING_CONFIG = "SAPL_CONFIG not found in Django settings"
 

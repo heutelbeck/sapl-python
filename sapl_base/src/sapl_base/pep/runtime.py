@@ -14,13 +14,17 @@ or as attributes on a Flask extension object (Flask).
 from __future__ import annotations
 
 import threading
-from collections.abc import Iterable
+from typing import TYPE_CHECKING
 
 from sapl_base.pep.filters import ContentFilteringProvider, ContentFilterPredicateProvider
 from sapl_base.pep.planner import EnforcementPlanner
-from sapl_base.pep.provider import ConstraintHandlerProvider
-from sapl_base.pep.transaction import SyncTransactionProvider, TransactionProvider
 from sapl_base.transport import HttpPdpClient, HttpPdpClientOptions
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from sapl_base.pep.provider import ConstraintHandlerProvider
+    from sapl_base.pep.transaction import SyncTransactionProvider, TransactionProvider
 
 ERROR_NOT_CONFIGURED = "SAPL not configured. Call configure() first."
 

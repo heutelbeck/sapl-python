@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -12,6 +11,9 @@ from sapl_base.pep.streaming.transition_signals import (
     on_transitions,
 )
 from sapl_base.types import AuthorizationDecision, Decision
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 
 async def _stream(items: list[Any]) -> AsyncIterator[Any]:

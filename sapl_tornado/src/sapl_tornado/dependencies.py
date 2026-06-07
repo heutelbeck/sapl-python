@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from sapl_base.pep import ConstraintHandlerProvider, EnforcementPlanner, PepRuntime
-from sapl_base.pep.transaction import TransactionProvider
-from sapl_base.transport import HttpPdpClient, HttpPdpClientOptions
+
+if TYPE_CHECKING:
+    from sapl_base.pep.transaction import TransactionProvider
+    from sapl_base.transport import HttpPdpClient, HttpPdpClientOptions
 
 _runtime = PepRuntime()
 

@@ -28,9 +28,8 @@ DECISION / OUTPUT / ERROR signal dataclasses are reused from
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -46,7 +45,6 @@ from sapl_base.pep.enforce import (
     OutputSignal,
 )
 from sapl_base.pep.plan import ABSENT
-from sapl_base.pep.planner import EnforcementPlanner
 from sapl_base.pep.signal import SignalKind
 from sapl_base.pep.streaming.mealy import (
     EMIT_COMPLETE,
@@ -71,6 +69,11 @@ from sapl_base.pep.streaming.mealy import (
     step,
 )
 from sapl_base.types import AuthorizationDecision, Decision
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Callable
+
+    from sapl_base.pep.planner import EnforcementPlanner
 
 logger = structlog.get_logger(__name__)
 
@@ -277,7 +280,7 @@ async def _pump_pdp(
             await queue.put(_classify(decision, planner))
     except asyncio.CancelledError:
         raise
-    except Exception as error:  # noqa: BLE001
+    except Exception as error:
         logger.warning("pdp_pump_failed", error=str(error))
         await queue.put(
             PdpDeny(
@@ -298,7 +301,7 @@ async def _pump_rap(
             await queue.put(RapItem(value=value))
     except asyncio.CancelledError:
         raise
-    except Exception as error:  # noqa: BLE001
+    except Exception as error:
         logger.warning("rap_pump_failed", error=str(error))
         await queue.put(_RapError(error=error))
         return

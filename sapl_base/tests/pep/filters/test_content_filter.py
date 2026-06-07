@@ -7,7 +7,6 @@ import pytest
 from sapl_base.pep import (
     ABSENT,
     DECISION,
-    DROP,
     ERROR,
     OUTPUT,
     EnforcementPlanner,
@@ -15,7 +14,6 @@ from sapl_base.pep import (
 )
 from sapl_base.pep.filters import ContentFilteringProvider, ContentFilterPredicateProvider
 from sapl_base.types import AuthorizationDecision, Decision
-
 
 _STREAM_SIGNALS = frozenset({DECISION, OUTPUT, ERROR})
 

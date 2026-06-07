@@ -12,7 +12,6 @@ import pytest
 
 from sapl_base.transport import HttpPdpClient, HttpPdpClientOptions
 from sapl_base.types import AuthorizationSubscription, Decision
-
 from tests.integration.conftest import _fetch_oauth_token
 
 

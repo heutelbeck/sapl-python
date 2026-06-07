@@ -18,7 +18,6 @@ from typing import Any
 
 from sapl_base.pep import DROP, ScopedHandler
 from sapl_base.types import AuthorizationDecision, AuthorizationSubscription, Decision
-
 from sapl_sqlalchemy import SQL_QUERY, SqlQueryManipulationProvider
 
 SUBSCRIPTION = AuthorizationSubscription(subject="s", action="read", resource="patient")

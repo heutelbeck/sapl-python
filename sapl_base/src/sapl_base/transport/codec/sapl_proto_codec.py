@@ -15,9 +15,8 @@ are returned as `int`; anything else as `float`.
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from google.protobuf import message as _proto_message
 from google.protobuf.message import DecodeError
 
 from sapl_base.transport.codec import sapl_types_pb2 as types
@@ -30,6 +29,9 @@ from sapl_base.types import (
     MultiAuthorizationDecision,
     MultiAuthorizationSubscription,
 )
+
+if TYPE_CHECKING:
+    from google.protobuf import message as _proto_message
 
 _DECISION_FROM_PROTO = {
     types.Decision.INDETERMINATE: Decision.INDETERMINATE,

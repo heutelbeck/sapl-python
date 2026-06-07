@@ -40,13 +40,14 @@ from sapl_base.pep.enforce import (
 from sapl_base.pep.enforce import (
     pre_enforce as base_pre_enforce,
 )
-from sapl_base.transport import HttpPdpClient
 from sapl_fastmcp.context import FinalizeCallback, SaplConfig, SubscriptionContext
 from sapl_fastmcp.enforcement import enforce_decision_gate
 from sapl_fastmcp.subscription import build_middleware_subscription
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from sapl_base.transport import HttpPdpClient
 
 logger = logging.getLogger("sapl.mcp.middleware")
 

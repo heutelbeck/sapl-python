@@ -17,16 +17,18 @@ Contract:
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from sapl_base.types import (
-    AuthorizationDecision,
-    AuthorizationSubscription,
-    IdentifiableAuthorizationDecision,
-    MultiAuthorizationDecision,
-    MultiAuthorizationSubscription,
-)
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
+    from sapl_base.types import (
+        AuthorizationDecision,
+        AuthorizationSubscription,
+        IdentifiableAuthorizationDecision,
+        MultiAuthorizationDecision,
+        MultiAuthorizationSubscription,
+    )
 
 
 @runtime_checkable

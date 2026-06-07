@@ -8,8 +8,7 @@ core, so a post-write denial rolls the DB transaction back.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import pytest_asyncio
@@ -23,6 +22,9 @@ import sapl_fastapi.decorators as decorators
 from sapl_base.pep import OUTPUT, EnforcementPlanner, ScopedHandler
 from sapl_base.types import AuthorizationDecision, AuthorizationSubscription, Decision
 from sapl_fastapi.decorators import post_enforce, pre_enforce
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 FAIL_OUTPUT = {"type": "failOutput"}
 

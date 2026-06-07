@@ -18,14 +18,16 @@ consumers in the same `execute` call are skipped after a DROP.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import structlog
 
-from sapl_base.pep.provider import ConstraintTag, HandlerShape
-from sapl_base.pep.signal import Signal, SignalKind
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping, Sequence
+
+    from sapl_base.pep.provider import ConstraintTag, HandlerShape
+    from sapl_base.pep.signal import Signal, SignalKind
 
 logger = structlog.get_logger(__name__)
 
@@ -33,9 +35,9 @@ logger = structlog.get_logger(__name__)
 class _Absent:
     """Sentinel for "no value" (used after a DROP or at void signals)."""
 
-    _INSTANCE: "_Absent | None" = None
+    _INSTANCE: _Absent | None = None
 
-    def __new__(cls) -> "_Absent":
+    def __new__(cls) -> _Absent:
         if cls._INSTANCE is None:
             cls._INSTANCE = super().__new__(cls)
         return cls._INSTANCE
@@ -50,9 +52,9 @@ ABSENT: Final[_Absent] = _Absent()
 class _Drop:
     """Sentinel returned by a mapper to drop the current item."""
 
-    _INSTANCE: "_Drop | None" = None
+    _INSTANCE: _Drop | None = None
 
-    def __new__(cls) -> "_Drop":
+    def __new__(cls) -> _Drop:
         if cls._INSTANCE is None:
             cls._INSTANCE = super().__new__(cls)
         return cls._INSTANCE
@@ -149,10 +151,7 @@ class EnforcementPlan:
                     continue
                 elif entry.shape == "mapper":
                     result = entry.handler(value)
-                    if result is DROP:
-                        value = ABSENT
-                    else:
-                        value = result
+                    value = ABSENT if result is DROP else result
                 else:
                     entry.handler(value)
             except Exception as error:

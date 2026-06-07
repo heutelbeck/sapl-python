@@ -27,9 +27,8 @@ import asyncio
 import base64
 import json
 import random
-from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin, urlparse
 
 import httpx
@@ -47,8 +46,6 @@ from sapl_base.transport.constants import (
     RETRY_ESCALATION_THRESHOLD,
     PdpRoute,
 )
-from sapl_base.transport.oauth2 import TokenProvider
-from sapl_base.transport.tls_config import TlsConfig
 from sapl_base.types import (
     AuthorizationDecision,
     AuthorizationSubscription,
@@ -57,6 +54,12 @@ from sapl_base.types import (
     MultiAuthorizationDecision,
     MultiAuthorizationSubscription,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Callable
+
+    from sapl_base.transport.oauth2 import TokenProvider
+    from sapl_base.transport.tls_config import TlsConfig
 
 logger = structlog.get_logger(__name__)
 
@@ -429,9 +432,8 @@ class HttpPdpClient:
                     status=response.status_code,
                     body=excerpt,
                 )
-                if response.status_code in (401, 403):
-                    if self._handle_auth_failure() and not retried:
-                        return await self._post_json(url, body, retried=True)
+                if response.status_code in (401, 403) and self._handle_auth_failure() and not retried:
+                    return await self._post_json(url, body, retried=True)
                 return None
             return response.json()
         except httpx.TimeoutException:
@@ -493,7 +495,7 @@ class HttpPdpClient:
                         last_emitted = validated
                         yield validated
                 attempt += 1
-            except _SseBufferOverflow:
+            except _SseBufferOverflowError:
                 attempt += 1
                 logger.error("sse_buffer_overflow", url=url)
             except (httpx.HTTPError, OSError) as error:
@@ -531,7 +533,7 @@ class HttpPdpClient:
             async for chunk in response.aiter_text():
                 buffer += chunk
                 if len(buffer) > MAX_SSE_BUFFER_BYTES:
-                    raise _SseBufferOverflow()
+                    raise _SseBufferOverflowError()
                 while "\n" in buffer:
                     line, _, buffer = buffer.partition("\n")
                     trimmed = line.strip()
@@ -546,7 +548,7 @@ class HttpPdpClient:
                         logger.warning("sse_frame_not_valid_json", frame=truncate(data))
 
 
-class _SseBufferOverflow(Exception):
+class _SseBufferOverflowError(Exception):
     """Raised internally when an SSE frame exceeds MAX_SSE_BUFFER_BYTES."""
 
 

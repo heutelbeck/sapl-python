@@ -17,16 +17,14 @@ dataclasses.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from inspect import isawaitable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
 from sapl_base.pep.boundary_signals import AccessDeniedError
 from sapl_base.pep.plan import ABSENT
-from sapl_base.pep.planner import EnforcementPlanner
 from sapl_base.pep.request_context import reset_current_plan, set_current_plan
 from sapl_base.pep.shim_signals import shim_signals
 from sapl_base.pep.signal import SignalKind
@@ -36,8 +34,13 @@ from sapl_base.pep.transaction import (
     transaction_scope,
     transaction_scope_sync,
 )
-from sapl_base.transport.pdp_client import PdpClient
 from sapl_base.types import AuthorizationDecision, AuthorizationSubscription, Decision
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from sapl_base.pep.planner import EnforcementPlanner
+    from sapl_base.transport.pdp_client import PdpClient
 
 logger = structlog.get_logger(__name__)
 
@@ -58,7 +61,7 @@ POST_ENFORCE_SUPPORTED: frozenset[SignalKind] = frozenset({DECISION, OUTPUT, ERR
 class DecisionSignal:
     """Fires once per PDP decision. Self-contained; carries the decision."""
 
-    decision: AuthorizationDecision = AuthorizationDecision()
+    decision: AuthorizationDecision = field(default_factory=AuthorizationDecision)
     kind: SignalKind = DECISION
 
 

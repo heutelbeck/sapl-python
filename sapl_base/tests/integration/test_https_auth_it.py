@@ -6,7 +6,6 @@ import pytest
 
 from sapl_base.transport import HttpPdpClient, HttpPdpClientOptions, TlsConfig
 from sapl_base.types import AuthorizationSubscription, Decision
-
 from tests.integration.conftest import API_KEY_PLAIN, BASIC_SECRET, BASIC_USER
 
 

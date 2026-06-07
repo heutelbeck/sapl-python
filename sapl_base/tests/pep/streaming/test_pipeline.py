@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Callable
-from typing import Any
+import contextlib
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -17,6 +17,9 @@ from sapl_base.pep import (
 )
 from sapl_base.pep.streaming.pipeline import run_pipeline
 from sapl_base.types import AuthorizationDecision, Decision
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Callable
 
 
 async def _iter(items: list[Any]) -> AsyncIterator[Any]:
@@ -49,10 +52,8 @@ async def _collect(
     async def _go() -> None:
         async for item in iterator:
             collected.append(item)
-    try:
+    with contextlib.suppress(TimeoutError):
         await asyncio.wait_for(_go(), timeout=limit_seconds)
-    except asyncio.TimeoutError:
-        pass
     return collected
 
 

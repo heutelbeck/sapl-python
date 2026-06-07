@@ -26,10 +26,10 @@ from sapl_base.pep.streaming.transition_signals import (
 __all__ = [
     "CANCEL_SIGNAL",
     "COMPLETE",
-    "CancelSignal",
-    "CompleteSignal",
     "STREAM_SUPPORTED",
     "TERMINATION",
+    "CancelSignal",
+    "CompleteSignal",
     "TerminationSignal",
     "on_granted",
     "on_suspend",

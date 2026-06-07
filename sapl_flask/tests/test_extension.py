@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from flask import Flask
 
 from sapl_base.pep import OUTPUT, ScopedHandler
 from sapl_flask.extension import SaplFlask, get_sapl_extension
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 @pytest.fixture

@@ -13,15 +13,13 @@ Triggers covered:
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+import pytest
 import pytest_asyncio
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-
-import pytest
 
 from sapl_base.pep import (
     OUTPUT,
@@ -32,6 +30,9 @@ from sapl_base.pep import (
     pre_enforce,
 )
 from sapl_base.types import AuthorizationDecision, AuthorizationSubscription, Decision
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 FAIL_OUTPUT = {"type": "failOutput"}
 SUBSCRIPTION = AuthorizationSubscription(subject="s", action="a", resource="r")

@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.12', '3.13']
-        package: [sapl_base, sapl_sqlalchemy, sapl_fastapi, sapl_django, sapl_flask, sapl_tornado, sapl_fastmcp]
+        package: [sapl_base, sapl_sqlalchemy, sapl_pymongo, sapl_fastapi, sapl_django, sapl_flask, sapl_tornado, sapl_fastmcp]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
@@ -31,7 +31,7 @@ jobs:
           if [ "${{ matrix.package }}" != "sapl_base" ] && [ "${{ matrix.package }}" != "sapl_sqlalchemy" ]; then pip install ./${{ matrix.package }}[dev]; fi
       - name: Lint with ruff
         run: |
-          pip install ruff
+          pip install ruff==0.15.4
           ruff check ${{ matrix.package }}/src/ ${{ matrix.package }}/tests/
       - name: Test ${{ matrix.package }}
         run: |

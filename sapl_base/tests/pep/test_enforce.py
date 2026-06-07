@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -19,10 +18,12 @@ from sapl_base.types import (
     AuthorizationDecision,
     AuthorizationSubscription,
     Decision,
-    MultiAuthorizationDecision,
-    MultiAuthorizationSubscription,
     IdentifiableAuthorizationDecision,
+    MultiAuthorizationDecision,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Sequence
 
 
 class _ScriptedPdpClient:

@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sapl_base.pep import (
     DECISION,
-    ERROR,
     OUTPUT,
-    ConstraintHandlerProvider,
     DecisionSignal,
     EnforcementPlanner,
     OutputSignal,
@@ -16,6 +13,8 @@ from sapl_base.pep import (
 from sapl_base.pep.streaming import STREAM_SUPPORTED
 from sapl_base.types import AuthorizationDecision, Decision
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 _STREAM_SIGNALS = STREAM_SUPPORTED
 

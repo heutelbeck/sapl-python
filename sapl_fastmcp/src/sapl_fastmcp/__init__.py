@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from sapl_base.pep import ConstraintHandlerProvider, EnforcementPlanner, PepRuntime
-from sapl_base.transport import HttpPdpClient, HttpPdpClientOptions
-
 from sapl_fastmcp.auth_check import sapl
 from sapl_fastmcp.context import SaplConfig, SubscriptionContext
 from sapl_fastmcp.decorators import post_enforce, pre_enforce
 from sapl_fastmcp.middleware import SAPLMiddleware
+
+if TYPE_CHECKING:
+    from sapl_base.transport import HttpPdpClient, HttpPdpClientOptions
 
 logger = logging.getLogger("sapl.mcp")
 

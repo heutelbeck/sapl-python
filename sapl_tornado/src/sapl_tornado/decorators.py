@@ -13,11 +13,14 @@ from sapl_base.pep import (
     AccessDeniedError,
     AccessGrantedSignal,
     AccessSuspendedSignal,
+)
+from sapl_base.pep import (
     post_enforce as _post_enforce,
+)
+from sapl_base.pep import (
     pre_enforce as _pre_enforce,
 )
 from sapl_base.pep.streaming import run_pipeline
-
 from sapl_tornado.dependencies import get_pdp_client, get_planner, get_transaction_provider
 from sapl_tornado.subscription import SubscriptionBuilder, SubscriptionField
 
@@ -67,12 +70,12 @@ def _extract_request_and_handler(
     request = handler.request if handler is not None else None
 
     if request is None:
-        from tornado.httputil import HTTPServerRequest as _HSR
+        from tornado.httputil import HTTPServerRequest as _HttpServerRequest
         for arg in args:
-            if isinstance(arg, _HSR):
+            if isinstance(arg, _HttpServerRequest):
                 return arg, handler
         for value in kwargs.values():
-            if isinstance(value, _HSR):
+            if isinstance(value, _HttpServerRequest):
                 return value, handler
 
     return request, handler

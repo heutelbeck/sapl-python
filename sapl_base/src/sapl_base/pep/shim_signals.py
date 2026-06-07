@@ -16,8 +16,10 @@ omitting one it can, both break the planner's fail-closed guarantee.
 from __future__ import annotations
 
 import threading
+from typing import TYPE_CHECKING
 
-from sapl_base.pep.signal import SignalKind
+if TYPE_CHECKING:
+    from sapl_base.pep.signal import SignalKind
 
 _lock = threading.Lock()
 _signals: set[SignalKind] = set()

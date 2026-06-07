@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 from sapl_base.pep import ConstraintHandlerProvider, EnforcementPlanner, PepRuntime
-from sapl_base.pep.transaction import SyncTransactionProvider, TransactionProvider
 from sapl_base.transport import HttpPdpClient, HttpPdpClientOptions
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from flask import Flask
+
+    from sapl_base.pep.transaction import SyncTransactionProvider, TransactionProvider
 
 
 class SaplFlask:

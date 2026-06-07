@@ -27,10 +27,9 @@ from __future__ import annotations
 
 import asyncio
 import random
-from collections.abc import AsyncIterator, Callable
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 import structlog
@@ -59,8 +58,6 @@ from sapl_base.transport.constants import (
     LOOPBACK_HOSTS,
     PdpRoute,
 )
-from sapl_base.transport.oauth2 import TokenProvider
-from sapl_base.transport.tls_config import TlsConfig
 from sapl_base.types import (
     AuthorizationDecision,
     AuthorizationSubscription,
@@ -68,6 +65,12 @@ from sapl_base.types import (
     MultiAuthorizationDecision,
     MultiAuthorizationSubscription,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Callable
+
+    from sapl_base.transport.oauth2 import TokenProvider
+    from sapl_base.transport.tls_config import TlsConfig
 
 logger = structlog.get_logger(__name__)
 
