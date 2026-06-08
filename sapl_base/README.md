@@ -2,6 +2,8 @@
 
 Core SAPL Policy Enforcement Point (PEP) library for Python. Provides the async PDP client, constraint enforcement engine, and enforcement primitives used by the framework integrations ([sapl-flask](https://pypi.org/project/sapl-flask/), [sapl-django](https://pypi.org/project/sapl-django/), [sapl-fastapi](https://pypi.org/project/sapl-fastapi/)).
 
+Implements the SAPL 4.1 enforcement model: a planner that binds constraint handlers to lifecycle signals, the `SUSPEND` decision verb, an optional RSocket transport, and a library-owned transaction boundary that rolls back on post-write denial.
+
 ## How It Works
 
 Your application sends authorization subscriptions to the Policy Decision Point (PDP) and enforces the decision. The PDP evaluates SAPL policies and returns permit/deny decisions with optional obligations, advice, and resource transformations.

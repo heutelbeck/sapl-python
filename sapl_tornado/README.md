@@ -2,6 +2,8 @@
 
 Policy-based authorization for Tornado. Write access control rules as external SAPL policy files and enforce them at runtime through decorators like `@pre_enforce` and `@post_enforce`. Policies can be updated without code changes or redeployment.
 
+Built on [sapl-base](https://pypi.org/project/sapl-base/) and the SAPL 4.1 enforcement model: planner-driven constraint handling, the `SUSPEND` decision verb, an optional RSocket transport, and transaction rollback on post-write denial. Data-layer query rewriting is available via [sapl-sqlalchemy](https://pypi.org/project/sapl-sqlalchemy/) (SQL) and [sapl-pymongo](https://pypi.org/project/sapl-pymongo/) (MongoDB).
+
 ## How It Works
 
 Your application decorates handler methods with enforcement decorators. SAPL intercepts the call, sends an authorization subscription to the Policy Decision Point (PDP), and enforces the decision, including any obligations or advice the policy attaches.

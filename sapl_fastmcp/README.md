@@ -2,6 +2,8 @@
 
 Policy-based authorization for FastMCP servers. Write access control rules as external SAPL policy files and enforce them at runtime through middleware or per-component `auth=` callbacks. Policies can be updated without code changes or redeployment.
 
+Built on [sapl-base](https://pypi.org/project/sapl-base/) and the SAPL 4.1 enforcement model: planner-driven constraint handling, the `SUSPEND` decision verb, and an optional RSocket transport.
+
 ## How It Works
 
 Two enforcement approaches are available. The **middleware** approach intercepts every tool call, resource read, and prompt get through `SAPLMiddleware`, giving you a single enforcement point for the entire server. The **per-component** approach uses `auth=sapl()` on individual tools, resources, and prompts for fine-grained control with decorator overrides.

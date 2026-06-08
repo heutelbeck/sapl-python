@@ -2,16 +2,20 @@
 
 Policy Enforcement Point (PEP) implementations for Python web frameworks, built on the [SAPL](https://sapl.io) authorization engine.
 
+Built on the SAPL 4.1 enforcement model: a planner-driven constraint architecture that binds handlers to lifecycle signals, the new `SUSPEND` decision verb, an optional RSocket transport, library-owned transaction rollback on post-write denial, and data-layer query rewriting (SQLAlchemy and PyMongo). See the [CHANGELOG](CHANGELOG.md) for the 4.1.0 release notes.
+
 ## Packages
 
 | Package | Description | PyPI |
 |---------|-------------|------|
 | sapl-base | Core PEP library | [sapl-base](https://pypi.org/project/sapl-base/) |
 | sapl-fastapi | FastAPI integration | [sapl-fastapi](https://pypi.org/project/sapl-fastapi/) |
-| sapl-django | Django integration | [sapl-django](https://pypi.org/project/sapl-django/) |
+| sapl-django | Django integration (includes a query-rewriting provider) | [sapl-django](https://pypi.org/project/sapl-django/) |
 | sapl-flask | Flask integration | [sapl-flask](https://pypi.org/project/sapl-flask/) |
 | sapl-tornado | Tornado integration | [sapl-tornado](https://pypi.org/project/sapl-tornado/) |
 | sapl-fastmcp | FastMCP integration | [sapl-fastmcp](https://pypi.org/project/sapl-fastmcp/) |
+| sapl-sqlalchemy | SQLAlchemy query-rewriting shim | [sapl-sqlalchemy](https://pypi.org/project/sapl-sqlalchemy/) |
+| sapl-pymongo | PyMongo query-rewriting shim | [sapl-pymongo](https://pypi.org/project/sapl-pymongo/) |
 
 ## Quick Start
 
