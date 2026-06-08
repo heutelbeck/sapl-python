@@ -7,8 +7,8 @@ from sapl_sqlalchemy.signal import SQL_QUERY, SqlQuerySignal
 
 __all__ = [
     "SQL_QUERY",
-    "SqlQueryRewritingProvider",
     "SqlQueryMapper",
+    "SqlQueryRewritingProvider",
     "SqlQuerySignal",
     "register_orm_listener",
     "unregister_orm_listener",
