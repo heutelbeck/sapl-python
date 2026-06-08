@@ -221,7 +221,7 @@ def stream_enforce(
 
     Writes SSE frames directly to the Tornado handler. DENY emits a final
     ACCESS_DENIED frame; SUSPEND with `signal_transitions=True` emits
-    ACCESS_SUSPENDED / ACCESS_RESTORED.
+    ACCESS_SUSPENDED / ACCESS_GRANTED.
     """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
@@ -285,7 +285,7 @@ def _format_sse(data: Any) -> str:
     if isinstance(data, AccessSuspendedSignal):
         return "data: " + json.dumps({"type": "ACCESS_SUSPENDED"}) + "\n\n"
     if isinstance(data, AccessGrantedSignal):
-        return "data: " + json.dumps({"type": "ACCESS_RESTORED"}) + "\n\n"
+        return "data: " + json.dumps({"type": "ACCESS_GRANTED"}) + "\n\n"
     if isinstance(data, str):
         return f"data: {data}\n\n"
     if isinstance(data, dict):

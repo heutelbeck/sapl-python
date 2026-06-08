@@ -238,7 +238,7 @@ def stream_enforce(
     The decorated function returns an async iterator. The wrapper drives
     the Mealy FSM and yields items as SSE frames on `text/event-stream`.
 
-    - `signal_transitions=True`: emit ACCESS_SUSPENDED / ACCESS_RESTORED
+    - `signal_transitions=True`: emit ACCESS_SUSPENDED / ACCESS_GRANTED
       SSE frames on Suspended/Permitting boundary transitions.
     - `pause_rap_during_suspend=True`: cancel the upstream iterator on
       entry to Suspended; re-subscribe on exit.
@@ -291,7 +291,7 @@ def _format_sse(data: Any) -> str:
     if isinstance(data, AccessSuspendedSignal):
         return "data: " + json.dumps({"type": "ACCESS_SUSPENDED"}) + "\n\n"
     if isinstance(data, AccessGrantedSignal):
-        return "data: " + json.dumps({"type": "ACCESS_RESTORED"}) + "\n\n"
+        return "data: " + json.dumps({"type": "ACCESS_GRANTED"}) + "\n\n"
     if isinstance(data, str):
         return f"data: {data}\n\n"
     if isinstance(data, dict):

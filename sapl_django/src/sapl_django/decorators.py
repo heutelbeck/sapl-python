@@ -261,7 +261,7 @@ def stream_enforce(
     The decorated function returns an async iterator. Flags map to
     `run_pipeline`:
 
-    - `signal_transitions`: emit ACCESS_SUSPENDED / ACCESS_RESTORED SSE frames
+    - `signal_transitions`: emit ACCESS_SUSPENDED / ACCESS_GRANTED SSE frames
       on Suspended/Permitting boundary transitions.
     - `pause_rap_during_suspend`: cancel the upstream iterator on entry to
       Suspended; re-subscribe on exit.
@@ -311,7 +311,7 @@ def _format_sse(data: Any) -> str:
     if isinstance(data, AccessSuspendedSignal):
         return "data: " + json.dumps({"type": "ACCESS_SUSPENDED"}) + "\n\n"
     if isinstance(data, AccessGrantedSignal):
-        return "data: " + json.dumps({"type": "ACCESS_RESTORED"}) + "\n\n"
+        return "data: " + json.dumps({"type": "ACCESS_GRANTED"}) + "\n\n"
     if isinstance(data, str):
         return f"data: {data}\n\n"
     if isinstance(data, dict):
