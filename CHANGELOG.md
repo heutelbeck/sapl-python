@@ -2,10 +2,11 @@
 
 ## 4.1.0
 
-Aligns the Python PEP libraries with the SAPL 4.1 enforcement model: a
-planner-driven constraint architecture and stream-enforcement, plus support
-for the new `SUSPEND` decision verb, the RSocket transport, library-owned
-transaction rollback, and data-layer query rewriting.
+Brings the Python PEP libraries to the SAPL 4.1 enforcement model.
+Constraint handling now uses a planner that binds handlers to lifecycle
+signals. Adds the `SUSPEND` decision verb, the RSocket transport,
+library-owned transaction rollback on post-write denial, and data-layer
+query rewriting.
 
 ### Added
 
@@ -23,7 +24,7 @@ transaction rollback, and data-layer query rewriting.
   method, but output obligations run after it writes). Opt in with
   `set_transaction_provider`; unset, the PEP owns no transaction.
 - **Data-layer query rewriting.** A `sql:queryRewriting` or
-  `mongo:queryRewriting` obligation transparently narrows the queries an
+  `mongo:queryRewriting` obligation narrows the queries an
   enforced method issues, fail-closed and narrowing-only. New packages
   `sapl-sqlalchemy` (SQLAlchemy) and `sapl-pymongo` (PyMongo), plus a Django
   ORM provider in `sapl-django`.
