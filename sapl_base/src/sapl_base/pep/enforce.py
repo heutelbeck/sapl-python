@@ -213,7 +213,7 @@ def pre_enforce_blocking(
     """Blocking counterpart of `pre_enforce`.
 
     Runs the method synchronously, off any event loop, so synchronous ORM access
-    (and its query-manipulation cut point) works. Only the PDP decision is bridged:
+    (and its query-rewriting cut point) works. Only the PDP decision is bridged:
     an async client is driven to completion before the method runs, so the method
     executes with no running event loop. Plan execution and obligation handling are
     already synchronous.

@@ -1,4 +1,4 @@
-"""DjangoQueryManipulationProvider: lower sql:queryManipulation to a Django Query rewrite.
+"""DjangoQueryRewritingProvider: lower sql:queryRewriting to a Django Query rewrite.
 
 Mirrors the `sapl_sqlalchemy` provider's contract field-for-field -- a `criteria` tree
 (`and`/`or` + `{column, op, value}` leaves), a string `conditions` array, a `columns`
@@ -39,8 +39,8 @@ from sapl_django.orm_signal import DJANGO_QUERY
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-_CONSTRAINT_TYPE_RELATIONAL = "relational:queryManipulation"
-_CONSTRAINT_TYPE_SQL = "sql:queryManipulation"
+_CONSTRAINT_TYPE_RELATIONAL = "relational:queryRewriting"
+_CONSTRAINT_TYPE_SQL = "sql:queryRewriting"
 _DEFAULT_PRIORITY = 30
 _SAPL_LIKE = "sapllike"
 
@@ -93,8 +93,8 @@ class _SaplLike(Lookup):
 Field.register_lookup(_SaplLike)
 
 
-class DjangoQueryManipulationProvider:
-    """ConstraintHandlerProvider for `sql:queryManipulation` against the Django ORM."""
+class DjangoQueryRewritingProvider:
+    """ConstraintHandlerProvider for `sql:queryRewriting` against the Django ORM."""
 
     def get_handlers(self, constraint: Any) -> Sequence[ScopedHandler]:
         if not _is_responsible(constraint):

@@ -69,7 +69,7 @@ def register_orm_listener(
     Idempotent: a second call with the same listener is a no-op.
 
     Also advertises SQL_QUERY as a supported signal so the planner schedules
-    a matching `sql:queryManipulation` obligation onto this shim instead of
+    a matching `sql:queryRewriting` obligation onto this shim instead of
     failing it closed as inadmissible.
     """
     register_shim_signal(SQL_QUERY)

@@ -22,7 +22,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install ./sapl_base[dev]
           # sapl_sqlalchemy (and its sqlalchemy + aiosqlite dependencies) backs the cross-package
-          # transaction and SQL query-manipulation integration tests in the framework packages.
+          # transaction and SQL query-rewriting integration tests in the framework packages.
           pip install ./sapl_sqlalchemy[dev]
           if [ "${{ matrix.package }}" != "sapl_base" ] && [ "${{ matrix.package }}" != "sapl_sqlalchemy" ]; then pip install ./${{ matrix.package }}[dev]; fi
       - name: Test ${{ matrix.package }}

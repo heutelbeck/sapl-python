@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "sapl-sqlalchemy"
 version = "4.1.0"
-description = "SAPL SQL_QUERY signal source and sql:queryManipulation provider for SQLAlchemy"
+description = "SAPL SQL_QUERY signal source and sql:queryRewriting provider for SQLAlchemy"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.12"

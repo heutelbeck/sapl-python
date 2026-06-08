@@ -8,7 +8,7 @@ the underlying driver with the handler's returned query. With the logging provid
 the query is returned unchanged.
 
 `register_mongo_shim` advertises MONGO_QUERY to the planner so `pre_enforce`
-schedules a matching ``mongo:queryManipulation`` obligation onto this shim instead
+schedules a matching ``mongo:queryRewriting`` obligation onto this shim instead
 of failing it closed as inadmissible. The proxies are duck-typed over the
 collection method surface and do not import pymongo: a synchronous proxy backs the
 blocking PEP path (Flask, sync Django) and an asynchronous proxy backs the async

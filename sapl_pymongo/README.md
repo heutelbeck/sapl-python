@@ -1,7 +1,7 @@
 # sapl-pymongo
 
 SAPL signal source for PyMongo. Contributes the `MONGO_QUERY` signal and a
-`mongo:queryManipulation` constraint handler provider so a SAPL policy can shape
+`mongo:queryRewriting` constraint handler provider so a SAPL policy can shape
 the MongoDB queries an application issues, the same way `sapl-sqlalchemy`
 contributes `SQL_QUERY` for relational queries.
 
@@ -16,14 +16,14 @@ async Django).
 
 ## Obligation
 
-`MongoDbQueryManipulationProvider` handles the `mongo:queryManipulation` obligation,
+`MongoDbQueryRewritingProvider` handles the `mongo:queryRewriting` obligation,
 mirroring the Spring provider so the same obligation narrows identically on every SAPL
 Mongo PEP. Two shapes, combinable, narrowing-only (criteria and conditions are AND-merged
 into the user's filter, never widening it):
 
 ```json
 {
-  "type": "mongo:queryManipulation",
+  "type": "mongo:queryRewriting",
   "criteria": [
     {"column": "tenantId", "op": "=", "value": 7},
     {"or": [{"column": "ownerId", "op": "=", "value": "alice"},
@@ -42,14 +42,14 @@ by this contract, so a pipeline intercept fails closed, as does a malformed cond
 ## Usage
 
 ```python
-from sapl_pymongo import MongoDbQueryManipulationProvider, wrap_collection
+from sapl_pymongo import MongoDbQueryRewritingProvider, wrap_collection
 
 # At startup: wrap each collection once (this also registers the shim with the planner).
 widgets = wrap_collection(database["widgets"])
 
 # Register the provider with the EnforcementPlanner that backs your framework wrapper.
-# providers=(MongoDbQueryManipulationProvider(),)
+# providers=(MongoDbQueryRewritingProvider(),)
 
 # In a @pre_enforce-protected handler, query the wrapped collection as usual; a
-# mongo:queryManipulation obligation on the decision narrows the filter automatically.
+# mongo:queryRewriting obligation on the decision narrows the filter automatically.
 ```

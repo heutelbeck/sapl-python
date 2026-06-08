@@ -1,6 +1,6 @@
-"""Dummy Django ORM query-manipulation shim, end to end across every query type.
+"""Dummy Django ORM query-rewriting shim, end to end across every query type.
 
-A PDP decision carrying a ``sql:queryManipulation`` obligation flows through ``@pre_enforce``
+A PDP decision carrying a ``sql:queryRewriting`` obligation flows through ``@pre_enforce``
 -> the planner -> the dummy ``DjangoQueryLoggingProvider`` -> the registered
 ``SQLCompiler.execute_sql`` hook, which fires DJANGO_QUERY with the structured Query. The
 dummy logs the query type and returns it unchanged, proving the cut point fires on a real
@@ -36,9 +36,9 @@ from sapl_django.orm_shim import DJANGO_QUERY, register_orm_listener, unregister
 
 logger = structlog.get_logger(__name__)
 
-SHIM_FIRED_EVENT = "django_query_manipulation_shim_fired"
+SHIM_FIRED_EVENT = "django_query_rewriting_shim_fired"
 QUERY_OBLIGATION = {
-    "type": "sql:queryManipulation",
+    "type": "sql:queryRewriting",
     "criteria": [{"column": "username", "op": "=", "value": "alice"}],
 }
 
@@ -49,13 +49,13 @@ def _log_and_pass(query: Any) -> Any:
 
 
 class LoggingProvider:
-    """Diagnostic provider: claims sql:queryManipulation, logs the query, returns it unchanged.
+    """Diagnostic provider: claims sql:queryRewriting, logs the query, returns it unchanged.
 
     Used to prove the cut point fires across query types, independently of any real lowering.
     """
 
     def get_handlers(self, constraint: Any) -> tuple[ScopedHandler, ...]:
-        if isinstance(constraint, dict) and constraint.get("type") == "sql:queryManipulation":
+        if isinstance(constraint, dict) and constraint.get("type") == "sql:queryRewriting":
             return (ScopedHandler(signal=DJANGO_QUERY, priority=30, shape="mapper", handler=_log_and_pass),)
         return ()
 

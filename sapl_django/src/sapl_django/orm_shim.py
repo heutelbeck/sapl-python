@@ -12,7 +12,7 @@ strings.
 
 The hook is installed by ``register_orm_listener`` and gated on ``current_plan``, so it is a
 no-op for queries outside an enforced call. It advertises DJANGO_QUERY so the planner
-schedules a matching ``sql:queryManipulation`` obligation onto this shim instead of failing
+schedules a matching ``sql:queryRewriting`` obligation onto this shim instead of failing
 it closed as inadmissible.
 """
 
@@ -47,7 +47,7 @@ def register_orm_listener() -> None:
     """Install the SAPL cut point on ``SQLCompiler.execute_sql`` and advertise DJANGO_QUERY.
 
     Idempotent. Advertises DJANGO_QUERY so the planner schedules a matching
-    ``sql:queryManipulation`` obligation onto this shim instead of failing it closed as
+    ``sql:queryRewriting`` obligation onto this shim instead of failing it closed as
     inadmissible. Call ``unregister_orm_listener`` to withdraw both.
     """
     global _original_execute_sql

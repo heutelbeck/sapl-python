@@ -1,9 +1,9 @@
-"""Constraint handler provider for the mongo:queryManipulation obligation.
+"""Constraint handler provider for the mongo:queryRewriting obligation.
 
-``MongoDbQueryManipulationProvider`` lowers a ``mongo:queryManipulation`` obligation
+``MongoDbQueryRewritingProvider`` lowers a ``mongo:queryRewriting`` obligation
 into MongoDB filter fragments and AND-merges them into the query the shim intercepts,
 so the obligation can only narrow the result set, never widen it. It mirrors the Spring
-``MongoDbQueryManipulationProvider`` so the same obligation narrows identically on every
+``MongoDbQueryRewritingProvider`` so the same obligation narrows identically on every
 SAPL Mongo PEP.
 
 Two obligation shapes are supported and may be combined:
@@ -31,7 +31,7 @@ from sapl_pymongo.signal import MONGO_QUERY
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-_CONSTRAINT_TYPE_MONGO: str = "mongo:queryManipulation"
+_CONSTRAINT_TYPE_MONGO: str = "mongo:queryRewriting"
 _DEFAULT_PRIORITY: int = 30
 
 _FIELD_AND: str = "and"
@@ -42,11 +42,11 @@ _FIELD_OP: str = "op"
 _FIELD_OR: str = "or"
 _FIELD_VALUE: str = "value"
 
-_ERROR_AGGREGATE_NOT_SUPPORTED: str = "mongo:queryManipulation cannot narrow an aggregation pipeline"
+_ERROR_AGGREGATE_NOT_SUPPORTED: str = "mongo:queryRewriting cannot narrow an aggregation pipeline"
 
 
-class MongoDbQueryManipulationProvider:
-    """ConstraintHandlerProvider for mongo:queryManipulation.
+class MongoDbQueryRewritingProvider:
+    """ConstraintHandlerProvider for mongo:queryRewriting.
 
     Criteria and string conditions are AND-merged into the user's filter, so the
     obligation can only narrow access, never widen it. An aggregation pipeline or a

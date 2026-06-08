@@ -1,7 +1,7 @@
-"""End-to-end SQL query manipulation through the Tornado wrapper and the SQLAlchemy shim.
+"""End-to-end SQL query rewriting through the Tornado wrapper and the SQLAlchemy shim.
 
-A PDP decision carrying a ``sql:queryManipulation`` obligation, flowing through
-``@pre_enforce`` -> the planner -> ``SqlQueryManipulationProvider`` -> the registered
+A PDP decision carrying a ``sql:queryRewriting`` obligation, flowing through
+``@pre_enforce`` -> the planner -> ``SqlQueryRewritingProvider`` -> the registered
 ORM listener, rewrites a real ``SELECT`` so the database returns only the authorised
 rows. Only the PDP is mocked; the database, the query, and the rewrite are real.
 
@@ -26,14 +26,14 @@ import sapl_tornado.decorators as decorators
 from sapl_base.pep import EnforcementPlanner
 from sapl_base.types import AuthorizationDecision, AuthorizationSubscription, Decision
 from sapl_sqlalchemy import (
-    SqlQueryManipulationProvider,
+    SqlQueryRewritingProvider,
     register_orm_listener,
     unregister_orm_listener,
 )
 from sapl_tornado.decorators import pre_enforce
 
 OWNER_OBLIGATION = {
-    "type": "sql:queryManipulation",
+    "type": "sql:queryRewriting",
     "criteria": [{"column": "owner", "op": "=", "value": "alice"}],
 }
 
@@ -83,7 +83,7 @@ class _SqlTestCase(tornado.testing.AsyncHTTPTestCase):
 
         self._patches = [
             ("get_pdp_client", lambda: StubPdp(self.DECISION)),
-            ("get_planner", lambda: EnforcementPlanner(providers=(SqlQueryManipulationProvider(),))),
+            ("get_planner", lambda: EnforcementPlanner(providers=(SqlQueryRewritingProvider(),))),
             ("get_transaction_provider", lambda: None),
         ]
         self._originals = {}

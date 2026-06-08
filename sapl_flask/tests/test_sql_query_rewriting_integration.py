@@ -1,7 +1,7 @@
-"""End-to-end SQL query manipulation through the Flask wrapper and the SQLAlchemy shim.
+"""End-to-end SQL query rewriting through the Flask wrapper and the SQLAlchemy shim.
 
-A PDP decision carrying a ``sql:queryManipulation`` obligation, flowing through
-``@pre_enforce`` -> the planner -> ``SqlQueryManipulationProvider`` -> the registered
+A PDP decision carrying a ``sql:queryRewriting`` obligation, flowing through
+``@pre_enforce`` -> the planner -> ``SqlQueryRewritingProvider`` -> the registered
 ORM listener, rewrites a real ``SELECT`` so the database returns only the authorised
 rows. Only the PDP is mocked; the database, the query, and the rewrite are real.
 
@@ -26,13 +26,13 @@ from sapl_base.pep import EnforcementPlanner
 from sapl_base.types import AuthorizationDecision, Decision
 from sapl_flask.decorators import pre_enforce
 from sapl_sqlalchemy import (
-    SqlQueryManipulationProvider,
+    SqlQueryRewritingProvider,
     register_orm_listener,
     unregister_orm_listener,
 )
 
 OWNER_OBLIGATION = {
-    "type": "sql:queryManipulation",
+    "type": "sql:queryRewriting",
     "criteria": [{"column": "owner", "op": "=", "value": "alice"}],
 }
 
@@ -81,7 +81,7 @@ def orm_listener():
 def _wire(monkeypatch, decision: AuthorizationDecision) -> None:
     extension = types.SimpleNamespace(
         pdp_client=StubPdp(decision),
-        planner=EnforcementPlanner(providers=(SqlQueryManipulationProvider(),)),
+        planner=EnforcementPlanner(providers=(SqlQueryRewritingProvider(),)),
         transaction_provider=None,
     )
     monkeypatch.setattr(decorators, "get_sapl_extension", lambda: extension)

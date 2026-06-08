@@ -1,7 +1,7 @@
-"""Unit tests for MongoDbQueryManipulationProvider criteria lowering.
+"""Unit tests for MongoDbQueryRewritingProvider criteria lowering.
 
 These exercise the obligation-to-BSON-filter lowering in isolation: no enforcement,
-no driver, no database. They pin the mongo:queryManipulation contract that must
+no driver, no database. They pin the mongo:queryRewriting contract that must
 narrow identically on every SAPL Mongo PEP (mirroring the Spring provider): the op
 set, and / or grouping, value passthrough, the AND-merge narrowing semantic, and
 the aggregation-pipeline fail-closed.
@@ -14,16 +14,16 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from sapl_base.pep.provider import ScopedHandler
-from sapl_pymongo import MONGO_QUERY, MongoDbQueryManipulationProvider
+from sapl_pymongo import MONGO_QUERY, MongoDbQueryRewritingProvider
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-TYPE = "mongo:queryManipulation"
+TYPE = "mongo:queryRewriting"
 
 
 def _mapper_for(obligation: dict[str, Any]) -> Callable[[Any], Any]:
-    handlers = MongoDbQueryManipulationProvider().get_handlers(obligation)
+    handlers = MongoDbQueryRewritingProvider().get_handlers(obligation)
     assert len(handlers) == 1
     return handlers[0].handler
 
@@ -54,7 +54,7 @@ def test_in_lowers_to_dollar_in():
 
 
 def test_in_without_list_value_is_dropped():
-    handlers = MongoDbQueryManipulationProvider().get_handlers(
+    handlers = MongoDbQueryRewritingProvider().get_handlers(
         _obligation({"column": "moon", "op": "in", "value": "io"})
     )
     assert handlers == ()
@@ -123,7 +123,7 @@ def test_aggregate_pipeline_fails_closed():
 
 
 def test_handler_is_a_mapper_on_mongo_query_at_default_priority():
-    handlers = MongoDbQueryManipulationProvider().get_handlers(_obligation({"column": "x", "op": "=", "value": 1}))
+    handlers = MongoDbQueryRewritingProvider().get_handlers(_obligation({"column": "x", "op": "=", "value": 1}))
     handler = handlers[0]
     assert handler == ScopedHandler(
         signal=MONGO_QUERY, priority=handler.priority, shape="mapper", handler=handler.handler
@@ -163,14 +163,14 @@ def test_single_quoted_condition_fails_closed():
 
 
 def test_conditions_only_obligation_yields_a_handler():
-    handlers = MongoDbQueryManipulationProvider().get_handlers(
+    handlers = MongoDbQueryRewritingProvider().get_handlers(
         {"type": TYPE, "conditions": ['{"tenantId": 7}']}
     )
     assert len(handlers) == 1
 
 
 def test_not_responsible_for_other_constraint_type():
-    assert MongoDbQueryManipulationProvider().get_handlers({"type": "other"}) == ()
+    assert MongoDbQueryRewritingProvider().get_handlers({"type": "other"}) == ()
 
 
 @pytest.mark.parametrize(
@@ -185,11 +185,11 @@ def test_not_responsible_for_other_constraint_type():
     ],
 )
 def test_invalid_criterion_is_skipped(criterion):
-    handlers = MongoDbQueryManipulationProvider().get_handlers({"type": TYPE, "criteria": [criterion]})
+    handlers = MongoDbQueryRewritingProvider().get_handlers({"type": TYPE, "criteria": [criterion]})
     assert handlers == ()
 
 
 def test_no_handler_when_criteria_absent_or_empty():
-    provider = MongoDbQueryManipulationProvider()
+    provider = MongoDbQueryRewritingProvider()
     assert provider.get_handlers({"type": TYPE}) == ()
     assert provider.get_handlers(_obligation()) == ()

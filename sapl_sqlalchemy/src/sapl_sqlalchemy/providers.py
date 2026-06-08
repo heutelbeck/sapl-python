@@ -1,6 +1,6 @@
-"""SqlQueryManipulationProvider.
+"""SqlQueryRewritingProvider.
 
-Translates a `sql:queryManipulation` (or alias `relational:queryManipulation`)
+Translates a `sql:queryRewriting` (or alias `relational:queryRewriting`)
 constraint into a single mapper attached to SQL_QUERY. Lowers the typed
 `criteria` tree, the string `conditions` array, and the `columns` projection
 list to native SQLAlchemy expression objects.
@@ -31,8 +31,8 @@ from sapl_sqlalchemy.signal import SQL_QUERY
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-_CONSTRAINT_TYPE_SQL: str = "sql:queryManipulation"
-_CONSTRAINT_TYPE_RELATIONAL: str = "relational:queryManipulation"
+_CONSTRAINT_TYPE_SQL: str = "sql:queryRewriting"
+_CONSTRAINT_TYPE_RELATIONAL: str = "relational:queryRewriting"
 _DEFAULT_PRIORITY: int = 30
 
 _FIELD_AND: str = "and"
@@ -80,8 +80,8 @@ _ERROR_VALUE_KIND_FOR_OPERATOR: str = "VALUE_KIND_FOR_OPERATOR: value kind %s in
 _ERROR_VALUE_REQUIRED: str = "VALUE_REQUIRED: value required for operator %s"
 
 
-class SqlQueryManipulationProvider:
-    """ConstraintHandlerProvider for sql:queryManipulation."""
+class SqlQueryRewritingProvider:
+    """ConstraintHandlerProvider for sql:queryRewriting."""
 
     def get_handlers(self, constraint: Any) -> Sequence[ScopedHandler]:
         if not _is_responsible(constraint):

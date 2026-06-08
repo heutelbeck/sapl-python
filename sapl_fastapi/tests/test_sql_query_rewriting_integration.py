@@ -1,7 +1,7 @@
-"""End-to-end SQL query manipulation through the FastAPI wrapper and the SQLAlchemy shim.
+"""End-to-end SQL query rewriting through the FastAPI wrapper and the SQLAlchemy shim.
 
-Proves the whole path: a PDP decision carrying a ``sql:queryManipulation`` obligation,
-flowing through ``@pre_enforce`` -> the planner -> ``SqlQueryManipulationProvider`` ->
+Proves the whole path: a PDP decision carrying a ``sql:queryRewriting`` obligation,
+flowing through ``@pre_enforce`` -> the planner -> ``SqlQueryRewritingProvider`` ->
 the registered ORM listener, rewrites a real ``SELECT`` so the database returns only the
 authorised rows. Only the PDP is mocked. The database, the query, and the rewrite are real.
 
@@ -26,13 +26,13 @@ from sapl_base.pep import EnforcementPlanner
 from sapl_base.types import AuthorizationDecision, AuthorizationSubscription, Decision
 from sapl_fastapi.decorators import pre_enforce
 from sapl_sqlalchemy import (
-    SqlQueryManipulationProvider,
+    SqlQueryRewritingProvider,
     register_orm_listener,
     unregister_orm_listener,
 )
 
 OWNER_OBLIGATION = {
-    "type": "sql:queryManipulation",
+    "type": "sql:queryRewriting",
     "criteria": [{"column": "owner", "op": "=", "value": "alice"}],
 }
 
@@ -82,7 +82,7 @@ def orm_listener():
 def _wire(monkeypatch, decision: AuthorizationDecision) -> None:
     monkeypatch.setattr(decorators, "get_pdp_client", lambda: StubPdp(decision))
     monkeypatch.setattr(
-        decorators, "get_planner", lambda: EnforcementPlanner(providers=(SqlQueryManipulationProvider(),))
+        decorators, "get_planner", lambda: EnforcementPlanner(providers=(SqlQueryRewritingProvider(),))
     )
     monkeypatch.setattr(decorators, "get_transaction_provider", lambda: None)
 

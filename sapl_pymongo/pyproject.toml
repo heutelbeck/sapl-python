@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "sapl-pymongo"
 version = "4.1.0"
-description = "SAPL MONGO_QUERY signal source and mongo:queryManipulation provider for PyMongo"
+description = "SAPL MONGO_QUERY signal source and mongo:queryRewriting provider for PyMongo"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.12"

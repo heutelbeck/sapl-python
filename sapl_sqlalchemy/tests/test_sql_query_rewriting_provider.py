@@ -7,11 +7,11 @@ from sqlalchemy import delete, insert, select, union, update
 from sqlalchemy.dialects import sqlite
 from tests.models import Patient
 
-from sapl_sqlalchemy import SQL_QUERY, SqlQueryManipulationProvider
+from sapl_sqlalchemy import SQL_QUERY, SqlQueryRewritingProvider
 
 
-def _provider() -> SqlQueryManipulationProvider:
-    return SqlQueryManipulationProvider()
+def _provider() -> SqlQueryRewritingProvider:
+    return SqlQueryRewritingProvider()
 
 
 def _compile(stmt: Any) -> str:
@@ -44,7 +44,7 @@ def _leaf(column: str, op: str, value: Any = ...) -> dict[str, Any]:
 
 
 def _criteria_constraint(*criteria: Any) -> dict[str, Any]:
-    return {"type": "sql:queryManipulation", "criteria": list(criteria)}
+    return {"type": "sql:queryRewriting", "criteria": list(criteria)}
 
 
 class TestResponsibility:
@@ -58,15 +58,15 @@ class TestResponsibility:
         assert _provider().get_handlers({"type": "audit"}) == ()
 
     def test_canonical_type_is_claimed(self) -> None:
-        c = {"type": "sql:queryManipulation", "criteria": [_leaf("x", "isNull")]}
+        c = {"type": "sql:queryRewriting", "criteria": [_leaf("x", "isNull")]}
         assert len(_provider().get_handlers(c)) == 1
 
     def test_alias_relational_type_is_claimed(self) -> None:
-        c = {"type": "relational:queryManipulation", "criteria": [_leaf("x", "isNull")]}
+        c = {"type": "relational:queryRewriting", "criteria": [_leaf("x", "isNull")]}
         assert len(_provider().get_handlers(c)) == 1
 
     def test_empty_constraint_yields_no_handlers(self) -> None:
-        assert _provider().get_handlers({"type": "sql:queryManipulation"}) == ()
+        assert _provider().get_handlers({"type": "sql:queryRewriting"}) == ()
 
     def test_one_handler_attaches_to_sql_query(self) -> None:
         c = _criteria_constraint(_leaf("tenant_id", "=", 7))
@@ -240,7 +240,7 @@ class TestConditions:
     def test_single_condition_fragment(self) -> None:
         stmt = _apply(
             {
-                "type": "sql:queryManipulation",
+                "type": "sql:queryRewriting",
                 "conditions": ["status IN ('active', 'pending')"],
             },
             _column_select(),
@@ -251,7 +251,7 @@ class TestConditions:
     def test_criteria_and_conditions_combine(self) -> None:
         stmt = _apply(
             {
-                "type": "sql:queryManipulation",
+                "type": "sql:queryRewriting",
                 "criteria": [_leaf("tenant_id", "=", 7)],
                 "conditions": ["status IN ('active', 'pending')"],
             },
@@ -266,7 +266,7 @@ class TestColumnsProjection:
     def test_intersection_narrows_select_list(self) -> None:
         stmt = _apply(
             {
-                "type": "sql:queryManipulation",
+                "type": "sql:queryRewriting",
                 "columns": ["id", "name"],
             },
             _column_select(),
@@ -279,7 +279,7 @@ class TestColumnsProjection:
 
     def test_empty_intersection_yields_empty_projection(self) -> None:
         stmt = _apply(
-            {"type": "sql:queryManipulation", "columns": ["nonexistent"]},
+            {"type": "sql:queryRewriting", "columns": ["nonexistent"]},
             _column_select(),
         )
         sql = _compile(stmt).replace('"', "")
@@ -289,14 +289,14 @@ class TestColumnsProjection:
     def test_columns_against_entity_select_fails_closed(self) -> None:
         with pytest.raises(ValueError, match="COLUMNS_AGAINST_ENTITY_SELECT"):
             _apply(
-                {"type": "sql:queryManipulation", "columns": ["id"]},
+                {"type": "sql:queryRewriting", "columns": ["id"]},
                 select(Patient),
             )
 
     def test_columns_ignored_on_update(self) -> None:
         stmt = _apply(
             {
-                "type": "sql:queryManipulation",
+                "type": "sql:queryRewriting",
                 "criteria": [_leaf("tenant_id", "=", 7)],
                 "columns": ["id"],
             },
@@ -308,7 +308,7 @@ class TestColumnsProjection:
     def test_columns_ignored_on_delete(self) -> None:
         stmt = _apply(
             {
-                "type": "sql:queryManipulation",
+                "type": "sql:queryRewriting",
                 "criteria": [_leaf("tenant_id", "=", 7)],
                 "columns": ["id"],
             },
@@ -440,7 +440,7 @@ class TestProjectionCannotWiden:
         )
         stmt = _apply(
             {
-                "type": "sql:queryManipulation",
+                "type": "sql:queryRewriting",
                 "columns": ["id", "name", "ssn"],
             },
             narrow,
@@ -466,6 +466,6 @@ class TestEdgeCases:
         stmt_b = select(Patient.__table__.c.id)
         u = union(stmt_a, stmt_b)
         result = _apply(
-            {"type": "sql:queryManipulation", "columns": ["id"]}, u
+            {"type": "sql:queryRewriting", "columns": ["id"]}, u
         )
         assert result is u

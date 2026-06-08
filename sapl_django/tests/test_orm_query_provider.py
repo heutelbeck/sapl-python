@@ -1,4 +1,4 @@
-"""Unit tests for DjangoQueryManipulationProvider: criteria/conditions/columns lowering.
+"""Unit tests for DjangoQueryRewritingProvider: criteria/conditions/columns lowering.
 
 Applies the provider's mapper to a real Django ``Query`` and asserts on the compiled SQL
 (``str(query)``), with no database access. Uses the built-in ``auth.User`` model and its real
@@ -13,12 +13,12 @@ from typing import Any
 import pytest
 from django.contrib.auth.models import User
 
-from sapl_django.orm_providers import DjangoQueryManipulationProvider
+from sapl_django.orm_providers import DjangoQueryRewritingProvider
 from sapl_django.orm_signal import DJANGO_QUERY
 
 
 def _handler(constraint: Any):
-    handlers = DjangoQueryManipulationProvider().get_handlers(constraint)
+    handlers = DjangoQueryRewritingProvider().get_handlers(constraint)
     assert len(handlers) == 1
     return handlers[0].handler
 
@@ -40,31 +40,31 @@ def _leaf(column: str, op: str, value: Any = ...) -> dict[str, Any]:
 
 
 def _criteria(*criteria: Any) -> dict[str, Any]:
-    return {"type": "sql:queryManipulation", "criteria": list(criteria)}
+    return {"type": "sql:queryRewriting", "criteria": list(criteria)}
 
 
 class TestResponsibility:
     def test_non_dict_yields_no_handlers(self):
-        assert DjangoQueryManipulationProvider().get_handlers("nope") == ()
+        assert DjangoQueryRewritingProvider().get_handlers("nope") == ()
 
     def test_dict_without_type_yields_no_handlers(self):
-        assert DjangoQueryManipulationProvider().get_handlers({"criteria": []}) == ()
+        assert DjangoQueryRewritingProvider().get_handlers({"criteria": []}) == ()
 
     def test_unrelated_type_yields_no_handlers(self):
-        assert DjangoQueryManipulationProvider().get_handlers({"type": "audit"}) == ()
+        assert DjangoQueryRewritingProvider().get_handlers({"type": "audit"}) == ()
 
     def test_empty_constraint_yields_no_handlers(self):
-        assert DjangoQueryManipulationProvider().get_handlers({"type": "sql:queryManipulation"}) == ()
+        assert DjangoQueryRewritingProvider().get_handlers({"type": "sql:queryRewriting"}) == ()
 
-    @pytest.mark.parametrize("ctype", ["sql:queryManipulation", "relational:queryManipulation"])
+    @pytest.mark.parametrize("ctype", ["sql:queryRewriting", "relational:queryRewriting"])
     def test_typed_constraint_is_claimed(self, ctype: str):
-        handlers = DjangoQueryManipulationProvider().get_handlers(
+        handlers = DjangoQueryRewritingProvider().get_handlers(
             {"type": ctype, "criteria": [_leaf("id", "isNull")]}
         )
         assert len(handlers) == 1
 
     def test_handler_attaches_to_django_query_as_mapper_at_priority_30(self):
-        handler = DjangoQueryManipulationProvider().get_handlers(_criteria(_leaf("id", "=", 7)))[0]
+        handler = DjangoQueryRewritingProvider().get_handlers(_criteria(_leaf("id", "=", 7)))[0]
         assert handler.signal is DJANGO_QUERY
         assert handler.shape == "mapper"
         assert handler.priority == 30
@@ -150,24 +150,24 @@ class TestTreeComposition:
 
 class TestConditions:
     def test_single_condition_fragment(self):
-        sql = _sql(_apply({"type": "sql:queryManipulation", "conditions": ["id > 0"]}))
+        sql = _sql(_apply({"type": "sql:queryRewriting", "conditions": ["id > 0"]}))
         assert "id > 0" in sql
 
     def test_criteria_and_conditions_combine(self):
         sql = _sql(
-            _apply({"type": "sql:queryManipulation", "criteria": [_leaf("id", "=", 7)], "conditions": ["id > 0"]})
+            _apply({"type": "sql:queryRewriting", "criteria": [_leaf("id", "=", 7)], "conditions": ["id > 0"]})
         )
         assert "id = 7" in sql and "id > 0" in sql
 
 
 class TestColumnsProjection:
     def test_only_narrows_select(self):
-        sql = _sql(_apply({"type": "sql:queryManipulation", "columns": ["id", "username"]}))
+        sql = _sql(_apply({"type": "sql:queryRewriting", "columns": ["id", "username"]}))
         assert "auth_user.username" in sql
         assert "auth_user.email" not in sql
 
     def test_nonexistent_columns_leave_projection_unchanged(self):
-        sql = _sql(_apply({"type": "sql:queryManipulation", "columns": ["does_not_exist"]}))
+        sql = _sql(_apply({"type": "sql:queryRewriting", "columns": ["does_not_exist"]}))
         assert "auth_user.email" in sql
 
 
@@ -181,7 +181,7 @@ class TestTargetSelection:
         assert "WHERE" in _sql(_apply(_criteria(_leaf("username", "=", "alice"))))
 
     def test_columns_on_absent_column_passes_query_through(self):
-        sql = _sql(_apply({"type": "sql:queryManipulation", "columns": ["tenant_id"]}))
+        sql = _sql(_apply({"type": "sql:queryRewriting", "columns": ["tenant_id"]}))
         assert "auth_user.email" in sql
 
 

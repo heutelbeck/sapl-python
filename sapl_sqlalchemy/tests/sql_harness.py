@@ -8,7 +8,7 @@ the planner alone decides whether an obligation is dischargeable.
 ``DropMapperProvider`` and ``IdentityMapperProvider`` are deliberately
 non-rewriting providers used to exercise the listener's contract branches (a
 handler that returns DROP, a handler that returns the statement unchanged)
-through the real planner, which the real ``SqlQueryManipulationProvider`` cannot
+through the real planner, which the real ``SqlQueryRewritingProvider`` cannot
 produce.
 """
 
@@ -18,12 +18,12 @@ from typing import Any
 
 from sapl_base.pep import DROP, ScopedHandler
 from sapl_base.types import AuthorizationDecision, AuthorizationSubscription, Decision
-from sapl_sqlalchemy import SQL_QUERY, SqlQueryManipulationProvider
+from sapl_sqlalchemy import SQL_QUERY, SqlQueryRewritingProvider
 
 SUBSCRIPTION = AuthorizationSubscription(subject="s", action="read", resource="patient")
 
 BAD_OPERATOR_OBLIGATION: dict[str, Any] = {
-    "type": "sql:queryManipulation",
+    "type": "sql:queryRewriting",
     "criteria": [{"column": "tenant_id", "op": "BOGUS", "value": 1}],
 }
 DROP_OBLIGATION: dict[str, Any] = {"type": "test:drop"}
@@ -32,7 +32,7 @@ IDENTITY_OBLIGATION: dict[str, Any] = {"type": "test:identity"}
 
 def tenant_obligation(value: int) -> dict[str, Any]:
     return {
-        "type": "sql:queryManipulation",
+        "type": "sql:queryRewriting",
         "criteria": [{"column": "tenant_id", "op": "=", "value": value}],
     }
 
@@ -41,8 +41,8 @@ def permit(*obligations: Any) -> AuthorizationDecision:
     return AuthorizationDecision(decision=Decision.PERMIT, obligations=tuple(obligations))
 
 
-def default_providers() -> tuple[SqlQueryManipulationProvider]:
-    return (SqlQueryManipulationProvider(),)
+def default_providers() -> tuple[SqlQueryRewritingProvider]:
+    return (SqlQueryRewritingProvider(),)
 
 
 class StubPdp:

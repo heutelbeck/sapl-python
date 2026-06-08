@@ -8,14 +8,14 @@ from sapl_django.config import (
 )
 from sapl_django.decorators import post_enforce, pre_enforce, stream_enforce
 from sapl_django.middleware import SaplRequestMiddleware
-from sapl_django.orm_providers import DjangoQueryManipulationProvider
+from sapl_django.orm_providers import DjangoQueryRewritingProvider
 from sapl_django.orm_shim import register_orm_listener, unregister_orm_listener
 from sapl_django.orm_signal import DJANGO_QUERY, DjangoQuerySignal
 from sapl_django.subscription import SubscriptionBuilder
 
 __all__ = [
     "DJANGO_QUERY",
-    "DjangoQueryManipulationProvider",
+    "DjangoQueryRewritingProvider",
     "DjangoQuerySignal",
     "SaplRequestMiddleware",
     "SubscriptionBuilder",

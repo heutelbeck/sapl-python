@@ -2,7 +2,7 @@
 
 A real (in-memory mongomock) collection is wrapped once at "startup" and queried by an
 application endpoint that lists the owners of the widgets it returns. The endpoint code is
-fixed; only the PDP decision changes between cases. Each mongo:queryManipulation obligation
+fixed; only the PDP decision changes between cases. Each mongo:queryRewriting obligation
 rewrites the filter the driver executes, so the same endpoint returns a different result set
 per obligation. A DENY blocks it entirely.
 
@@ -26,7 +26,7 @@ from sapl_base.pep import EnforcementPlanner
 from sapl_base.pep.boundary_signals import AccessDeniedError
 from sapl_base.pep.enforce import pre_enforce_blocking
 from sapl_base.types import AuthorizationDecision, AuthorizationSubscription, Decision
-from sapl_pymongo import MongoDbQueryManipulationProvider, unregister_mongo_shim, wrap_collection
+from sapl_pymongo import MongoDbQueryRewritingProvider, unregister_mongo_shim, wrap_collection
 
 DOCUMENTS = [
     {"_id": 1, "owner": "alice", "tenant": 1, "status": "active"},
@@ -34,7 +34,7 @@ DOCUMENTS = [
     {"_id": 3, "owner": "alice", "tenant": 2, "status": "archived"},
 ]
 
-TYPE = "mongo:queryManipulation"
+TYPE = "mongo:queryRewriting"
 SUBSCRIPTION = AuthorizationSubscription(subject="u", action="read", resource="widget")
 
 
@@ -68,7 +68,7 @@ def _run(widgets: Any, decision: AuthorizationDecision) -> list[str]:
     return pre_enforce_blocking(
         lambda: _list_owners(widgets),
         pdp_client=StubPdp(decision),
-        planner=EnforcementPlanner(providers=(MongoDbQueryManipulationProvider(),)),
+        planner=EnforcementPlanner(providers=(MongoDbQueryRewritingProvider(),)),
         subscription=SUBSCRIPTION,
     )
 

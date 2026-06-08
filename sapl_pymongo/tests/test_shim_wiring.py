@@ -8,8 +8,8 @@ the blocking path, Tornado the async path, FastAPI and Django both.
 
 What is validated here:
 
-- With a wrapped collection (which registers the shim) a mongo:queryManipulation
-  obligation flows through the planner to MongoDbQueryManipulationProvider, and the cut
+- With a wrapped collection (which registers the shim) a mongo:queryRewriting
+  obligation flows through the planner to MongoDbQueryRewritingProvider, and the cut
   point rewrites the filter the collection receives. The recording stub captures that
   filter, so the test asserts the exact rewrite that reached the driver on each path.
 - Without the shim registered the obligation is inadmissible and enforcement fails closed
@@ -33,13 +33,13 @@ from sapl_base.pep.boundary_signals import AccessDeniedError
 from sapl_base.pep.enforce import pre_enforce, pre_enforce_blocking
 from sapl_base.types import AuthorizationDecision, AuthorizationSubscription, Decision
 from sapl_pymongo import (
-    MongoDbQueryManipulationProvider,
+    MongoDbQueryRewritingProvider,
     unregister_mongo_shim,
     wrap_async_collection,
     wrap_collection,
 )
 
-OWNER_OBLIGATION = {"type": "mongo:queryManipulation", "criteria": [{"column": "owner", "op": "=", "value": "alice"}]}
+OWNER_OBLIGATION = {"type": "mongo:queryRewriting", "criteria": [{"column": "owner", "op": "=", "value": "alice"}]}
 USER_FILTER = {"status": "active"}
 NARROWED = {"$and": [USER_FILTER, {"owner": "alice"}]}
 SUBSCRIPTION = AuthorizationSubscription(subject="u", action="read", resource="widget")
@@ -72,7 +72,7 @@ class StubPdp:
 
 
 def _planner() -> EnforcementPlanner:
-    return EnforcementPlanner(providers=(MongoDbQueryManipulationProvider(),))
+    return EnforcementPlanner(providers=(MongoDbQueryRewritingProvider(),))
 
 
 @pytest.fixture(autouse=True)

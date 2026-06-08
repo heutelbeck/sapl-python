@@ -1,7 +1,7 @@
 """SAPL signal source for PyMongo collection queries."""
 
 from sapl_pymongo.handler import MongoQueryMapper
-from sapl_pymongo.providers import MongoDbQueryManipulationProvider
+from sapl_pymongo.providers import MongoDbQueryRewritingProvider
 from sapl_pymongo.shim import (
     AsyncMongoCollectionProxy,
     MongoCollectionProxy,
@@ -16,7 +16,7 @@ __all__ = [
     "MONGO_QUERY",
     "AsyncMongoCollectionProxy",
     "MongoCollectionProxy",
-    "MongoDbQueryManipulationProvider",
+    "MongoDbQueryRewritingProvider",
     "MongoQueryMapper",
     "MongoQuerySignal",
     "register_mongo_shim",

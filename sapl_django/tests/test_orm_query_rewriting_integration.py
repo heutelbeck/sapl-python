@@ -1,7 +1,7 @@
-"""End-to-end SQL query manipulation through the Django wrapper and the ORM shim.
+"""End-to-end SQL query rewriting through the Django wrapper and the ORM shim.
 
-A PDP decision carrying a ``sql:queryManipulation`` obligation flows through ``@pre_enforce``
--> the planner -> ``DjangoQueryManipulationProvider`` -> the registered
+A PDP decision carrying a ``sql:queryRewriting`` obligation flows through ``@pre_enforce``
+-> the planner -> ``DjangoQueryRewritingProvider`` -> the registered
 ``SQLCompiler.execute_sql`` hook, rewriting a real query so the database returns only the
 authorised rows. Only the PDP is mocked; the database (embedded sqlite), the query, and the
 rewrite are real. Both the sync (blocking-core) and async paths are exercised.
@@ -23,7 +23,7 @@ import sapl_django.decorators as decorators
 from sapl_base.pep import EnforcementPlanner
 from sapl_base.types import AuthorizationDecision, AuthorizationSubscription, Decision
 from sapl_django.decorators import pre_enforce
-from sapl_django.orm_providers import DjangoQueryManipulationProvider
+from sapl_django.orm_providers import DjangoQueryRewritingProvider
 from sapl_django.orm_shim import register_orm_listener, unregister_orm_listener
 
 
@@ -40,7 +40,7 @@ def _permit(*obligations: Any) -> AuthorizationDecision:
 
 
 def _criteria(*criteria: Any) -> dict[str, Any]:
-    return {"type": "sql:queryManipulation", "criteria": list(criteria)}
+    return {"type": "sql:queryRewriting", "criteria": list(criteria)}
 
 
 def _leaf(column: str, op: str, value: Any = ...) -> dict[str, Any]:
@@ -54,7 +54,7 @@ def _wire(monkeypatch, decision: AuthorizationDecision) -> None:
     monkeypatch.setattr(decorators, "get_pdp_client", lambda: StubPdp(decision))
     monkeypatch.setattr(
         decorators, "get_planner",
-        lambda: EnforcementPlanner(providers=(DjangoQueryManipulationProvider(),)),
+        lambda: EnforcementPlanner(providers=(DjangoQueryRewritingProvider(),)),
     )
     monkeypatch.setattr(decorators, "get_transaction_provider", lambda: None)
 
@@ -175,14 +175,14 @@ def test_delete_removes_only_target_rows(monkeypatch, orm_listener):
 def test_conditions_filter_rows(monkeypatch, orm_listener):
     User.objects.create(username="alice")
     User.objects.create(username="bob")
-    _wire(monkeypatch, _permit({"type": "sql:queryManipulation", "conditions": ["username = 'alice'"]}))
+    _wire(monkeypatch, _permit({"type": "sql:queryRewriting", "conditions": ["username = 'alice'"]}))
     assert _enforced_sync(_names)() == ["alice"]
 
 
 @pytest.mark.django_db(transaction=True)
 def test_columns_projection_defers_other_fields(monkeypatch, orm_listener):
     User.objects.create(username="alice", email="alice@example.com")
-    _wire(monkeypatch, _permit({"type": "sql:queryManipulation", "columns": ["username"]}))
+    _wire(monkeypatch, _permit({"type": "sql:queryRewriting", "columns": ["username"]}))
     result = _enforced_sync(lambda: list(User.objects.all()))()
     assert result[0].username == "alice"
     assert "email" in result[0].get_deferred_fields()
