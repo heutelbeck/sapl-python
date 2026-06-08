@@ -70,6 +70,46 @@ def _wait_for_pdp_ready(base_url: str, timeout_seconds: float = 60.0) -> None:
     )
 
 
+def _wait_for_rsocket_ready(host: str, port: int, timeout_seconds: float = 60.0) -> None:
+    """Drive a real RSocket decide-once until the transport answers decisively.
+
+    HTTP readiness is not enough to prove the RSocket transport is warm. The
+    RSocket port is bound early in startup, before the HTTP probe goes green,
+    so the socket already accepts connections by the time a test runs. The
+    first request on a freshly started, not yet JIT-warmed node can still
+    fail-close to INDETERMINATE or drop the connection. Probe the exact path
+    the tests use and accept only a decisive PERMIT, against the permit-all
+    policy, as ready.
+    """
+    import asyncio
+
+    from sapl_base.transport import RsocketPdpClient, RsocketPdpClientOptions
+    from sapl_base.types import AuthorizationSubscription, Decision
+
+    async def probe() -> None:
+        deadline = time.monotonic() + timeout_seconds
+        delay = 0.2
+        while True:
+            client = RsocketPdpClient(RsocketPdpClientOptions(host=host, port=port))
+            try:
+                decision = await client.decide_once(
+                    AuthorizationSubscription(subject="_", action="_", resource="_")
+                )
+            finally:
+                await client.close()
+            if decision.decision == Decision.PERMIT:
+                return
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"SAPL Node RSocket at {host}:{port} did not answer decisively "
+                    f"within {timeout_seconds}s"
+                )
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, 2.0)
+
+    asyncio.run(probe())
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _require_sapl_node_image() -> None:
     if not _docker_image_present(SAPL_NODE_IMAGE):
@@ -549,7 +589,9 @@ def sapl_node_dual_transport_noauth(
     """SAPL Node with both HTTP and RSocket published, no-auth.
 
     Yields `(http_base_url, rsocket_host, rsocket_port)`. Both ports
-    back the same PDP; HTTP is the readiness probe target.
+    back the same PDP. HTTP is the first readiness gate; the RSocket
+    transport is then probed functionally so the fixture only yields
+    once a real decide-once over RSocket answers decisively.
     """
     http_port = _free_port()
     rsocket_port = _free_port()
@@ -569,6 +611,7 @@ def sapl_node_dual_transport_noauth(
     base_url = f"http://127.0.0.1:{http_port}"
     try:
         _wait_for_pdp_ready(base_url, timeout_seconds=60.0)
+        _wait_for_rsocket_ready("127.0.0.1", rsocket_port, timeout_seconds=60.0)
         yield base_url, "127.0.0.1", rsocket_port
     finally:
         _stop_container(container_id)

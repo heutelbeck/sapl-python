@@ -28,11 +28,15 @@ async def _retry_until(call, ok, attempts: int = 5):
     """Cold-start tolerance for one-offs: a fresh RSocket connection can hit a
     transient setup error that correctly fail-closes to INDETERMINATE; a retried
     (warm) connection then succeeds. The client fail-closes fast by design (no
-    retry on one-offs), so the test rides out the cold-connect transient itself."""
+    retry on one-offs), so the test rides out the cold-connect transient itself.
+    Retries back off so they do not all burn inside one cold window."""
     result = await call()
+    delay = 0.2
     for _ in range(attempts - 1):
         if ok(result):
             break
+        await asyncio.sleep(delay)
+        delay = min(delay * 2, 2.0)
         result = await call()
     return result
 
