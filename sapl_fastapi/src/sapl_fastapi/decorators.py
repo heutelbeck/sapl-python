@@ -3,18 +3,14 @@ from __future__ import annotations
 import asyncio
 import functools
 import inspect
-import json
 from typing import TYPE_CHECKING, Any
 
 import structlog
 from fastapi import HTTPException
 from starlette.requests import Request
-from starlette.responses import StreamingResponse
 
 from sapl_base.pep import (
     AccessDeniedError,
-    AccessGrantedSignal,
-    AccessSuspendedSignal,
 )
 from sapl_base.pep import (
     post_enforce as _post_enforce,
@@ -233,22 +229,21 @@ def stream_enforce(
     signal_transitions: bool = False,
     pause_rap_during_suspend: bool = False,
 ) -> Callable:
-    """Decorator: SAPL-enforced SSE streaming.
+    """Decorator: SAPL-enforced streaming.
 
-    The decorated function returns an async iterator. The wrapper drives
-    the Mealy FSM and yields items as SSE frames on `text/event-stream`.
+    The decorated function returns an async iterator. The wrapper drives the Mealy
+    FSM and returns the enforced async iterator: it yields the permitted items,
+    yields `AccessGrantedSignal` / `AccessSuspendedSignal` boundary markers when
+    `signal_transitions=True`, and raises `AccessDeniedError` on terminal denial.
+    The caller renders the returned stream to a transport.
 
-    - `signal_transitions=True`: emit ACCESS_SUSPENDED / ACCESS_GRANTED
-      SSE frames on Suspended/Permitting boundary transitions.
-    - `pause_rap_during_suspend=True`: cancel the upstream iterator on
-      entry to Suspended; re-subscribe on exit.
-
-    DENY is terminal; a final ACCESS_DENIED SSE frame is emitted before
-    the stream closes. Use SUSPEND in policies for keep-alive semantics.
+    - `signal_transitions=True`: surface Suspended/Permitting boundary markers.
+    - `pause_rap_during_suspend=True`: cancel the upstream iterator on entry to
+      Suspended; re-subscribe on exit.
     """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> StreamingResponse:
+        def wrapper(*args: Any, **kwargs: Any) -> AsyncIterator[Any]:
             subscription = _build_subscription(
                 func, args, kwargs,
                 subject=subject, action=action, resource=resource,
@@ -265,35 +260,12 @@ def stream_enforce(
             def _rap_factory() -> AsyncIterator[Any]:
                 return _async_rap()
 
-            async def _sse_generator() -> AsyncIterator[bytes]:
-                pipeline = run_pipeline(
-                    decisions=get_pdp_client().decide(subscription),
-                    planner=get_planner(),
-                    rap_factory=_rap_factory,
-                    signal_transitions=signal_transitions,
-                    pause_rap_during_suspend=pause_rap_during_suspend,
-                )
-                try:
-                    async for item in pipeline:
-                        yield _format_sse(item).encode("utf-8")
-                except AccessDeniedError as exc:
-                    yield _format_sse({
-                        "type": "ACCESS_DENIED",
-                        "reason": getattr(exc, "reason", None),
-                    }).encode("utf-8")
-
-            return StreamingResponse(_sse_generator(), media_type="text/event-stream")
+            return run_pipeline(
+                decisions=get_pdp_client().decide(subscription),
+                planner=get_planner(),
+                rap_factory=_rap_factory,
+                signal_transitions=signal_transitions,
+                pause_rap_during_suspend=pause_rap_during_suspend,
+            )
         return wrapper
     return decorator
-
-
-def _format_sse(data: Any) -> str:
-    if isinstance(data, AccessSuspendedSignal):
-        return "data: " + json.dumps({"type": "ACCESS_SUSPENDED"}) + "\n\n"
-    if isinstance(data, AccessGrantedSignal):
-        return "data: " + json.dumps({"type": "ACCESS_GRANTED"}) + "\n\n"
-    if isinstance(data, str):
-        return f"data: {data}\n\n"
-    if isinstance(data, dict):
-        return f"data: {json.dumps(data)}\n\n"
-    return f"data: {data}\n\n"

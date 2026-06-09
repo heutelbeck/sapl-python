@@ -3,17 +3,14 @@ from __future__ import annotations
 import asyncio
 import functools
 import inspect
-import json
 from typing import TYPE_CHECKING, Any
 
 import structlog
 from django.core.exceptions import PermissionDenied
-from django.http import HttpRequest, JsonResponse, StreamingHttpResponse
+from django.http import HttpRequest, JsonResponse
 
 from sapl_base.pep import (
     AccessDeniedError,
-    AccessGrantedSignal,
-    AccessSuspendedSignal,
 )
 from sapl_base.pep import (
     post_enforce as _post_enforce,
@@ -256,19 +253,21 @@ def stream_enforce(
     signal_transitions: bool = False,
     pause_rap_during_suspend: bool = False,
 ) -> Callable:
-    """Decorator: SAPL-enforced SSE streaming via Django StreamingHttpResponse.
+    """Decorator: SAPL-enforced streaming.
 
-    The decorated function returns an async iterator. Flags map to
-    `run_pipeline`:
+    The decorated function returns an async iterator. The wrapper drives the Mealy
+    FSM and returns the enforced async iterator: it yields the permitted items,
+    yields `AccessGrantedSignal` / `AccessSuspendedSignal` boundary markers when
+    `signal_transitions=True`, and raises `AccessDeniedError` on terminal denial.
+    The caller renders the returned stream to a transport.
 
-    - `signal_transitions`: emit ACCESS_SUSPENDED / ACCESS_GRANTED SSE frames
-      on Suspended/Permitting boundary transitions.
-    - `pause_rap_during_suspend`: cancel the upstream iterator on entry to
+    - `signal_transitions=True`: surface Suspended/Permitting boundary markers.
+    - `pause_rap_during_suspend=True`: cancel the upstream iterator on entry to
       Suspended; re-subscribe on exit.
     """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> StreamingHttpResponse:
+        def wrapper(*args: Any, **kwargs: Any) -> AsyncIterator[Any]:
             subscription, _ = _build_subscription(
                 func, args, kwargs,
                 subject=subject, action=action, resource=resource,
@@ -285,35 +284,12 @@ def stream_enforce(
             def _rap_factory() -> AsyncIterator[Any]:
                 return _async_rap()
 
-            async def _sse_generator() -> AsyncIterator[str]:
-                pipeline = run_pipeline(
-                    decisions=get_pdp_client().decide(subscription),
-                    planner=get_planner(),
-                    rap_factory=_rap_factory,
-                    signal_transitions=signal_transitions,
-                    pause_rap_during_suspend=pause_rap_during_suspend,
-                )
-                try:
-                    async for item in pipeline:
-                        yield _format_sse(item)
-                except AccessDeniedError as exc:
-                    yield _format_sse({
-                        "type": "ACCESS_DENIED",
-                        "reason": getattr(exc, "reason", None),
-                    })
-
-            return StreamingHttpResponse(_sse_generator(), content_type="text/event-stream")
+            return run_pipeline(
+                decisions=get_pdp_client().decide(subscription),
+                planner=get_planner(),
+                rap_factory=_rap_factory,
+                signal_transitions=signal_transitions,
+                pause_rap_during_suspend=pause_rap_during_suspend,
+            )
         return wrapper
     return decorator
-
-
-def _format_sse(data: Any) -> str:
-    if isinstance(data, AccessSuspendedSignal):
-        return "data: " + json.dumps({"type": "ACCESS_SUSPENDED"}) + "\n\n"
-    if isinstance(data, AccessGrantedSignal):
-        return "data: " + json.dumps({"type": "ACCESS_GRANTED"}) + "\n\n"
-    if isinstance(data, str):
-        return f"data: {data}\n\n"
-    if isinstance(data, dict):
-        return f"data: {json.dumps(data)}\n\n"
-    return f"data: {data}\n\n"

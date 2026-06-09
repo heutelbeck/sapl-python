@@ -11,8 +11,6 @@ from tornado.web import HTTPError, RequestHandler
 
 from sapl_base.pep import (
     AccessDeniedError,
-    AccessGrantedSignal,
-    AccessSuspendedSignal,
 )
 from sapl_base.pep import (
     post_enforce as _post_enforce,
@@ -217,16 +215,22 @@ def stream_enforce(
     signal_transitions: bool = False,
     pause_rap_during_suspend: bool = False,
 ) -> Callable:
-    """Decorator: SAPL-enforced SSE streaming.
+    """Decorator: SAPL-enforced streaming.
 
-    Writes SSE frames directly to the Tornado handler. DENY emits a final
-    ACCESS_DENIED frame; SUSPEND with `signal_transitions=True` emits
-    ACCESS_SUSPENDED / ACCESS_GRANTED.
+    The decorated function returns an async iterator. The wrapper drives the Mealy
+    FSM and returns the enforced async iterator: it yields the permitted items,
+    yields `AccessGrantedSignal` / `AccessSuspendedSignal` boundary markers when
+    `signal_transitions=True`, and raises `AccessDeniedError` on terminal denial.
+    The caller renders the returned stream to a transport.
+
+    - `signal_transitions=True`: surface Suspended/Permitting boundary markers.
+    - `pause_rap_during_suspend=True`: cancel the upstream iterator on entry to
+      Suspended; re-subscribe on exit.
     """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> None:
-            subscription, handler = _build_subscription(
+        def wrapper(*args: Any, **kwargs: Any) -> AsyncIterator[Any]:
+            subscription, _ = _build_subscription(
                 func, args, kwargs,
                 subject=subject, action=action, resource=resource,
                 environment=environment, secrets=secrets,
@@ -242,33 +246,13 @@ def stream_enforce(
             def _rap_factory() -> AsyncIterator[Any]:
                 return _async_rap()
 
-            if handler is not None:
-                handler.set_header("Content-Type", "text/event-stream")
-                handler.set_header("Cache-Control", "no-cache")
-
-            pipeline = run_pipeline(
+            return run_pipeline(
                 decisions=get_pdp_client().decide(subscription),
                 planner=get_planner(),
                 rap_factory=_rap_factory,
                 signal_transitions=signal_transitions,
                 pause_rap_during_suspend=pause_rap_during_suspend,
             )
-
-            try:
-                async for item in pipeline:
-                    if handler is not None:
-                        handler.write(_format_sse(item))
-                        handler.flush()
-            except AccessDeniedError as exc:
-                if handler is not None:
-                    handler.write(_format_sse({
-                        "type": "ACCESS_DENIED",
-                        "reason": getattr(exc, "reason", None),
-                    }))
-                    handler.flush()
-
-            if handler is not None and not handler._finished:
-                handler.finish()
         return wrapper
     return decorator
 
@@ -279,15 +263,3 @@ def _write_response(handler: RequestHandler, result: Any) -> None:
         handler.write(json.dumps(result))
     else:
         handler.write(str(result))
-
-
-def _format_sse(data: Any) -> str:
-    if isinstance(data, AccessSuspendedSignal):
-        return "data: " + json.dumps({"type": "ACCESS_SUSPENDED"}) + "\n\n"
-    if isinstance(data, AccessGrantedSignal):
-        return "data: " + json.dumps({"type": "ACCESS_GRANTED"}) + "\n\n"
-    if isinstance(data, str):
-        return f"data: {data}\n\n"
-    if isinstance(data, dict):
-        return f"data: {json.dumps(data)}\n\n"
-    return f"data: {data}\n\n"

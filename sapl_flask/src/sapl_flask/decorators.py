@@ -3,15 +3,12 @@ from __future__ import annotations
 import asyncio
 import functools
 import inspect
-import json
 from typing import TYPE_CHECKING, Any
 
-from flask import Response, abort
+from flask import abort
 
 from sapl_base.pep import (
     AccessDeniedError,
-    AccessGrantedSignal,
-    AccessSuspendedSignal,
 )
 from sapl_base.pep.enforce import (
     post_enforce_blocking as _post_enforce_blocking,
@@ -167,26 +164,21 @@ def stream_enforce(
     signal_transitions: bool = False,
     pause_rap_during_suspend: bool = False,
 ) -> Callable:
-    """Decorator: SAPL-enforced SSE streaming.
+    """Decorator: SAPL-enforced streaming.
 
-    The decorated function returns an async iterator of data items.
-    The wrapper opens a PDP subscription stream, drives the Mealy FSM,
-    and yields items as SSE `data:` frames on `text/event-stream`.
+    The decorated function returns an async iterator. The wrapper drives the Mealy
+    FSM and returns the enforced async iterator: it yields the permitted items,
+    yields `AccessGrantedSignal` / `AccessSuspendedSignal` boundary markers when
+    `signal_transitions=True`, and raises `AccessDeniedError` on terminal denial.
+    The caller renders the returned stream to a transport.
 
-    Flags map to `run_pipeline`:
-
-    - `signal_transitions`: when True, emits `ACCESS_SUSPENDED` and
-      `ACCESS_GRANTED` SSE frames on Suspended/Permitting transitions.
-    - `pause_rap_during_suspend`: when True, cancels the upstream
-      async iterator on entry to Suspended and re-subscribes on exit.
-
-    DENY is terminal: a final `ACCESS_DENIED` SSE frame is emitted and
-    the stream closes. For keep-alive semantics, the policy must emit
-    SUSPEND.
+    - `signal_transitions=True`: surface Suspended/Permitting boundary markers.
+    - `pause_rap_during_suspend=True`: cancel the upstream iterator on entry to
+      Suspended; re-subscribe on exit.
     """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Response:
+        def wrapper(*args: Any, **kwargs: Any) -> AsyncIterator[Any]:
             sapl = get_sapl_extension()
             subscription = _build_subscription(
                 func, args, kwargs,
@@ -202,42 +194,12 @@ def stream_enforce(
                     )
                 return result
 
-            def _sse_generator() -> Any:
-                loop = asyncio.new_event_loop()
-                try:
-                    pipeline = run_pipeline(
-                        decisions=sapl.pdp_client.decide(subscription),
-                        planner=sapl.planner,
-                        rap_factory=_rap_factory,
-                        signal_transitions=signal_transitions,
-                        pause_rap_during_suspend=pause_rap_during_suspend,
-                    )
-                    aiter_ = pipeline.__aiter__()
-                    while True:
-                        try:
-                            item = loop.run_until_complete(aiter_.__anext__())
-                        except StopAsyncIteration:
-                            break
-                        except AccessDeniedError as exc:
-                            yield _format_sse({
-                                "type": "ACCESS_DENIED",
-                                "reason": getattr(exc, "reason", None),
-                            })
-                            break
-                        yield _format_sse(item)
-                finally:
-                    loop.close()
-
-            return Response(_sse_generator(), mimetype="text/event-stream")
+            return run_pipeline(
+                decisions=sapl.pdp_client.decide(subscription),
+                planner=sapl.planner,
+                rap_factory=_rap_factory,
+                signal_transitions=signal_transitions,
+                pause_rap_during_suspend=pause_rap_during_suspend,
+            )
         return wrapper
     return decorator
-
-
-def _format_sse(data: Any) -> str:
-    if isinstance(data, AccessSuspendedSignal):
-        return "data: " + json.dumps({"type": "ACCESS_SUSPENDED"}) + "\n\n"
-    if isinstance(data, AccessGrantedSignal):
-        return "data: " + json.dumps({"type": "ACCESS_GRANTED"}) + "\n\n"
-    if isinstance(data, dict):
-        return f"data: {json.dumps(data)}\n\n"
-    return f"data: {data}\n\n"
