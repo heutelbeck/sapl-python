@@ -71,15 +71,13 @@ def _wait_for_pdp_ready(base_url: str, timeout_seconds: float = 60.0) -> None:
 
 
 def _wait_for_rsocket_ready(host: str, port: int, timeout_seconds: float = 60.0) -> None:
-    """Drive a real RSocket decide-once until the transport answers decisively.
+    """Drive a real RSocket decide-once until the transport answers a decisive
+    decision, or fail after timeout_seconds.
 
-    HTTP readiness is not enough to prove the RSocket transport is warm. The
-    RSocket port is bound early in startup, before the HTTP probe goes green,
-    so the socket already accepts connections by the time a test runs. The
-    first request on a freshly started, not yet JIT-warmed node can still
-    fail-close to INDETERMINATE or drop the connection. Probe the exact path
-    the tests use and accept only a decisive PERMIT, against the permit-all
-    policy, as ready.
+    HTTP readiness does not prove the RSocket transport is serving, so probe the
+    exact path the tests use and treat a decisive (non-INDETERMINATE) answer as
+    ready. This is a precondition for a reliable test, not an assertion about a
+    specific policy outcome.
     """
     import asyncio
 
@@ -97,7 +95,7 @@ def _wait_for_rsocket_ready(host: str, port: int, timeout_seconds: float = 60.0)
                 )
             finally:
                 await client.close()
-            if decision.decision == Decision.PERMIT:
+            if decision.decision != Decision.INDETERMINATE:
                 return
             if time.monotonic() >= deadline:
                 raise TimeoutError(
