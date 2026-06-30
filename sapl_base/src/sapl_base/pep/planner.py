@@ -108,11 +108,21 @@ class EnforcementPlanner:
         supported_signals: frozenset[SignalKind],
         per_signal: dict[SignalKind, list[PlanEntry]],
     ) -> None:
-        claims = [
-            tuple(p.get_handlers(constraint))
-            for p in self.providers
-            if p.get_handlers(constraint)
-        ]
+        claims: list[tuple[ScopedHandler, ...]] = []
+        for provider in self.providers:
+            try:
+                handlers = tuple(provider.get_handlers(constraint))
+            except Exception:  # noqa: BLE001 - a misbehaving provider must not crash planning
+                logger.warning(
+                    "constraint_handler_provider_failed",
+                    tag=tag,
+                    constraint=constraint,
+                    provider=type(provider).__name__,
+                    exc_info=True,
+                )
+                continue
+            if handlers:
+                claims.append(handlers)
 
         if len(claims) != 1 or not _all_well_formed(claims[0], tag, supported_signals):
             reason = _classify_rejection(claims)

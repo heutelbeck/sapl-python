@@ -34,7 +34,7 @@ class TestContentFilteringProvider:
         )
         result = plan.execute(OutputSignal(value={"name": "Jane", "ssn": "123-45-6789"}))
         assert result.value["ssn"].endswith("6789")
-        assert result.value["ssn"].startswith("X")
+        assert result.value["ssn"].startswith("█")
         assert result.value["name"] == "Jane"
 
     def test_replace_action_substitutes_value(self) -> None:
@@ -89,7 +89,7 @@ class TestContentFilteringProvider:
         )
         assert result.value == [{"id": 1}, {"id": 2}]
 
-    def test_prototype_pollution_path_rejected(self) -> None:
+    def test_prototype_pollution_path_denies(self) -> None:
         planner = EnforcementPlanner(providers=[ContentFilteringProvider()])
         plan = planner.plan(
             _decision({
@@ -98,23 +98,22 @@ class TestContentFilteringProvider:
             }),
             _STREAM_SIGNALS,
         )
-        original = {"foo": "bar"}
-        result = plan.execute(OutputSignal(value=original))
-        assert result.value == original
+        result = plan.execute(OutputSignal(value={"foo": "bar"}))
+        assert result.failure_state is True
 
-    def test_unsupported_path_syntax_rejected(self) -> None:
+    def test_unsupported_path_syntax_fails_closed(self) -> None:
         planner = EnforcementPlanner(providers=[ContentFilteringProvider()])
         plan = planner.plan(
             _decision({
                 "type": "filterJsonContent",
-                "actions": [{"type": "delete", "path": "$..secret"}],
+                "actions": [{"type": "delete", "path": "$.items[?(@.id==1)]"}],
             }),
             _STREAM_SIGNALS,
         )
-        result = plan.execute(OutputSignal(value={"secret": "hush"}))
-        assert result.value == {"secret": "hush"}
+        result = plan.execute(OutputSignal(value={"items": [{"id": 1}]}))
+        assert result.failure_state is True
 
-    def test_unknown_action_type_skipped_silently(self) -> None:
+    def test_unknown_action_type_denies(self) -> None:
         planner = EnforcementPlanner(providers=[ContentFilteringProvider()])
         plan = planner.plan(
             _decision({
@@ -124,7 +123,7 @@ class TestContentFilteringProvider:
             _STREAM_SIGNALS,
         )
         result = plan.execute(OutputSignal(value={"secret": "x"}))
-        assert result.value == {"secret": "x"}
+        assert result.failure_state is True
 
     def test_irrelevant_constraint_type_yields_no_handlers(self) -> None:
         provider = ContentFilteringProvider()

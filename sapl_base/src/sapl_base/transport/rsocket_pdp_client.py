@@ -343,10 +343,20 @@ class RsocketPdpClient:
                 )
                 publisher.initial_request_n(INITIAL_REQUEST_N)  # type: ignore[union-attr]
                 publisher.subscribe(_QueueSubscriber(queue))  # type: ignore[union-attr]
+                first_decision_received = False
                 while True:
-                    kind, value = await queue.get()
+                    if first_decision_received:
+                        kind, value = await queue.get()
+                    else:
+                        # Bound only the wait for the first decision so a
+                        # connected-but-silent server fails closed and reconnects.
+                        # Later items are not timed, keeping a healthy stream open.
+                        kind, value = await asyncio.wait_for(
+                            queue.get(), timeout=self._timeout
+                        )
                     if kind == "next":
                         attempt = 0
+                        first_decision_received = True
                         decoded = decode(value.data or b"")
                         if decoded is not None and decoded != last:
                             last = decoded

@@ -39,6 +39,7 @@ from sapl_base.types import AuthorizationDecision, AuthorizationSubscription, De
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
+    from sapl_base.pep.plan import EnforcementPlan
     from sapl_base.pep.planner import EnforcementPlanner
     from sapl_base.transport.pdp_client import PdpClient
 
@@ -110,32 +111,24 @@ async def pre_enforce(
     decision = await pdp_client.decide_once(subscription)
     plan = planner.plan(decision, PRE_ENFORCE_SUPPORTED | shim_signals())
 
-    decision_result = plan.execute(DecisionSignal(decision=decision))
-    if decision_result.failure_state or decision.decision is not Decision.PERMIT:
-        raise AccessDeniedError(
-            "Access denied",
-            decision=decision,
-            reason=_reason_for(decision, decision_result.failure_state),
-        )
-
+    failed = plan.execute(DecisionSignal(decision=decision)).failure_state
     if plan.has_entries(INPUT):
-        input_result = plan.execute(InputSignal(args=args, kwargs=kwargs))
-        if input_result.failure_state:
-            raise AccessDeniedError(
-                "Access denied", decision=decision, reason="INPUT_FAILURE"
-            )
+        input_result = plan.execute(InputSignal(args=args, kwargs=kwargs), failed)
+        failed = input_result.failure_state
         transformed = input_result.value
         if transformed is not ABSENT and isinstance(transformed, tuple) and len(transformed) == 2:
             args, kwargs = transformed[0], transformed[1]
+    _deny_pre_invocation(decision, failed)
 
     async with transaction_scope(transaction):
         token = set_current_plan(plan)
         try:
             result = await method(*args, **kwargs)
         except Exception as error:
-            if plan.has_entries(ERROR):
-                plan.execute(ErrorSignal(error=error))
-            raise
+            resolved = _resolve_error(plan, error)
+            if resolved is error:
+                raise
+            raise resolved from error
         finally:
             reset_current_plan(token)
 
@@ -222,32 +215,24 @@ def pre_enforce_blocking(
     decision = _decide_blocking(pdp_client, subscription)
     plan = planner.plan(decision, PRE_ENFORCE_SUPPORTED | shim_signals())
 
-    decision_result = plan.execute(DecisionSignal(decision=decision))
-    if decision_result.failure_state or decision.decision is not Decision.PERMIT:
-        raise AccessDeniedError(
-            "Access denied",
-            decision=decision,
-            reason=_reason_for(decision, decision_result.failure_state),
-        )
-
+    failed = plan.execute(DecisionSignal(decision=decision)).failure_state
     if plan.has_entries(INPUT):
-        input_result = plan.execute(InputSignal(args=args, kwargs=kwargs))
-        if input_result.failure_state:
-            raise AccessDeniedError(
-                "Access denied", decision=decision, reason="INPUT_FAILURE"
-            )
+        input_result = plan.execute(InputSignal(args=args, kwargs=kwargs), failed)
+        failed = input_result.failure_state
         transformed = input_result.value
         if transformed is not ABSENT and isinstance(transformed, tuple) and len(transformed) == 2:
             args, kwargs = transformed[0], transformed[1]
+    _deny_pre_invocation(decision, failed)
 
     with transaction_scope_sync(transaction):
         token = set_current_plan(plan)
         try:
             result = method(*args, **kwargs)
         except Exception as error:
-            if plan.has_entries(ERROR):
-                plan.execute(ErrorSignal(error=error))
-            raise
+            resolved = _resolve_error(plan, error)
+            if resolved is error:
+                raise
+            raise resolved from error
         finally:
             reset_current_plan(token)
 
@@ -316,6 +301,38 @@ def _decide_blocking(
     if isawaitable(outcome):
         return asyncio.run(outcome)
     return outcome
+
+
+def _deny_pre_invocation(decision: AuthorizationDecision, failed: bool) -> None:
+    """Raise the pre-invocation denial after the decision and input signals fired.
+
+    The decision and input handlers always run first; only then does a non-PERMIT
+    decision (denied first) or an accumulated obligation failure abort the call.
+    """
+    if decision.decision is not Decision.PERMIT:
+        raise AccessDeniedError(
+            "Access denied", decision=decision, reason=_reason_for(decision, False)
+        )
+    if failed:
+        raise AccessDeniedError(
+            "Access denied", decision=decision, reason="OBLIGATION_FAILURE"
+        )
+
+
+def _resolve_error(plan: EnforcementPlan, error: Exception) -> BaseException:
+    """Resolve the throwable to raise after firing the ERROR signal.
+
+    Fail-closed error path: a failing error-signal obligation escalates to
+    AccessDeniedError, an error mapper that returns an exception replaces the
+    original, otherwise the original propagates unchanged.
+    """
+    error_result = plan.execute(ErrorSignal(error=error))
+    if error_result.failure_state:
+        return AccessDeniedError("Access denied", reason="ERROR_OBLIGATION_FAILURE")
+    mapped = error_result.value
+    if mapped is not ABSENT and isinstance(mapped, BaseException):
+        return mapped
+    return error
 
 
 def _reason_for(decision: AuthorizationDecision, failure: bool) -> str:

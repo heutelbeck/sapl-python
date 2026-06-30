@@ -36,6 +36,12 @@ DEFAULT_TIMEOUT_SECONDS = 5.0
 DEFAULT_RETRY_BASE_DELAY_SECONDS = 1.0
 DEFAULT_RETRY_MAX_DELAY_SECONDS = 30.0
 
+DEFAULT_STREAMING_INACTIVITY_TIMEOUT_SECONDS = 60.0
+"""Liveness window for a streaming SSE connection. If no frame
+(decision or keep-alive) arrives within this window the connection
+is treated as dead, fails closed to INDETERMINATE, and reconnects.
+Matches the SAPL Node remote PDP `inactivityTimeoutMillis` default."""
+
 MAX_SSE_BUFFER_BYTES = 65_536
 """Cap on per-stream SSE buffer in bytes. Decision frames are
 sub-1 KB in practice; this cap bounds memory against a misbehaving

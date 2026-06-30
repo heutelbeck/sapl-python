@@ -183,10 +183,13 @@ async def run_pipeline(
 
             if isinstance(item, _PdpEnd):
                 continue
+            if isinstance(item, _RapError):
+                # A genuine resource failure inside the protected stream is a
+                # terminal stream error carrying its original cause, distinct
+                # from a per-item obligation-discharge failure.
+                raise item.error
             if isinstance(item, _RapEnd):
                 event: Event = RAP_COMPLETE
-            elif isinstance(item, _RapError):
-                event = RAP_OBLIGATION_FAILURE
             elif isinstance(item, RapItem):
                 event = _enforce_per_item(state, item)
             else:

@@ -38,6 +38,7 @@ from sapl_base.logging_utils import truncate
 from sapl_base.transport.constants import (
     DEFAULT_RETRY_BASE_DELAY_SECONDS,
     DEFAULT_RETRY_MAX_DELAY_SECONDS,
+    DEFAULT_STREAMING_INACTIVITY_TIMEOUT_SECONDS,
     DEFAULT_TIMEOUT_SECONDS,
     LOOPBACK_HOSTS,
     MAX_CONSTRAINT_COUNT,
@@ -101,6 +102,9 @@ class HttpPdpClientOptions:
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
     streaming_retry_base_delay_seconds: float = DEFAULT_RETRY_BASE_DELAY_SECONDS
     streaming_retry_max_delay_seconds: float = DEFAULT_RETRY_MAX_DELAY_SECONDS
+    streaming_inactivity_timeout_seconds: float = (
+        DEFAULT_STREAMING_INACTIVITY_TIMEOUT_SECONDS
+    )
 
 
 def _is_loopback(host: str) -> bool:
@@ -188,6 +192,21 @@ def _validate_multi(raw: Any) -> MultiAuthorizationDecision | None:
     return MultiAuthorizationDecision(decisions=decisions)
 
 
+def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """`object_pairs_hook` that fails closed on a repeated key.
+
+    A multi response that names the same subscription id twice is
+    malformed. `json.loads` would silently keep the last value; this
+    hook rejects it instead so the decode boundary stays fail-closed.
+    """
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise _DuplicateSubscriptionIdError(key)
+        result[key] = value
+    return result
+
+
 def _backoff_delay(attempt: int, base: float, cap: float) -> float:
     """Exponential backoff with multiplicative jitter (0.5-1.0)."""
     raw_delay = min(base * (2 ** (attempt - 1)), cap)
@@ -262,6 +281,7 @@ class HttpPdpClient:
         )
         self._retry_base = options.streaming_retry_base_delay_seconds
         self._retry_cap = options.streaming_retry_max_delay_seconds
+        self._streaming_inactivity_timeout = options.streaming_inactivity_timeout_seconds
 
         self._verify: Any = True
         self._temp_files: list[str] = []
@@ -330,6 +350,7 @@ class HttpPdpClient:
         raw = await self._post_json(
             self._url[PdpRoute.MULTI_DECIDE_ALL_ONCE],
             subscription.to_dict(),
+            object_pairs_hook=_reject_duplicate_keys,
         )
         if raw is None:
             return MultiAuthorizationDecision()
@@ -416,7 +437,11 @@ class HttpPdpClient:
         return True
 
     async def _post_json(
-        self, url: str, body: dict[str, Any], retried: bool = False
+        self,
+        url: str,
+        body: dict[str, Any],
+        retried: bool = False,
+        object_pairs_hook: Callable[[list[tuple[str, Any]]], Any] | None = None,
     ) -> Any | None:
         try:
             headers = {"Content-Type": "application/json"}
@@ -433,9 +458,18 @@ class HttpPdpClient:
                     body=excerpt,
                 )
                 if response.status_code in (401, 403) and self._handle_auth_failure() and not retried:
-                    return await self._post_json(url, body, retried=True)
+                    return await self._post_json(
+                        url, body, retried=True, object_pairs_hook=object_pairs_hook
+                    )
                 return None
-            return response.json()
+            return response.json(object_pairs_hook=object_pairs_hook)
+        except _DuplicateSubscriptionIdError as error:
+            logger.error(
+                "pdp_multi_response_duplicate_subscription_id",
+                url=url,
+                subscription_id=str(error),
+            )
+            return None
         except httpx.TimeoutException:
             logger.error("pdp_request_timed_out", url=url)
             return None
@@ -498,6 +532,13 @@ class HttpPdpClient:
             except _SseBufferOverflowError:
                 attempt += 1
                 logger.error("sse_buffer_overflow", url=url)
+            except TimeoutError:
+                attempt += 1
+                logger.warning(
+                    "pdp_streaming_inactivity_timeout",
+                    url=url,
+                    timeout_seconds=self._streaming_inactivity_timeout,
+                )
             except (httpx.HTTPError, OSError) as error:
                 attempt += 1
                 logger.warning("pdp_streaming_connection_lost", url=url, error=str(error))
@@ -530,7 +571,18 @@ class HttpPdpClient:
                     response=response,
                 )
             buffer = ""
-            async for chunk in response.aiter_text():
+            text_stream = response.aiter_text()
+            first_frame = True
+            while True:
+                read_timeout = (
+                    self._options.timeout_seconds
+                    if first_frame
+                    else self._streaming_inactivity_timeout
+                )
+                chunk = await asyncio.wait_for(_next_chunk(text_stream), read_timeout)
+                if chunk is _STREAM_EXHAUSTED:
+                    break
+                first_frame = False
                 buffer += chunk
                 if len(buffer) > MAX_SSE_BUFFER_BYTES:
                     raise _SseBufferOverflowError()
@@ -552,4 +604,22 @@ class _SseBufferOverflowError(Exception):
     """Raised internally when an SSE frame exceeds MAX_SSE_BUFFER_BYTES."""
 
 
+class _DuplicateSubscriptionIdError(ValueError):
+    """Raised when a multi-decision payload names the same subscription id twice."""
+
+
+async def _next_chunk(text_stream: AsyncIterator[str]) -> Any:
+    """Return the next text chunk, or `_STREAM_EXHAUSTED` at end of stream.
+
+    The sentinel keeps `StopAsyncIteration` from crossing the
+    `asyncio.wait_for` task boundary, so the inactivity watchdog can
+    wrap each read with a clean timeout.
+    """
+    try:
+        return await text_stream.__anext__()
+    except StopAsyncIteration:
+        return _STREAM_EXHAUSTED
+
+
 _UNSET = object()
+_STREAM_EXHAUSTED = object()
