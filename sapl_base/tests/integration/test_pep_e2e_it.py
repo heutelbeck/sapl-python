@@ -108,7 +108,8 @@ async def test_pre_enforce_with_content_filter_redacts_output(
 
     assert result["name"] == "Jane Doe"
     assert result["ssn"].endswith("6789")
-    assert result["ssn"].startswith("X")
+    # The default blacken glyph is the full block (U+2588), matching the Spring reference.
+    assert result["ssn"].startswith("█")
 
 
 @pytest.mark.asyncio
