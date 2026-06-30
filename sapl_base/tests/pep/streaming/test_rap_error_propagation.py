@@ -77,6 +77,6 @@ class TestRapResourceFailurePropagation:
             async for _ in pipeline:
                 pass
 
-        with pytest.raises(BaseException) as caught:  # noqa: PT011, B017
+        with pytest.raises(BaseException) as caught:
             await _drain()
         assert not isinstance(caught.value, AccessDeniedError)

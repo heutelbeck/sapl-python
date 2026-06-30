@@ -112,7 +112,7 @@ class EnforcementPlanner:
         for provider in self.providers:
             try:
                 handlers = tuple(provider.get_handlers(constraint))
-            except Exception:  # noqa: BLE001 - a misbehaving provider must not crash planning
+            except Exception:  # a misbehaving provider must not crash planning
                 logger.warning(
                     "constraint_handler_provider_failed",
                     tag=tag,
