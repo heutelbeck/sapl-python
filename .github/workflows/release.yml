@@ -12,9 +12,9 @@ jobs:
       matrix:
         package: [sapl_base, sapl_sqlalchemy, sapl_pymongo, sapl_django, sapl_fastapi, sapl_flask, sapl_tornado, sapl_fastmcp]
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
       - name: Install dependencies
@@ -38,9 +38,9 @@ jobs:
       matrix:
         package: [sapl_base, sapl_sqlalchemy, sapl_pymongo, sapl_django, sapl_fastapi, sapl_flask, sapl_tornado, sapl_fastmcp]
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
       - name: Install build
@@ -50,7 +50,7 @@ jobs:
       - name: Build ${{ matrix.package }}
         run: python -m build ./${{ matrix.package }}
       - name: Publish ${{ matrix.package }}
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
         with:
           packages-dir: ./${{ matrix.package }}/dist
           user: __token__
@@ -62,7 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Remove triggering tag
-        uses: actions/github-script@v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

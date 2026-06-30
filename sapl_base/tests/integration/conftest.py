@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
 
-SAPL_NODE_IMAGE = "ghcr.io/heutelbeck/sapl-node:4.1.0-SNAPSHOT"
+SAPL_NODE_IMAGE = "ghcr.io/heutelbeck/sapl-node:4.1.2"
 
 
 def _docker_image_present(image: str) -> bool:

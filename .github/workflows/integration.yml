@@ -2,10 +2,7 @@ name: Integration tests (SAPL Node)
 
 # The container integration tests in sapl_base/tests/integration run the PDP client
 # against a real SAPL Node. They need the sapl-node image locally; if it is absent the
-# whole suite skips. Until the 4.1 image is published to ghcr.io, build it from the
-# engine's 4.1.0 branch with the same commands the engine CI uses. Once
-# ghcr.io/heutelbeck/sapl-node:4.1.0 is public, replace the engine checkout and the two
-# build steps with a single `docker pull` of that tag.
+# whole suite skips. The image is the published release pulled from ghcr.io.
 
 on:
   push:
@@ -24,33 +21,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out sapl-python
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Check out SAPL engine (4.1.0 branch)
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          repository: heutelbeck/sapl-policy-engine
-          ref: 4.1.0
-          path: sapl-policy-engine
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-
-      - name: Build SAPL Node image (ghcr.io/heutelbeck/sapl-node:4.1.0-SNAPSHOT)
-        working-directory: sapl-policy-engine
-        run: |
-          mvn -U -B install -pl sapl-node -am -Dmaven.test.skip=true
-          mvn -B spring-boot:build-image -pl sapl-node -Dmaven.test.skip=true
+      - name: Pull SAPL Node image
+        run: docker pull ghcr.io/heutelbeck/sapl-node:4.1.2
 
       # The ITs drive a wire protocol against a Java Node, so they are largely Python-version
       # independent. Run them on the ceiling of the supported range only (newest asyncio is
       # the one place version drift bites the transport); the 3.12 floor is covered by tests.yml.
       - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.13'
 
