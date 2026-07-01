@@ -55,6 +55,10 @@ jobs:
           packages-dir: ./${{ matrix.package }}/dist
           user: __token__
           password: ${{ secrets.PYPI_TOKEN }}
+          # Make the release idempotent: a re-run after a partial publish (or a
+          # transient failure part-way through the matrix) skips the versions that
+          # already uploaded and publishes only the missing ones.
+          skip-existing: true
 
   remove-on-failure:
     if: ${{ failure() }}
