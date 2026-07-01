@@ -33,6 +33,9 @@ jobs:
   release:
     needs: run-tests
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     strategy:
       max-parallel: 1
       matrix:
@@ -53,8 +56,9 @@ jobs:
         uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
         with:
           packages-dir: ./${{ matrix.package }}/dist
-          user: __token__
-          password: ${{ secrets.PYPI_TOKEN }}
+          # Trusted Publishing (OIDC): no token, and PEP 740 attestations are
+          # generated. Requires the id-token: write permission above and a
+          # Trusted Publisher configured for each package on PyPI.
           # Make the release idempotent: a re-run after a partial publish (or a
           # transient failure part-way through the matrix) skips the versions that
           # already uploaded and publishes only the missing ones.
